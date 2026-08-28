@@ -1,0 +1,31 @@
+{
+  "RecordCountInfo": {
+    "SubdomainCount": 2,
+    "TotalCount": 2,
+    "ListCount": 2
+  },
+  "RecordList": [
+    {
+      "RecordId": 556507778,
+      "Value": "f1g1ns1.dnspod.net.",
+      "Status": "ENABLE",
+      "Name": "@",
+      "Line": "默认",
+      "LineId": "0",
+      "Type": "NS",
+      "TTL": 86400,
+      "MX": 0,
+      "Remark": ""
+    },
+    {
+      "RecordId": 556507779,
+      "Value": "1.2.3.4",
+      "Status": "DISABLE",
+      "Name": "www",
+      "Line": "默认",
+      "Type": "A",
+      "TTL": 600,
+      "MX": 0
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "DomainCountInfo": {
+    "AllTotal": 35,
+    "DomainTotal": 1,
+    "ErrorTotal": 28,
+    "VipTotal": 4
+  },
+  "DomainList": [
+    {
+      "CNAMESpeedup": "DISABLE",
+      "CreatedOn": "2021-05-06 20:40:39",
+      "DNSStatus": "DNSERROR",
+      "DomainId": 12614766,
+      "EffectiveDNS": ["ns3.dnsv5.com", "ns4.dnsv5.com"],
+      "Grade": "DP_ULTRA",
+      "GradeTitle": "尊享版",
+      "GroupId": 1,
+      "Name": "dnspod.com",
+      "Punycode": "dnspod.com",
+      "RecordCount": 12,
+      "Remark": "prod",
+      "Status": "ENABLE",
+      "TTL": 600,
+      "VipEndAt": "2024-01-16 15:56:31"
+    }
+  ]
+}

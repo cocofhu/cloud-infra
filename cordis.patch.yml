@@ -1,0 +1,6 @@
+- insert:
+    - id: cloud-infra
+      name: '@cocofhu/cloud-infra'
+      config:
+        maxResults: 12
+        skipConfirm: false
