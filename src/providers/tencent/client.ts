@@ -89,3 +89,23 @@ export function dnspodCall<T>(
     fetchImpl: opts.fetchImpl,
   })
 }
+
+export function sslCall<T>(
+  action: string,
+  payload: unknown,
+  creds: { secretId: string; secretKey: string },
+  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch },
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'ssl',
+    host: 'ssl.tencentcloudapi.com',
+    version: '2019-12-05',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+  })
+}

@@ -28,10 +28,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书. Pass kind=domain for domains. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/SSL/我的证书. Pass kind=domain for domains. Pass kind=cert for 腾讯云 SSL 证书. Default kind is domain. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain or auto.' },
+      query: { type: 'string', description: 'Keyword such as example.com or certificate id. Empty lists all.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cert or auto. 查证书必须传 kind=cert。' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
@@ -79,9 +79,10 @@ export function apply(ctx: Context, config: Config): void {
         const kinds = supportedKinds().join(', ') || 'domain'
         return [
           `Cloud domains / DNS / 解析 / DNSPod / 证书: call ONLY cloud_infra_query. Never web_search.`,
+          `查证书 / SSL / 我的证书: pass kind=cert. 未传 kind 仍默认 domain.`,
           `Available modules: ${titles}. kind values: ${kinds}.`,
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
-          'After the table appears, one or two short sentences. Do not print secrets or full record dumps.',
+          'After the table appears, one or two short sentences. Click 证书 ID for full detail. Do not print secrets, PEM, or send users to settings.',
         ].join(' ')
       },
     })
@@ -169,6 +170,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         provider: String(body.provider || ''),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
+        group: body.group != null ? String(body.group) : '',
       }, cfg)
       return sendJson(res, 200, { ok: true, ...result })
     }
