@@ -7,89 +7,87 @@ window.__ModuleLoader__.load({
 
     const CSS = `
 .ci-root,.ci-tool{font-family:inherit;color:var(--dsw-alias-label-primary);width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:2px 0 6px}
-.ci-panel{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;background:var(--dsw-alias-bg-layer-3,#fff);overflow:hidden;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
-.ci-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;min-width:0;flex-wrap:wrap}
+.ci-panel{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);overflow:hidden;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.ci-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;min-width:0;flex-wrap:wrap}
 .ci-bar-left{display:flex;align-items:baseline;gap:8px;min-width:0}
 .ci-bar-title{font-size:14px;font-weight:650;line-height:22px;color:var(--dsw-alias-label-primary)}
-.ci-bar-count{color:var(--dsw-alias-label-tertiary,#6b7280);font-size:12px}
-.ci-search-wrap{position:relative;width:min(260px,100%);flex:none}
-.ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption,#9ca3af);pointer-events:none}
-.ci-search{width:100%;height:32px;border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;padding:0 28px 0 32px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-1,#fff);color:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none}
+.ci-bar-count{color:var(--dsw-alias-label-tertiary);font-size:12px}
+.ci-search-wrap{position:relative;width:min(220px,100%);flex:none}
+.ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption);pointer-events:none}
+.ci-search{width:100%;height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 28px 0 32px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none}
 .ci-search::-webkit-search-cancel-button,.ci-search::-webkit-search-decoration{appearance:none;-webkit-appearance:none;display:none}
-.ci-search:focus{outline:none;border-color:var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb) 16%,transparent)}
+.ci-search:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-search-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;line-height:1}
-.ci-search-x:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.06));color:var(--dsw-alias-label-primary)}
-.ci-list{background:var(--dsw-alias-bg-layer-1,#fff);border-top:1px solid var(--dsw-alias-border-l1,#f3f4f6);overflow:auto;width:100%;min-width:0}
-.ci-list.busy{opacity:.65;pointer-events:none}
-.ci-row{display:grid;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--dsw-alias-border-l1,#f3f4f6);min-width:0;box-sizing:border-box}
-.ci-row.head{background:var(--dsw-alias-bg-layer-2,rgba(15,23,42,.03));color:var(--dsw-alias-label-tertiary,#6b7280);font-size:12px;font-weight:500;padding:8px 14px}
+.ci-search-x:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.ci-list{border-top:1px solid var(--dsw-alias-border-l1);overflow:auto;width:100%;min-width:0}
+.ci-row{display:grid;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);min-width:0;box-sizing:border-box}
+.ci-row.head{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:500;padding:8px 14px}
 .ci-row:last-child{border-bottom:0}
-.ci-row:not(.head):hover{background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.04))}
-.ci-cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary,#4b5563)}
-.ci-row.head .ci-cell{color:var(--dsw-alias-label-tertiary,#6b7280)}
+.ci-row:not(.head):hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary)}
+.ci-row.head .ci-cell{color:var(--dsw-alias-label-tertiary)}
 .ci-cell.num{font-variant-numeric:tabular-nums}
-.ci-name{font-weight:500;color:var(--dsw-alias-label-primary);background:none;border:0;padding:0;cursor:pointer;font:inherit;font-size:13px;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ci-name:hover{color:var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb)}
-.ci-ops{display:flex;align-items:center;gap:12px}
-.ci-link{background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb)}
+.ci-name{font-weight:550;color:var(--dsw-alias-label-primary);background:none;border:0;padding:0;cursor:pointer;font:inherit;font-size:13px;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-name:hover{color:var(--dsw-alias-brand-primary)}
+.ci-ops{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.ci-link{background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-brand-primary)}
 .ci-link:hover{text-decoration:underline}
 .ci-link:disabled{opacity:.45;cursor:wait;text-decoration:none}
-.ci-link.danger{color:var(--dsw-alias-state-error-primary,#b91c1c)}
+.ci-link.danger{color:var(--dsw-alias-state-error-primary)}
 .ci-status{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px}
-.ci-dot{display:inline-block;width:6px;height:6px;min-width:6px;min-height:6px;border-radius:50%;flex:none;overflow:hidden}
-.ci-dot.enable{background:#00a870}
-.ci-dot.pause{background:#e37318}
-.ci-dot.error{background:#d54941}
-.ci-dot.unknown{background:#9ca3af}
-.ci-empty{padding:36px 16px;text-align:center;color:var(--dsw-alias-label-caption,#9ca3af);font-size:13px;background:var(--dsw-alias-bg-layer-1,#fff);border-top:1px solid var(--dsw-alias-border-l1,#f3f4f6)}
-.ci-footbar{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:1px solid var(--dsw-alias-border-l1,#f3f4f6);background:var(--dsw-alias-bg-layer-1,#fff)}
-.ci-page{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;font-size:12px;color:var(--dsw-alias-label-tertiary,#6b7280);flex-wrap:wrap}
+.ci-dot{display:inline-block;width:6px;height:6px;min-width:6px;min-height:6px;border-radius:50%;flex:none;overflow:hidden;background:var(--dsw-alias-state-success-primary)}
+.ci-dot.enable{background:var(--dsw-alias-state-success-primary)}
+.ci-dot.pause{background:var(--dsw-alias-state-warn-label)}
+.ci-dot.error{background:var(--dsw-alias-state-error-primary)}
+.ci-dot.unknown{background:var(--dsw-alias-label-caption)}
+.ci-empty{padding:36px 16px;text-align:center;color:var(--dsw-alias-label-caption);font-size:13px;border-top:1px solid var(--dsw-alias-border-l1)}
+.ci-footbar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-tertiary);font-size:12px}
+.ci-page{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;font-size:12px;color:var(--dsw-alias-label-tertiary);flex-wrap:wrap}
 .ci-page-btns{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.ci-page-btn{min-width:28px;height:28px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2,#e5e7eb);background:var(--dsw-alias-bg-layer-3,#fff);border-radius:8px;cursor:pointer;font:inherit;color:inherit}
-.ci-page-btn:hover:not(:disabled):not(.active){border-color:var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb);color:var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb)}
-.ci-page-btn.active{background:var(--dsw-alias-button-primary-fill,#2563eb);color:var(--dsw-alias-label-primary-foreground,#fff);border-color:transparent}
+.ci-page-btn{min-width:28px;height:28px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;cursor:pointer;font:inherit;color:inherit}
+.ci-page-btn:hover:not(:disabled):not(.active){border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}
+.ci-page-btn.active{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border-color:transparent}
 .ci-page-btn:disabled{opacity:.4;cursor:default}
 .ci-hint{color:var(--dsw-alias-label-caption);font-size:12px;line-height:18px;margin:0 0 10px}
-.ci-badge{display:inline-block;margin-right:6px;padding:1px 6px;border-radius:999px;background:var(--dsw-alias-markdown-tag,#f3f4f6);font-size:10px;color:var(--dsw-alias-label-secondary)}
+.ci-badge{display:inline-block;margin-right:6px;padding:1px 6px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);font-size:10px;color:var(--dsw-alias-label-secondary)}
 .ci-st{font-size:11px;padding:1px 6px;border-radius:999px}
-.ci-st.enable{background:var(--dsw-alias-state-success-tertiary,#ecfdf5);color:var(--dsw-alias-state-success-primary,#047857)}
-.ci-st.pause{background:var(--dsw-alias-state-warn-tertiary,#fff7ed);color:var(--dsw-alias-state-warn-label,#c2410c)}
-.ci-st.error{background:var(--dsw-alias-interactive-bg-hover-danger,#fef2f2);color:var(--dsw-alias-state-error-primary,#b91c1c)}
-.ci-foot{color:var(--dsw-alias-label-caption,#9ca3af);font-size:11px;line-height:16px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ci-overlay{position:fixed;inset:0;z-index:2147483000;background:var(--dsw-alias-bg-mask-3,rgba(15,23,42,.48));display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box}
-.ci-drawer{position:relative;width:min(840px,100%);height:min(86vh,860px);max-height:min(86vh,860px);margin:0 auto;background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(15,23,42,.28)}
-.ci-close{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-3);cursor:pointer;font-size:18px;z-index:2;color:var(--dsw-alias-label-secondary)}
-.ci-close:hover{background:var(--dsw-alias-interactive-bg-hover,#f3f4f6)}
-.ci-head{padding:18px 48px 16px 18px;border-bottom:1px solid var(--dsw-alias-border-l1);flex-shrink:0}
-.ci-head h2{margin:0 0 6px;font-size:18px;line-height:1.35}
-.ci-body{flex:1;min-height:0;overflow:auto;padding:12px 18px 20px}
-.ci-chips{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 16px}
-.ci-chip{font-size:12px;padding:5px 8px;border-radius:7px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-caption)}
+.ci-st.enable{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
+.ci-st.pause{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
+.ci-st.error{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-label-primary-foreground)}
+.ci-crumb{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-back{height:28px;padding:0 10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:8px;cursor:pointer;font:inherit;color:inherit}
+.ci-back:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-head-t{font-weight:650;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 4px}
+.ci-chip{font-size:12px;padding:4px 8px;border-radius:7px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-caption)}
 .ci-chip b{color:var(--dsw-alias-label-primary);margin-left:4px;font-weight:600}
-.ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
+.ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
 .ci-sec-t{font-size:13px;font-weight:650}
 .ci-table-wrap{width:100%;overflow:auto}
-.ci-table{width:100%;min-width:560px;border-collapse:collapse;font-size:13px}
-.ci-table th,.ci-table td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--dsw-alias-border-l1);vertical-align:middle}
+.ci-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
+.ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle}
 .ci-table th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px}
 .ci-table td{word-break:break-all;color:var(--dsw-alias-label-secondary)}
 .ci-table td.ci-ops-cell{white-space:nowrap;word-break:normal}
-.ci-table tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.04))}
-.ci-rec-page{margin-top:10px;padding-top:4px}
+.ci-table tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-rec-page{margin:0}
 .ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
 .ci-mini.primary{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border-color:transparent}
 .ci-mini.danger{color:var(--dsw-alias-state-error-primary)}
+.ci-mini:disabled{opacity:.4;cursor:default}
 .ci-actions{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
-.ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;margin:8px 0}
-.ci-load{display:flex;align-items:center;justify-content:center;padding:28px;color:var(--dsw-alias-label-caption)}
-.ci-modal-mask{position:fixed;inset:0;z-index:2147483645;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(16,28,36,.42)}
-.ci-modal{width:min(420px,100%);background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2);border-radius:14px;padding:18px}
+.ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;margin:8px 14px}
+.ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
+.ci-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:ci-spin .7s linear infinite;vertical-align:-1px;margin-right:6px}
+@keyframes ci-spin{to{transform:rotate(360deg)}}
+.ci-modal-mask{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--dsw-alias-bg-mask-3);box-sizing:border-box}
+.ci-modal-mask.stacked{z-index:41}
+.ci-modal{width:min(400px,100%);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:14px;padding:16px;box-shadow:var(--dsw-alias-shadow);box-sizing:border-box}
 .ci-modal h3{margin:0 0 8px;font-size:16px}
-.ci-modal p{margin:0 0 14px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.55}
+.ci-modal p{margin:0 0 12px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.55}
 .ci-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .ci-cfg-item{list-style:none;margin:0;padding:0;min-width:0}
-.ci-cfg{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:12px;overflow:hidden;box-sizing:border-box;width:100%;min-width:0}
-.ci-cfg[open]{background:var(--dsw-alias-bg-layer-2)}
+.ci-cfg{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:12px;overflow:hidden;box-sizing:border-box;width:100%;min-width:0}
 .ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:14px 16px;box-sizing:border-box;min-width:0}
 .ci-cfg-h::-webkit-details-marker,.ci-cfg-h::marker{display:none;content:none}
 .ci-cfg-t{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
@@ -101,18 +99,19 @@ window.__ModuleLoader__.load({
 .ci-cfg-f{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--dsw-alias-border-l1)}
 .ci-cfg-f:first-child{border-top:0}
 .ci-cfg-f label{font-size:13px;font-weight:500;color:var(--dsw-alias-label-secondary)}
-.ci-cfg-f input[type=text],.ci-cfg-f input[type=password],.ci-cfg-f input[type=number]{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);height:34px;font:inherit;border-radius:8px;padding:0 12px;font-size:13px}
+.ci-cfg-f input[type=text],.ci-cfg-f input[type=password],.ci-cfg-f input[type=number]{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);height:34px;font:inherit;border-radius:8px;padding:0 12px;font-size:13px}
+.ci-cfg-f input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-cfg-hint{margin:0;color:var(--dsw-alias-label-caption);font-size:12px}
 .ci-cfg-src{display:flex;flex-wrap:wrap;gap:10px 16px}
 .ci-cfg-src label{display:flex;gap:6px;align-items:center;font-weight:400;cursor:pointer}
 .ci-cfg-mod-hint{margin:0 0 8px;color:var(--dsw-alias-label-caption);font-size:12px;line-height:1.5;font-weight:400}
 .ci-cfg-mod-q{width:100%;height:34px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font:inherit;font-size:13px;box-sizing:border-box;margin-bottom:8px;appearance:none;-webkit-appearance:none}
 .ci-cfg-mod-q::-webkit-search-cancel-button,.ci-cfg-mod-q::-webkit-search-decoration{appearance:none;-webkit-appearance:none;display:none}
-.ci-cfg-mod-q:focus{outline:none;border-color:var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb)}
+.ci-cfg-mod-q:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-cfg-mod-list{max-height:196px;overflow-y:auto;overflow-x:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-3);padding:4px 0}
 .ci-cfg-mod-row{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;font-size:13px;font-weight:400;color:var(--dsw-alias-label-primary);min-width:0;margin:0}
-.ci-cfg-mod-row:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.04))}
-.ci-cfg-mod-row input{accent-color:var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb);width:15px;height:15px;flex:none}
+.ci-cfg-mod-row:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-cfg-mod-row input{accent-color:var(--dsw-alias-brand-primary);width:15px;height:15px;flex:none}
 .ci-cfg-mod-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
 .ci-cfg-mod-empty{padding:8px 12px;color:var(--dsw-alias-label-caption);font-size:13px}
 .ci-cfg-mod-meta{margin-top:6px;color:var(--dsw-alias-label-caption);font-size:12px;font-weight:400}
@@ -120,8 +119,9 @@ window.__ModuleLoader__.load({
 .ci-cfg-save{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border:1px solid transparent;border-radius:8px;padding:5px 14px;font:inherit;cursor:pointer}
 .ci-cfg-disc{background:var(--dsw-alias-button-elevated-fill);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);border-radius:8px;padding:5px 14px;font:inherit;cursor:pointer}
 .ci-cfg-save:disabled,.ci-cfg-disc:disabled{opacity:.4;cursor:default}
-.ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 10px}
-.ci-field input,.ci-field select{height:34px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:inherit;padding:0 10px;font:inherit}
+.ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
+.ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
+.ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -145,6 +145,8 @@ window.__ModuleLoader__.load({
     } catch { /* overlay still works without portal */ }
 
     const PLUGIN_SCRIPT_PATH = "/plugins/@cocofhu/cloud-infra/client.js";
+    const CONFIG_EVENT = "cloud-infra-config";
+    const SECRET_RE = /AKID[0-9A-Za-z]{8,}|LTAI[0-9A-Za-z]{8,}|sk-[A-Za-z0-9]{16,}|-----BEGIN |\bsecret(?:id|key)\b\s*[:=]/i;
 
     function prefixFromPluginUrl(src) {
       try {
@@ -174,6 +176,14 @@ window.__ModuleLoader__.load({
     function pluginUrl(path) {
       const suffix = path.startsWith("/") ? path : "/" + path;
       return sitePrefix() + suffix;
+    }
+
+    function publicErrorMessage(err) {
+      const raw = err instanceof Error ? err.message : String(err ?? "");
+      const message = raw.replace(/\s+/g, " ").trim();
+      if (!message) return "云厂商请求失败";
+      if (SECRET_RE.test(message)) return "云厂商请求失败";
+      return message;
     }
 
     async function api(method, payload) {
@@ -259,6 +269,10 @@ window.__ModuleLoader__.load({
       );
     }
 
+    function Spin() {
+      return h("span", { className: "ci-spin", "aria-hidden": "true" });
+    }
+
     function inferColumns(item) {
       if (Array.isArray(item && item.columns) && item.columns.length) return item.columns;
       const out = [];
@@ -312,10 +326,7 @@ window.__ModuleLoader__.load({
     function StatusCell({ status }) {
       if (!status) return h("span", null, "-");
       return h("span", { className: "ci-status" },
-        h("span", {
-          className: "ci-dot " + status,
-          style: { width: 6, height: 6, display: "inline-block", borderRadius: "50%", flex: "none" },
-        }),
+        h("span", { className: "ci-dot " + status }),
         statusText(status),
       );
     }
@@ -338,45 +349,47 @@ window.__ModuleLoader__.load({
 
     function Pager({ total, page, pages, busy, onPage }) {
       if (!total && pages <= 1) return null;
-      return h("div", { className: "ci-page" },
-        h("span", null, `共 ${total} 条`),
-        pages > 1 ? h("div", { className: "ci-page-btns" },
-          h("button", {
-            type: "button",
-            className: "ci-page-btn",
-            disabled: busy || page <= 1,
-            onClick: () => onPage(page - 1),
-          }, "上一页"),
-          pageWindow(page, pages).map((item, idx) => item === "..."
-            ? h("span", { key: "e" + idx }, "...")
-            : h("button", {
-              key: item,
+      return h("div", { className: "ci-footbar" },
+        h("div", { className: "ci-page" },
+          h("span", null, `共 ${total} 条`),
+          pages > 1 ? h("div", { className: "ci-page-btns" },
+            h("button", {
               type: "button",
-              className: "ci-page-btn" + (item === page ? " active" : ""),
-              disabled: busy || item === page,
-              onClick: () => onPage(item),
-            }, String(item))),
-          h("button", {
-            type: "button",
-            className: "ci-page-btn",
-            disabled: busy || page >= pages,
-            onClick: () => onPage(page + 1),
-          }, "下一页"),
-        ) : null,
+              className: "ci-page-btn",
+              disabled: busy || page <= 1,
+              onClick: () => onPage(page - 1),
+            }, "上一页"),
+            pageWindow(page, pages).map((item, idx) => item === "..."
+              ? h("span", { key: "e" + idx }, "...")
+              : h("button", {
+                key: item,
+                type: "button",
+                className: "ci-page-btn" + (item === page ? " active" : ""),
+                disabled: busy || item === page,
+                onClick: () => onPage(item),
+              }, String(item))),
+            h("button", {
+              type: "button",
+              className: "ci-page-btn",
+              disabled: busy || page >= pages,
+              onClick: () => onPage(page + 1),
+            }, "下一页"),
+          ) : null,
+        ),
       );
     }
 
-    function ResourceTable({ items, pendingId, onOpen, extraCols, showProvider, busy, emptyHint }) {
+    function ResourceTable({ items, pendingId, onOpen, extraCols, showProvider, emptyHint }) {
       extraCols = Array.isArray(extraCols) ? extraCols : [];
       const rows = Array.isArray(items) ? items.filter(Boolean) : [];
       if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "没有资源");
       const nameLabel = rows.every((row) => row.kind === "domain") ? "域名" : "名称";
       const template = [
-        "minmax(140px,1.8fr)",
+        "minmax(120px,1.7fr)",
         showProvider ? "64px" : null,
         "84px",
-        ...extraCols.map((label) => label === "记录数" ? "64px" : "minmax(72px,0.7fr)"),
-        "64px",
+        ...extraCols.map((label) => label === "记录数" ? "64px" : "minmax(72px,0.8fr)"),
+        "52px",
       ].filter(Boolean).join(" ");
       const head = [
         h("div", { key: "n", className: "ci-cell" }, nameLabel),
@@ -385,7 +398,7 @@ window.__ModuleLoader__.load({
         extraCols.map((label) => h("div", { key: label, className: "ci-cell" }, label)),
         h("div", { key: "o", className: "ci-cell" }, "操作"),
       ];
-      return h("div", { className: "ci-list" + (busy ? " busy" : "") },
+      return h("div", { className: "ci-list" },
         h("div", { className: "ci-row head", style: { gridTemplateColumns: template } }, head),
         rows.map((item) => h("div", {
           key: item.id,
@@ -415,10 +428,35 @@ window.__ModuleLoader__.load({
       );
     }
 
+    function useOverlayKeys(open, busy, onClose, capture) {
+      const box = useRef(null);
+      useEffect(() => {
+        if (!open) return;
+        const root = box.current;
+        const first = root && root.querySelector("input,button,select,textarea");
+        if (first && typeof first.focus === "function") first.focus();
+        const onKey = (e) => {
+          if (e.key !== "Escape") return;
+          if (busy) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        };
+        document.addEventListener("keydown", onKey, !!capture);
+        return () => document.removeEventListener("keydown", onKey, !!capture);
+      }, [open, busy, onClose, capture]);
+      return box;
+    }
+
     function ConfirmDialog({ open, title, text, busy, danger, onCancel, onConfirm }) {
+      const box = useOverlayKeys(open, busy, onCancel, true);
       if (!open) return null;
-      const node = h("div", { className: "ci-modal-mask", role: "dialog" },
-        h("div", { className: "ci-modal" },
+      const node = h("div", {
+        className: "ci-modal-mask stacked",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
           h("h3", null, title || "确认"),
           h("p", null, text),
           h("div", { className: "ci-modal-actions" },
@@ -448,8 +486,13 @@ window.__ModuleLoader__.load({
         for (const field of fields) out[field.key] = initial?.[field.key] || "";
         return out;
       });
-      const node = h("div", { className: "ci-modal-mask" },
-        h("div", { className: "ci-modal" },
+      const box = useOverlayKeys(true, busy, onCancel, false);
+      const node = h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
           h("h3", null, action.label),
           fields.map((field) => h("div", { className: "ci-field", key: field.key },
             h("label", null, field.label),
@@ -457,10 +500,11 @@ window.__ModuleLoader__.load({
               type: "text",
               placeholder: field.placeholder || "",
               value: draft[field.key] || "",
+              disabled: busy,
               onChange: (e) => setDraft({ ...draft, [field.key]: e.target.value }),
             }),
           )),
-          err ? h("p", { className: "ci-err" }, err) : null,
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
           h("div", { className: "ci-modal-actions" },
             h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
             h("button", {
@@ -475,7 +519,7 @@ window.__ModuleLoader__.load({
       return createPortal(node, document.body);
     }
 
-    function Drawer({ item, detail, loading, error, skipConfirm, onClose, onReload }) {
+    function DetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
       const [form, setForm] = useState(null);
       const [confirm, setConfirm] = useState(null);
       const [busy, setBusy] = useState(false);
@@ -507,122 +551,119 @@ window.__ModuleLoader__.load({
           setConfirm(null);
           await onReload();
         } catch (e) {
-          setErr(e.message || String(e));
+          setErr(publicErrorMessage(e));
         } finally {
           setBusy(false);
         }
       };
-      const request = (action, payload, text) => {
-        const must = action.confirm === "always" || (action.confirm === "default" && !skipConfirm);
+      const request = async (action, payload, text) => {
+        let skip = skipConfirm;
+        try {
+          const d = await api("meta", {});
+          skip = !!d.skipConfirm;
+          if (onSkipConfirm) onSkipConfirm(skip);
+        } catch { /* keep last known skipConfirm */ }
+        const must = action.confirm === "always" || (action.confirm === "default" && !skip);
         if (!must) return run(action, payload);
         setConfirm({ action, payload, text, danger: action.confirm === "always" });
       };
-      const node = h("div", { className: "ci-overlay", onClick: (e) => { if (e.target === e.currentTarget) onClose(); } },
-        h("div", { className: "ci-drawer" },
-          h("button", { type: "button", className: "ci-close", onClick: onClose }, "×"),
-          h("div", { className: "ci-head" },
-            h("h2", null, item.title),
-            h("div", { className: "ci-foot" },
-              h(StatusCell, { status: item.status }),
-              item.badges?.length ? " · " + item.badges.join(" · ") : "",
-            ),
-          ),
-          h("div", { className: "ci-body" },
-            loading ? h("div", { className: "ci-load" }, "加载详情…") : null,
-            !loading && error && !detail ? h("div", { className: "ci-err" }, error) : null,
-            !loading && detail ? [
-              h("div", { key: "chips", className: "ci-chips" },
-                (detail.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" },
-                  row.label,
-                  h("b", null, row.value),
-                )),
-              ),
-              h("div", { key: "sec", className: "ci-sec" },
-                h("span", { className: "ci-sec-t" }, "解析记录"),
-                h("button", {
-                  type: "button",
-                  className: "ci-mini primary",
-                  onClick: () => setForm({ action: createAction, initial: { host: "", type: "A", value: "", line: "默认", ttl: "600" } }),
-                }, createAction.label),
-              ),
-              err ? h("p", { key: "err", className: "ci-err" }, err) : null,
-              records.length ? [
-                h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
-                  h("thead", null, h("tr", null,
-                    h("th", null, "主机记录"),
-                    h("th", null, "记录类型"),
-                    h("th", null, "记录值"),
-                    showLine ? h("th", null, "线路") : null,
-                    h("th", null, "TTL"),
-                    h("th", null, "状态"),
-                    h("th", null, "操作"),
-                  )),
-                  h("tbody", null, recSlice.map((row) => h("tr", { key: row.id },
-                    h("td", null, row.host),
-                    h("td", null, row.type),
-                    h("td", null, row.value),
-                    showLine ? h("td", null, row.line || "") : null,
-                    h("td", null, row.ttl != null ? String(row.ttl) : ""),
-                    h("td", null, h(StatusCell, { status: recordStatus(row.status) })),
-                    h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
-                      h("button", {
-                        type: "button",
-                        className: "ci-link",
-                        onClick: () => setForm({
-                          action: { id: "record.update", label: "修改记录", confirm: "default" },
-                          initial: { host: row.host, type: row.type, value: row.value, line: row.line || "默认", ttl: row.ttl != null ? String(row.ttl) : "", recordId: row.id },
-                        }),
-                      }, "修改"),
-                      h("button", {
-                        type: "button",
-                        className: "ci-link",
-                        onClick: () => request(
-                          { id: "record.status", label: "启停记录", confirm: "default" },
-                          { recordId: row.id, status: String(row.status || "").toLowerCase() === "enable" ? "DISABLE" : "ENABLE" },
-                          `将 ${row.host} ${row.type} 设为 ${String(row.status || "").toLowerCase() === "enable" ? "暂停" : "启用"}？`,
-                        ),
-                      }, String(row.status || "").toLowerCase() === "enable" ? "暂停" : "启用"),
-                      h("button", {
-                        type: "button",
-                        className: "ci-link danger",
-                        onClick: () => request(
-                          { id: "record.delete", label: "删除记录", confirm: "always" },
-                          { recordId: row.id },
-                          `确定删除 ${row.host} ${row.type} ${row.value}？此操作不可撤销。`,
-                        ),
-                      }, "删除"),
-                    )),
-                  ))),
-                )),
-                h("div", { key: "rec-page", className: "ci-rec-page" }, h(Pager, {
-                  total: records.length,
-                  page: recPage,
-                  pages: recPages,
-                  busy: false,
-                  onPage: setRecPage,
-                })),
-              ] : h("div", { key: "empty", className: "ci-empty" }, "没有解析记录"),
-            ] : null,
-          ),
-        ),
-      );
       return [
-        createPortal(node, document.body),
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h("span", { className: "ci-head-t", title: item.title }, item.title),
+        ),
+        loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
+        !loading && detail ? [
+          h("div", { key: "chips", className: "ci-chips" },
+            (detail.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" },
+              row.label,
+              h("b", null, row.value),
+            )),
+          ),
+          h("div", { key: "sec", className: "ci-sec" },
+            h("span", { className: "ci-sec-t" }, "解析记录"),
+            h("button", {
+              type: "button",
+              className: "ci-mini primary",
+              onClick: () => setForm({ action: createAction, initial: { host: "", type: "A", value: "", line: "默认", ttl: "600" } }),
+            }, createAction.label),
+          ),
+          err ? h("p", { key: "err", className: "ci-err" }, err) : null,
+          records.length ? [
+            h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null,
+                h("th", null, "主机记录"),
+                h("th", null, "记录类型"),
+                h("th", null, "记录值"),
+                showLine ? h("th", null, "线路") : null,
+                h("th", null, "TTL"),
+                h("th", null, "状态"),
+                h("th", null, "操作"),
+              )),
+              h("tbody", null, recSlice.map((row) => h("tr", { key: row.id },
+                h("td", null, row.host),
+                h("td", null, row.type),
+                h("td", null, row.value),
+                showLine ? h("td", null, row.line || "") : null,
+                h("td", null, row.ttl != null ? String(row.ttl) : ""),
+                h("td", null, h(StatusCell, { status: recordStatus(row.status) })),
+                h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
+                  h("button", {
+                    type: "button",
+                    className: "ci-link",
+                    onClick: () => setForm({
+                      action: { id: "record.update", label: "修改记录", confirm: "default" },
+                      initial: { host: row.host, type: row.type, value: row.value, line: row.line || "默认", ttl: row.ttl != null ? String(row.ttl) : "", recordId: row.id },
+                    }),
+                  }, "修改"),
+                  h("button", {
+                    type: "button",
+                    className: "ci-link",
+                    onClick: () => request(
+                      { id: "record.status", label: "启停记录", confirm: "default" },
+                      { recordId: row.id, status: String(row.status || "").toLowerCase() === "enable" ? "DISABLE" : "ENABLE" },
+                      `将 ${row.host} ${row.type} 设为 ${String(row.status || "").toLowerCase() === "enable" ? "暂停" : "启用"}？`,
+                    ),
+                  }, String(row.status || "").toLowerCase() === "enable" ? "暂停" : "启用"),
+                  h("button", {
+                    type: "button",
+                    className: "ci-link danger",
+                    onClick: () => request(
+                      { id: "record.delete", label: "删除记录", confirm: "always" },
+                      { recordId: row.id },
+                      `确定删除 ${row.host} ${row.type} ${row.value}？此操作不可撤销。`,
+                    ),
+                  }, "删除"),
+                )),
+              ))),
+            )),
+            h("div", { key: "rec-page", className: "ci-rec-page" }, h(Pager, {
+              total: records.length,
+              page: recPage,
+              pages: recPages,
+              busy: false,
+              onPage: setRecPage,
+            })),
+          ] : h("div", { key: "empty", className: "ci-empty" }, "没有解析记录"),
+        ] : null,
         form ? h(RecordForm, {
+          key: "form",
           action: form.action,
           initial: form.initial,
           busy,
           err,
-          onCancel: () => setForm(null),
+          onCancel: () => { if (!busy) setForm(null); },
           onSubmit: (draft) => request(form.action, { ...form.initial, ...draft }, `确认${form.action.label}？`),
         }) : null,
         h(ConfirmDialog, {
+          key: "confirm",
           open: !!confirm,
           title: confirm?.action?.label,
           text: confirm?.text,
           busy,
           danger: !!confirm?.danger,
-          onCancel: () => setConfirm(null),
+          onCancel: () => { if (!busy) setConfirm(null); },
           onConfirm: () => confirm && run(confirm.action, confirm.payload),
         }),
       ];
@@ -651,10 +692,15 @@ window.__ModuleLoader__.load({
       const [activeQ, setActiveQ] = useState(initialQuery);
       const seq = useRef(0);
       const debounce = useRef(0);
+      const refreshSkip = () => {
+        api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
+      };
       useEffect(() => {
-        let live = true;
-        api("meta", {}).then((d) => { if (live) setSkipConfirm(!!d.skipConfirm); }).catch(() => {});
-        return () => { live = false; };
+        refreshSkip();
+        if (typeof window === "undefined") return;
+        const onCfg = () => refreshSkip();
+        window.addEventListener(CONFIG_EVENT, onCfg);
+        return () => window.removeEventListener(CONFIG_EVENT, onCfg);
       }, []);
       const toolSig = fromTool
         ? `${Number(payload?.offset) || 0}|${fromTool.map((i) => i.id).join(",")}|${payload?.total}|${payload?.hasMore}|${initialQuery}`
@@ -690,7 +736,7 @@ window.__ModuleLoader__.load({
           setActiveQ(q);
         } catch (e) {
           if (n !== seq.current) return;
-          setListErr(e.message || String(e));
+          setListErr(publicErrorMessage(e));
         } finally {
           if (n === seq.current) setListBusy(false);
         }
@@ -717,11 +763,12 @@ window.__ModuleLoader__.load({
       const openItem = async (item) => {
         setPendingId(item.id);
         setSession({ item, loading: true, detail: null });
+        refreshSkip();
         try {
           const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: item.title });
           setSession({ item, loading: false, detail });
         } catch (e) {
-          setSession({ item, loading: false, detail: null, error: e.message });
+          setSession({ item, loading: false, detail: null, error: publicErrorMessage(e) });
         } finally {
           setPendingId("");
         }
@@ -741,65 +788,65 @@ window.__ModuleLoader__.load({
       const showProvider = new Set((Array.isArray(rows) ? rows : []).map((item) => item && item.provider)).size > 1;
       return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
         h("div", { className: "ci-panel" },
-          h("div", { className: "ci-bar" },
-            h("div", { className: "ci-bar-left" },
-              h("span", { className: "ci-bar-title" }, kind === "domain" ? "域名解析" : "云资源"),
-              h("span", { className: "ci-bar-count" }, `${counted} 条`),
+          session ? h(DetailView, {
+            item: session.item,
+            detail: session.detail,
+            loading: session.loading,
+            error: session.error,
+            skipConfirm,
+            onBack: () => setSession(null),
+            onReload: reload,
+            onSkipConfirm: setSkipConfirm,
+          }) : [
+            h("div", { key: "bar", className: "ci-bar" },
+              h("div", { className: "ci-bar-left" },
+                h("span", { className: "ci-bar-title" }, kind === "domain" ? "域名解析" : "云资源"),
+                h("span", { className: "ci-bar-count" }, `${counted} 条`),
+              ),
+              h("div", { className: "ci-search-wrap" },
+                h(SearchIcon),
+                h("input", {
+                  className: "ci-search",
+                  type: "search",
+                  placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
+                  value: draftQ,
+                  onChange: (e) => onDraft(e.target.value),
+                  onKeyDown: (e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      runSearch(draftQ);
+                    }
+                  },
+                }),
+                draftQ ? h("button", {
+                  type: "button",
+                  className: "ci-search-x",
+                  disabled: listBusy,
+                  onClick: () => { setDraftQ(""); runSearch(""); },
+                  "aria-label": "清空",
+                }, "×") : null,
+              ),
             ),
-            h("div", { className: "ci-search-wrap" },
-              h(SearchIcon),
-              h("input", {
-                className: "ci-search",
-                type: "search",
-                placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
-                value: draftQ,
-                disabled: listBusy,
-                onChange: (e) => onDraft(e.target.value),
-                onKeyDown: (e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    runSearch(draftQ);
-                  }
-                },
-              }),
-              draftQ ? h("button", {
-                type: "button",
-                className: "ci-search-x",
-                disabled: listBusy,
-                onClick: () => { setDraftQ(""); runSearch(""); },
-                "aria-label": "清空",
-              }, "×") : null,
-            ),
-          ),
-          listErr ? h("div", { className: "ci-err", style: { margin: "0 14px 8px" } }, listErr) : null,
-          h(ResourceTable, {
-            items: rows,
-            pendingId,
-            onOpen: openItem,
-            extraCols,
-            showProvider,
-            busy: listBusy,
-            emptyHint: activeQ ? `没有匹配「${activeQ}」的资源` : "没有资源",
-          }),
-          h("div", { className: "ci-footbar" },
+            listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
+            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ResourceTable, {
+              key: "table",
+              items: rows,
+              pendingId,
+              onOpen: openItem,
+              extraCols,
+              showProvider,
+              emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
+            }),
             h(Pager, {
+              key: "pager",
               total: counted,
               page,
               pages: pageCount,
               busy: listBusy,
               onPage: goPage,
             }),
-          ),
+          ],
         ),
-        session ? h(Drawer, {
-          item: session.item,
-          detail: session.detail,
-          loading: session.loading,
-          error: session.error,
-          skipConfirm,
-          onClose: () => setSession(null),
-          onReload: reload,
-        }) : null,
       ));
     }
 
@@ -857,7 +904,7 @@ window.__ModuleLoader__.load({
           const next = configToDraft(d);
           setSaved(next);
           setDraft(next);
-        }).catch((e) => { if (live) setErr(e.message || String(e)); });
+        }).catch((e) => { if (live) setErr(publicErrorMessage(e)); });
         return () => { live = false; };
       }, []);
       const dirty = !!(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
@@ -886,8 +933,11 @@ window.__ModuleLoader__.load({
           const next = configToDraft(d);
           setSaved(next);
           setDraft(next);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent(CONFIG_EVENT, { detail: { skipConfirm: !!next.skipConfirm } }));
+          }
         } catch (e) {
-          setErr(e.message || String(e));
+          setErr(publicErrorMessage(e));
         } finally {
           setSaving(false);
         }
