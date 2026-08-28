@@ -122,6 +122,17 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-tabs{display:flex;gap:4px;padding:0 14px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-tab{height:34px;padding:0 10px;border:0;background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:13px;cursor:pointer;border-bottom:2px solid transparent}
+.ci-tab.active{color:var(--dsw-alias-brand-primary);border-bottom-color:var(--dsw-alias-brand-primary);font-weight:650}
+.ci-agree{display:flex;align-items:flex-start;gap:8px;margin:8px 0 0;font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary)}
+.ci-agree a{color:var(--dsw-alias-brand-primary)}
+.ci-switch{display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-brand-primary)}
+.ci-switch:disabled{opacity:.45;cursor:not-allowed}
+.ci-hint-inline{color:var(--dsw-alias-label-caption);font-size:12px;padding:8px 14px 12px}
+.ci-cart-list{margin:0 0 12px;padding:0;list-style:none}
+.ci-cart-list li{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--dsw-alias-border-l1);font-size:13px}
+.ci-modal.wide{width:min(480px,100%)}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -519,6 +530,403 @@ window.__ModuleLoader__.load({
       return createPortal(node, document.body);
     }
 
+    function extraOf(item, key, fallback) {
+      const extras = item && item.extras;
+      if (extras && extras[key] != null) return extras[key];
+      return fallback;
+    }
+
+    function barTitleOf(kind) {
+      if (kind === "registrar") return "域名注册";
+      if (kind === "my-domain") return "我的域名";
+      if (kind === "domain") return "域名解析";
+      return "云资源";
+    }
+
+    function searchPlaceholderOf(kind) {
+      if (kind === "registrar") return "请输入域名或后缀";
+      if (kind === "my-domain" || kind === "domain") return "请输入域名关键字";
+      return "搜索";
+    }
+
+    function canAddCart(item) {
+      if (!item) return false;
+      if (extraOf(item, "available", false) === true) return true;
+      return item.openLabel === "立即加购";
+    }
+
+    function actionHint(item) {
+      return extraOf(item, "actionHint", "") || item.openLabel || cellValue(item, "状态") || "已被注册";
+    }
+
+    function RegistrarTable({ items, pendingId, cartTitles, onAdd, emptyHint }) {
+      const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "请输入域名后查询");
+      const template = "minmax(120px,1.7fr) 84px minmax(72px,0.8fr) 110px";
+      return h("div", { className: "ci-list" },
+        h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
+          h("div", { className: "ci-cell" }, "域名"),
+          h("div", { className: "ci-cell" }, "状态"),
+          h("div", { className: "ci-cell" }, "价格"),
+          h("div", { className: "ci-cell" }, "操作"),
+        ),
+        rows.map((item) => {
+          const addable = canAddCart(item);
+          const inCart = (cartTitles || []).includes(item.title);
+          return h("div", { key: item.id, className: "ci-row", style: { gridTemplateColumns: template } },
+            h("div", { className: "ci-cell" }, h("span", { className: "ci-name", title: item.title, style: { cursor: "default" } }, item.title)),
+            h("div", { className: "ci-cell" }, cellValue(item, "状态") || item.description || "-"),
+            h("div", { className: "ci-cell num" }, cellValue(item, "价格") || "-"),
+            h("div", { className: "ci-cell ci-ops" }, addable
+              ? h("button", {
+                type: "button",
+                className: "ci-link",
+                disabled: pendingId === item.id || inCart,
+                onClick: () => onAdd(item),
+              }, inCart ? "已加购" : "立即加购")
+              : h("span", { className: "ci-muted", style: { color: "var(--dsw-alias-label-caption)" } }, actionHint(item))),
+          );
+        }),
+      );
+    }
+
+    function MyDomainTable({ items, pendingId, busyId, onOpen, onToggleRenew, emptyHint }) {
+      const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "没有资源");
+      const template = "minmax(120px,1.6fr) minmax(88px,0.8fr) 88px 64px";
+      return h("div", { className: "ci-list" },
+        h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
+          h("div", { className: "ci-cell" }, "域名"),
+          h("div", { className: "ci-cell" }, "到期"),
+          h("div", { className: "ci-cell" }, "自动续费"),
+          h("div", { className: "ci-cell" }, "操作"),
+        ),
+        rows.map((item) => {
+          const on = extraOf(item, "autoRenew", cellValue(item, "自动续费") === "开") === true
+            || extraOf(item, "autoRenew", false) === true
+            || cellValue(item, "自动续费") === "开";
+          return h("div", { key: item.id, className: "ci-row", style: { gridTemplateColumns: template } },
+            h("div", { className: "ci-cell" }, h("button", {
+              type: "button",
+              className: "ci-name",
+              title: item.title,
+              disabled: pendingId === item.id,
+              onClick: () => onOpen(item),
+            }, item.title)),
+            h("div", { className: "ci-cell num" }, cellValue(item, "到期") || item.expiresAt || "-"),
+            h("div", { className: "ci-cell" }, h("button", {
+              type: "button",
+              className: "ci-switch",
+              disabled: busyId === item.id,
+              onClick: () => onToggleRenew(item, !on),
+            }, on ? "开" : "关")),
+            h("div", { className: "ci-cell ci-ops" }, h("button", {
+              type: "button",
+              className: "ci-link",
+              disabled: pendingId === item.id,
+              onClick: () => onOpen(item),
+            }, pendingId === item.id ? "加载中" : "管理")),
+          );
+        }),
+      );
+    }
+
+    function CartModal({ open, items, busy, err, onClose, onRemove, onBuy }) {
+      const box = useOverlayKeys(open, busy, onClose, false);
+      if (!open) return null;
+      const node = h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onClose(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "域名购物车"),
+          items.length
+            ? h("ul", { className: "ci-cart-list" }, items.map((row) => h("li", { key: row.title },
+              h("span", null, row.title),
+              h("span", null,
+                row.price ? `¥${row.price}/年 ` : "",
+                h("button", { type: "button", className: "ci-link", disabled: busy, onClick: () => onRemove(row.title) }, "移除"),
+              ),
+            )))
+            : h("p", null, "购物车为空，不能买"),
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onClose }, "关闭"),
+            h("button", {
+              type: "button",
+              className: "ci-mini primary",
+              disabled: busy || !items.length,
+              onClick: onBuy,
+            }, busy ? "处理中" : "立即购买"),
+          ),
+        ),
+      );
+      return createPortal(node, document.body);
+    }
+
+    function SubmitOrderModal({ open, draft, setDraft, busy, err, maxPeriod, onClose, onNext }) {
+      const box = useOverlayKeys(open, busy, onClose, false);
+      if (!open || !draft) return null;
+      const years = Array.from({ length: maxPeriod }, (_, i) => i + 1);
+      const node = h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onClose(); },
+      },
+        h("div", { className: "ci-modal wide", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "提交订单"),
+          h("div", { className: "ci-field" },
+            h("label", null, "时长"),
+            h("select", {
+              value: draft.period,
+              disabled: busy,
+              onChange: (e) => setDraft({ ...draft, period: Number(e.target.value) || 1 }),
+            }, years.map((n) => h("option", { key: n, value: n }, `${n} 年`))),
+          ),
+          h("div", { className: "ci-field" },
+            h("label", null, "已实名信息模板"),
+            (draft.templates || []).length
+              ? h("select", {
+                value: draft.templateId,
+                disabled: busy,
+                onChange: (e) => setDraft({ ...draft, templateId: e.target.value }),
+              }, (draft.templates || []).map((item) => h("option", { key: item.templateId, value: item.templateId }, item.label)))
+              : h("p", { className: "ci-hint" }, "没有已实名信息模板。请先到腾讯云控制台「信息模板」完成实名。"),
+          ),
+          h("label", { className: "ci-cfg-src", style: { marginBottom: 8 } },
+            h("input", {
+              type: "checkbox",
+              checked: !!draft.autoRenew,
+              disabled: busy,
+              onChange: () => setDraft({ ...draft, autoRenew: !draft.autoRenew }),
+            }),
+            "开启自动续费",
+          ),
+          h("label", { className: "ci-cfg-src", style: { marginBottom: 8 } },
+            h("input", {
+              type: "checkbox",
+              checked: !!draft.updateLock,
+              disabled: busy,
+              onChange: () => setDraft({ ...draft, updateLock: !draft.updateLock, transferLock: draft.updateLock ? draft.transferLock : false }),
+            }),
+            "禁止更新锁",
+          ),
+          h("label", { className: "ci-cfg-src", style: { marginBottom: 8 } },
+            h("input", {
+              type: "checkbox",
+              checked: !!draft.transferLock,
+              disabled: busy || !!draft.updateLock,
+              onChange: () => { if (!draft.updateLock) setDraft({ ...draft, transferLock: !draft.transferLock }); },
+            }),
+            "禁止转移锁",
+          ),
+          h("label", { className: "ci-agree" },
+            h("input", {
+              type: "checkbox",
+              checked: !!draft.agree,
+              disabled: busy,
+              onChange: () => setDraft({ ...draft, agree: !draft.agree }),
+            }),
+            h("span", null, "我已阅读并同意", h("a", {
+              href: draft.agreementUrl || "https://cloud.tencent.com/document/product/242/8458",
+              target: "_blank",
+              rel: "noreferrer",
+            }, "《腾讯云域名注册协议》")),
+          ),
+          err ? h("p", { className: "ci-err", style: { margin: "8px 0 0" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onClose }, "返回购物车"),
+            h("button", {
+              type: "button",
+              className: "ci-mini primary",
+              disabled: busy || !(draft.templates || []).length,
+              onClick: onNext,
+            }, busy ? "处理中" : "核对信息"),
+          ),
+        ),
+      );
+      return createPortal(node, document.body);
+    }
+
+    function ReviewModal({ open, draft, cart, busy, err, onClose, onPay }) {
+      const box = useOverlayKeys(open, busy, onClose, false);
+      if (!open || !draft) return null;
+      const preview = draft.preview || {};
+      const domains = preview.domains || cart.map((row) => row.title);
+      const period = preview.period || draft.period;
+      const total = preview.total != null ? preview.total : cart.reduce((sum, row) => sum + Number(row.price || 0), 0) * Number(period || 1);
+      const node = h("div", {
+        className: "ci-modal-mask stacked",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onClose(); },
+      },
+        h("div", { className: "ci-modal wide", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "核对信息"),
+          h("p", null, `域名：${domains.join("、")}`),
+          h("p", null, `时长：${period} 年`),
+          h("p", null, `模板：${preview.templateLabel || draft.templateId || "-"}`),
+          h("p", null, `费用：¥${total}`),
+          h("p", null, "将从账户余额扣费。不支持微信 / QQ 钱包 / 网银。"),
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onClose }, "返回"),
+            h("button", {
+              type: "button",
+              className: "ci-mini primary",
+              disabled: busy,
+              onClick: onPay,
+            }, busy ? "支付中" : "账户余额支付"),
+          ),
+        ),
+      );
+      return createPortal(node, document.body);
+    }
+
+    function StatusModal({ open, result, busy, err, onClose, onRefresh }) {
+      const box = useOverlayKeys(open, busy, onClose, false);
+      if (!open) return null;
+      const node = h("div", {
+        className: "ci-modal-mask stacked",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onClose(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "操作状态"),
+          h("p", null, result?.statusLabel || "已提交"),
+          result?.reason ? h("p", null, result.reason) : null,
+          h("p", null, result?.hint || "可到我的域名卡片刷新查看。注册不是瞬时生效。"),
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            result?.logId ? h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onRefresh }, busy ? "刷新中" : "刷新状态") : null,
+            h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: onClose }, "完成"),
+          ),
+        ),
+      );
+      return createPortal(node, document.body);
+    }
+
+    function OwnedDetailView({ item, detail, loading, error, onBack, onReload }) {
+      const [tab, setTab] = useState("basic");
+      const [confirm, setConfirm] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const extras = detail?.card?.extras || item.extras || {};
+      const updateLock = extras.updateLock === true;
+      const transferLock = extras.transferLock === true;
+      const autoRenew = extras.autoRenew === true;
+      const run = async (action, payload) => {
+        setBusy(true);
+        setErr("");
+        try {
+          await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action: action.id,
+            payload: {
+              domain: item.title,
+              domainId: extras.domainId || String(item.id).split(":").pop(),
+              updateLock,
+              ...payload,
+            },
+          });
+          setConfirm(null);
+          await onReload();
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      const request = (action, payload, text) => {
+        setConfirm({ action, payload, text });
+      };
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h("span", { className: "ci-head-t", title: item.title }, item.title),
+        ),
+        loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
+        !loading && detail ? [
+          h("div", { key: "tabs", className: "ci-tabs" },
+            h("button", { type: "button", className: "ci-tab" + (tab === "basic" ? " active" : ""), onClick: () => setTab("basic") }, "基本信息"),
+            h("button", { type: "button", className: "ci-tab" + (tab === "security" ? " active" : ""), onClick: () => setTab("security") }, "域名安全"),
+          ),
+          tab === "basic" ? h("div", { key: "chips", className: "ci-chips" },
+            (detail.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" },
+              row.label,
+              h("b", null, row.value),
+            )),
+          ) : h("div", { key: "sec", style: { padding: "12px 14px" } },
+            h("p", { className: "ci-hint" }, "两锁在域名安全页签改。更新锁已开时不能改转移锁。"),
+            h("div", { className: "ci-field" },
+              h("label", { className: "ci-cfg-src" },
+                h("input", {
+                  type: "checkbox",
+                  checked: updateLock,
+                  disabled: busy,
+                  onChange: () => request(
+                    { id: "lock.update", label: "禁止更新锁", confirm: "always" },
+                    { enabled: !updateLock },
+                    `确认${updateLock ? "关闭" : "开启"} ${item.title} 禁止更新锁？`,
+                  ),
+                }),
+                "禁止更新锁",
+              ),
+            ),
+            h("div", { className: "ci-field" },
+              h("label", { className: "ci-cfg-src" },
+                h("input", {
+                  type: "checkbox",
+                  checked: transferLock,
+                  disabled: busy || updateLock,
+                  onChange: () => {
+                    if (updateLock) {
+                      setErr("更新锁已开，不能改转移锁");
+                      return;
+                    }
+                    request(
+                      { id: "lock.transfer", label: "禁止转移锁", confirm: "always" },
+                      { enabled: !transferLock },
+                      `确认${transferLock ? "关闭" : "开启"} ${item.title} 禁止转移锁？`,
+                    );
+                  },
+                }),
+                "禁止转移锁",
+              ),
+            ),
+            h("div", { className: "ci-field" },
+              h("label", { className: "ci-cfg-src" },
+                h("input", {
+                  type: "checkbox",
+                  checked: autoRenew,
+                  disabled: busy,
+                  onChange: () => request(
+                    { id: "autorenew.set", label: "自动续费", confirm: "always" },
+                    { autoRenew: !autoRenew },
+                    `确认${autoRenew ? "关闭" : "开启"} ${item.title} 自动续费？开启后将按续费价格从账户余额扣费。`,
+                  ),
+                }),
+                "自动续费",
+              ),
+            ),
+          ),
+          err ? h("p", { key: "err", className: "ci-err" }, err) : null,
+        ] : null,
+        h(ConfirmDialog, {
+          key: "confirm",
+          open: !!confirm,
+          title: confirm?.action?.label,
+          text: confirm?.text,
+          busy,
+          danger: false,
+          onCancel: () => { if (!busy) setConfirm(null); },
+          onConfirm: () => confirm && run(confirm.action, confirm.payload),
+        }),
+      ];
+    }
+
     function DetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
       const [form, setForm] = useState(null);
       const [confirm, setConfirm] = useState(null);
@@ -690,6 +1098,13 @@ window.__ModuleLoader__.load({
       const [listErr, setListErr] = useState("");
       const [draftQ, setDraftQ] = useState(initialQuery);
       const [activeQ, setActiveQ] = useState(initialQuery);
+      const [cart, setCart] = useState([]);
+      const [flow, setFlow] = useState("");
+      const [orderDraft, setOrderDraft] = useState(null);
+      const [orderBusy, setOrderBusy] = useState(false);
+      const [orderErr, setOrderErr] = useState("");
+      const [orderResult, setOrderResult] = useState(null);
+      const [listConfirm, setListConfirm] = useState(null);
       const seq = useRef(0);
       const debounce = useRef(0);
       const refreshSkip = () => {
@@ -780,15 +1195,206 @@ window.__ModuleLoader__.load({
       };
       if (running) return null;
       const errors = payload?.errors || [];
-      if (!fromTool?.length && !rows.length && !activeQ && !draftQ) {
+      const keepCard = kind === "registrar" || kind === "my-domain";
+      if (!keepCard && !fromTool?.length && !rows.length && !activeQ && !draftQ) {
         const msg = errors.map((e) => e.message).join("；");
         return msg ? h("div", { className: "ci-err" }, msg) : null;
       }
       const extraCols = columnLabels(rows);
       const showProvider = new Set((Array.isArray(rows) ? rows : []).map((item) => item && item.provider)).size > 1;
-      return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
-        h("div", { className: "ci-panel" },
-          session ? h(DetailView, {
+      const addCart = (item) => {
+        if (!canAddCart(item)) return;
+        setCart((cur) => {
+          if (cur.some((row) => row.title === item.title)) return cur;
+          return [...cur, {
+            title: item.title,
+            price: Number(extraOf(item, "price", 0) || 0),
+            id: item.id,
+            moduleId: item.moduleId,
+          }];
+        });
+        setOrderErr("");
+        setFlow("cart");
+      };
+      const removeCart = (title) => setCart((cur) => cur.filter((row) => row.title !== title));
+      const registrarId = cart[0]?.moduleId || (rows[0] && rows[0].moduleId) || "tencent.registrar";
+      const registrarRow = cart[0]?.id || (rows[0] && rows[0].id) || "";
+      const maxPeriod = cart.some((row) => /\.co$/.test(row.title) && !/\.com$/.test(row.title)) ? 5 : 10;
+      const openSubmit = async () => {
+        if (!cart.length) {
+          setOrderErr("购物车为空，不能买");
+          return;
+        }
+        setOrderBusy(true);
+        setOrderErr("");
+        try {
+          const result = await api("action", {
+            moduleId: registrarId,
+            id: registrarRow,
+            action: "templates.list",
+            payload: {},
+          });
+          const templates = result.data?.templates || [];
+          const picked = templates.find((item) => item.isDefault) || templates[0];
+          setOrderDraft({
+            period: 1,
+            templateId: picked?.templateId || "",
+            templates,
+            autoRenew: true,
+            updateLock: false,
+            transferLock: false,
+            agree: false,
+            agreementUrl: result.data?.agreementUrl || "https://cloud.tencent.com/document/product/242/8458",
+          });
+          setFlow("submit");
+        } catch (e) {
+          setOrderErr(publicErrorMessage(e));
+          setFlow("cart");
+        } finally {
+          setOrderBusy(false);
+        }
+      };
+      const orderPayload = () => ({
+        domains: cart.map((row) => row.title),
+        period: orderDraft?.period || 1,
+        templateId: orderDraft?.templateId || "",
+        autoRenew: !!orderDraft?.autoRenew,
+        updateLock: !!orderDraft?.updateLock,
+        transferLock: !!orderDraft?.transferLock,
+        agree: !!orderDraft?.agree,
+      });
+      const goReview = async () => {
+        if (!orderDraft?.agree) {
+          setOrderErr("未勾选协议，不能提交订单");
+          return;
+        }
+        setOrderBusy(true);
+        setOrderErr("");
+        try {
+          const result = await api("action", {
+            moduleId: registrarId,
+            id: registrarRow,
+            action: "order.preview",
+            payload: orderPayload(),
+          });
+          setOrderDraft({ ...orderDraft, preview: result.data, agree: true });
+          setFlow("review");
+        } catch (e) {
+          setOrderErr(publicErrorMessage(e));
+        } finally {
+          setOrderBusy(false);
+        }
+      };
+      const pay = async () => {
+        setOrderBusy(true);
+        setOrderErr("");
+        try {
+          const result = await api("action", {
+            moduleId: registrarId,
+            id: registrarRow,
+            action: "order.create",
+            payload: { ...orderPayload(), agree: true },
+          });
+          setOrderResult(result.data || { statusLabel: "已提交" });
+          setCart([]);
+          setFlow("status");
+        } catch (e) {
+          setOrderErr(publicErrorMessage(e));
+        } finally {
+          setOrderBusy(false);
+        }
+      };
+      const refreshStatus = async () => {
+        if (!orderResult?.logId) return;
+        setOrderBusy(true);
+        setOrderErr("");
+        try {
+          const result = await api("action", {
+            moduleId: registrarId,
+            id: registrarRow,
+            action: "order.status",
+            payload: { logId: orderResult.logId },
+          });
+          setOrderResult(result.data || orderResult);
+        } catch (e) {
+          setOrderErr(publicErrorMessage(e));
+        } finally {
+          setOrderBusy(false);
+        }
+      };
+      const runListAction = async () => {
+        if (!listConfirm) return;
+        setOrderBusy(true);
+        setOrderErr("");
+        try {
+          await api("action", {
+            moduleId: listConfirm.item.moduleId,
+            id: listConfirm.item.id,
+            action: listConfirm.action.id,
+            payload: listConfirm.payload,
+          });
+          setListConfirm(null);
+          await fetchList(offset, String(activeQ || "").trim());
+        } catch (e) {
+          setOrderErr(publicErrorMessage(e));
+        } finally {
+          setOrderBusy(false);
+        }
+      };
+      const emptyHint = kind === "registrar"
+        ? ((activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "请输入域名后查询")
+        : ((activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源");
+      const table = listBusy
+        ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…")
+        : kind === "registrar"
+          ? h(RegistrarTable, {
+            key: "table",
+            items: rows,
+            pendingId,
+            cartTitles: cart.map((row) => row.title),
+            onAdd: addCart,
+            emptyHint,
+          })
+          : kind === "my-domain"
+            ? h(MyDomainTable, {
+              key: "table",
+              items: rows,
+              pendingId,
+              busyId: orderBusy && listConfirm ? listConfirm.item.id : "",
+              onOpen: openItem,
+              onToggleRenew: (item, next) => setListConfirm({
+                item,
+                action: { id: "autorenew.set", label: "自动续费", confirm: "always" },
+                payload: {
+                  domainId: extraOf(item, "domainId", String(item.id).split(":").pop()),
+                  autoRenew: next,
+                },
+                text: next
+                  ? `确认开启 ${item.title} 自动续费？将按续费价格从账户余额扣费。`
+                  : `确认关闭 ${item.title} 自动续费？`,
+              }),
+              emptyHint,
+            })
+            : h(ResourceTable, {
+              key: "table",
+              items: rows,
+              pendingId,
+              onOpen: openItem,
+              extraCols,
+              showProvider,
+              emptyHint,
+            });
+      const detailNode = session
+        ? (session.item.kind === "my-domain"
+          ? h(OwnedDetailView, {
+            item: session.item,
+            detail: session.detail,
+            loading: session.loading,
+            error: session.error,
+            onBack: () => setSession(null),
+            onReload: reload,
+          })
+          : h(DetailView, {
             item: session.item,
             detail: session.detail,
             loading: session.loading,
@@ -797,18 +1403,27 @@ window.__ModuleLoader__.load({
             onBack: () => setSession(null),
             onReload: reload,
             onSkipConfirm: setSkipConfirm,
-          }) : [
+          }))
+        : null;
+      return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
+        h("div", { className: "ci-panel" },
+          detailNode || [
             h("div", { key: "bar", className: "ci-bar" },
               h("div", { className: "ci-bar-left" },
-                h("span", { className: "ci-bar-title" }, kind === "domain" ? "域名解析" : "云资源"),
+                h("span", { className: "ci-bar-title" }, barTitleOf(kind)),
                 h("span", { className: "ci-bar-count" }, `${counted} 条`),
+                kind === "registrar" ? h("button", {
+                  type: "button",
+                  className: "ci-link",
+                  onClick: () => { setOrderErr(""); setFlow("cart"); },
+                }, `购物车${cart.length ? `(${cart.length})` : ""}`) : null,
               ),
               h("div", { className: "ci-search-wrap" },
                 h(SearchIcon),
                 h("input", {
                   className: "ci-search",
                   type: "search",
-                  placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
+                  placeholder: searchPlaceholderOf(kind),
                   value: draftQ,
                   onChange: (e) => onDraft(e.target.value),
                   onKeyDown: (e) => {
@@ -828,15 +1443,8 @@ window.__ModuleLoader__.load({
               ),
             ),
             listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
-            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ResourceTable, {
-              key: "table",
-              items: rows,
-              pendingId,
-              onOpen: openItem,
-              extraCols,
-              showProvider,
-              emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
-            }),
+            orderErr && !flow ? h("div", { key: "oerr", className: "ci-err" }, orderErr) : null,
+            table,
             h(Pager, {
               key: "pager",
               total: counted,
@@ -847,6 +1455,51 @@ window.__ModuleLoader__.load({
             }),
           ],
         ),
+        h(CartModal, {
+          open: flow === "cart",
+          items: cart,
+          busy: orderBusy,
+          err: orderErr,
+          onClose: () => { if (!orderBusy) setFlow(""); },
+          onRemove: removeCart,
+          onBuy: openSubmit,
+        }),
+        h(SubmitOrderModal, {
+          open: flow === "submit",
+          draft: orderDraft,
+          setDraft: setOrderDraft,
+          busy: orderBusy,
+          err: orderErr,
+          maxPeriod,
+          onClose: () => { if (!orderBusy) { setFlow("cart"); setOrderErr(""); } },
+          onNext: goReview,
+        }),
+        h(ReviewModal, {
+          open: flow === "review",
+          draft: orderDraft,
+          cart,
+          busy: orderBusy,
+          err: orderErr,
+          onClose: () => { if (!orderBusy) { setFlow("submit"); setOrderErr(""); } },
+          onPay: pay,
+        }),
+        h(StatusModal, {
+          open: flow === "status",
+          result: orderResult,
+          busy: orderBusy,
+          err: orderErr,
+          onClose: () => { if (!orderBusy) setFlow(""); },
+          onRefresh: refreshStatus,
+        }),
+        h(ConfirmDialog, {
+          open: !!listConfirm,
+          title: listConfirm?.action?.label,
+          text: listConfirm?.text,
+          busy: orderBusy,
+          danger: false,
+          onCancel: () => { if (!orderBusy) setListConfirm(null); },
+          onConfirm: runListAction,
+        }),
       ));
     }
 

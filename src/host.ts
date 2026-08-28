@@ -28,10 +28,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书. Pass kind=domain for domains. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / domain registration as a console-style chat tool card. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/注册/可注册/能不能注册/买域名/我的域名. Pass kind=domain for DNS 解析; kind=registrar to check if a name can be registered; kind=my-domain for purchased domains. After the card appears, the user searches and 立即加购 inside the card — do not send them to settings or a standalone page. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain or auto.' },
+      query: { type: 'string', description: 'Keyword such as example or example.com. Empty lists all purchased domains, or waits for in-card search on registrar.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, registrar, my-domain, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
@@ -78,8 +78,10 @@ export function apply(ctx: Context, config: Config): void {
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
         const kinds = supportedKinds().join(', ') || 'domain'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书: call ONLY cloud_infra_query. Never web_search.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / 注册 / 可注册 / 我的域名: call ONLY cloud_infra_query. Never web_search.`,
           `Available modules: ${titles}. kind values: ${kinds}.`,
+          'kind=registrar for 注册/能不能注册; kind=my-domain for 我的域名; kind=domain for DNS 解析.',
+          'The result is a chat tool card. Users search and 立即加购 inside the card. Do not send them to settings or a standalone page.',
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
           'After the table appears, one or two short sentences. Do not print secrets or full record dumps.',
         ].join(' ')

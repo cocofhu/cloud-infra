@@ -89,3 +89,24 @@ export function dnspodCall<T>(
     fetchImpl: opts.fetchImpl,
   })
 }
+
+/** 腾讯云域名注册 Domain API：domain.tencentcloudapi.com / 2018-08-08 */
+export function domainCall<T>(
+  action: string,
+  payload: unknown,
+  creds: { secretId: string; secretKey: string },
+  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch },
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'domain',
+    host: 'domain.tencentcloudapi.com',
+    version: '2018-08-08',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+  })
+}

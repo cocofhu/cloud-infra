@@ -116,7 +116,18 @@ function clamp(n: number, min: number, max: number): number {
 export function renderQuery(result: QueryResult): string {
   if (!result.items.length) {
     const err = result.errors.map((item) => item.message).join('；')
-    return err || '没有找到相关资源。'
+    if (err) return err
+    if (result.kind === 'registrar') {
+      return result.query
+        ? `没有匹配「${result.query}」的可注册结果。请用户在对话卡片顶部搜索框改关键字再查。不要引导去设置页。不要打印密钥。`
+        : '请用户在对话卡片顶部搜索框输入域名后查询。不要引导去设置页。不要打印密钥。'
+    }
+    if (result.kind === 'my-domain') {
+      return result.query
+        ? `没有匹配「${result.query}」的已购域名。请用户在对话卡片顶部搜索框清空即可恢复全部。不要引导去设置页。不要打印密钥。`
+        : '没有已购域名。请用户在对话卡片顶部搜索框筛选。不要引导去设置页。不要打印密钥。'
+    }
+    return '没有找到相关资源。'
   }
   const lines = result.items.map((item, index) => {
     const status = item.status ? ` ${item.status}` : ''
@@ -129,5 +140,11 @@ export function renderQuery(result: QueryResult): string {
     ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}，offset=${shown}。`
     : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
+  if (result.kind === 'registrar') {
+    return `可注册查询已显示为对话卡片。请用户在卡片顶部搜索框改关键字再查；可买的点「立即加购」，再走购物车、提交订单、核对信息、账户余额支付。不要引导去设置页或独立页。不要打印密钥。\n\n${lines.join('\n')}${err}`
+  }
+  if (result.kind === 'my-domain') {
+    return `我的域名已显示为对话卡片。请用户在卡片顶部搜索框筛选，点「管理」查看基本信息与域名安全。不要引导去设置页或独立页。不要打印密钥。\n\n${lines.join('\n')}${err}`
+  }
   return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} 用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。\n\n${lines.join('\n')}${err}`
 }

@@ -1,0 +1,15 @@
+{
+  "DomainInfo": {
+    "DomainId": "domain-acme1",
+    "DomainName": "acme.cn",
+    "Status": "ok",
+    "ExpirationDate": "2027-08-11",
+    "CreationDate": "2024-08-11",
+    "AutoRenew": 1,
+    "CurrentDNS": "f1g1ns1.dnspod.net f1g1ns2.dnspod.net",
+    "RealNameAuditStatus": "Approved",
+    "UpdateProhibition": true,
+    "TransferProhibition": false,
+    "BuyStatus": "ok"
+  }
+}
