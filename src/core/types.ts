@@ -46,10 +46,32 @@ export interface DnsRecord {
   remark?: string
 }
 
+export interface DirEntry {
+  kind: 'folder' | 'file'
+  name: string
+  key: string
+  size?: number
+  storageClass?: string
+  lastModified?: string
+  url?: string
+}
+
+export interface RegionOption {
+  id: string
+  label: string
+  aliases?: string[]
+}
+
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
   records?: DnsRecord[]
+  entries?: DirEntry[]
+  prefix?: string
+  region?: string
+  bucket?: string
+  hasMore?: boolean
+  nextMarker?: string
 }
 
 export interface ResourceAction {
@@ -90,9 +112,13 @@ export interface ModuleContext {
   signal?: AbortSignal
   id?: string
   title?: string
+  region?: string
+  prefix?: string
+  marker?: string
+  bucket?: string
 }
 
-export type ActionResult = { ok: true } | { ok: false; error: string }
+export type ActionResult = { ok: true; data?: Record<string, unknown> } | { ok: false; error: string }
 
 export interface ResourceModule {
   id: string
@@ -104,6 +130,7 @@ export interface ResourceModule {
   detail?: (ctx: ModuleContext) => Promise<ResourceDetail>
   execute?: (actionId: string, payload: Record<string, unknown>, ctx: ModuleContext) => Promise<ActionResult>
   actions?: ResourceAction[]
+  regions?: RegionOption[]
 }
 
 export type ProviderBucket = Record<string, string | boolean | undefined>
@@ -147,6 +174,7 @@ export interface ModuleMeta {
   implemented: boolean
   enabled: boolean
   actions?: ResourceAction[]
+  regions?: RegionOption[]
 }
 
 export interface PluginMeta {

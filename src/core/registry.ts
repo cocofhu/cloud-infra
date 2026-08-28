@@ -92,6 +92,7 @@ export function publicMeta(config: PluginConfig, source: Registry = registry): P
     implemented: module.implemented,
     enabled: isModuleEnabled(module, config),
     actions: module.actions,
+    regions: module.regions,
   }))
   return { providers, modules }
 }

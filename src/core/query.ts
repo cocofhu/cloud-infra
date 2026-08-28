@@ -17,6 +17,7 @@ export interface QueryInput {
   query?: string
   offset?: number
   limit?: number
+  region?: string
 }
 
 export async function queryResources(
@@ -81,6 +82,7 @@ export async function queryResources(
         limit,
         timeoutMs: config.timeoutMs,
         signal,
+        region: input.region,
       })
       lists.push(result.items || [])
       if (result.total != null) total += result.total
@@ -126,8 +128,11 @@ export function renderQuery(result: QueryResult): string {
   const start = result.offset || 0
   const shown = start + result.items.length
   const more = result.hasMore
-    ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}，offset=${shown}。`
+    ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}，offset=${shown}${result.kind === 'cos' && result.items[0] ? `，region 保持已选地域` : ''}。`
     : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
-  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} 用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。\n\n${lines.join('\n')}${err}`
+  const hint = result.kind === 'cos'
+    ? '用一两句话概括即可，请用户点击存储桶名称进入文件列表。不要打印密钥或签名 URL。'
+    : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
+  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
 }

@@ -28,11 +28,12 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书. Pass kind=domain for domains. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / COS buckets as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/COS/对象存储/存储桶. Pass kind=domain for domains, kind=cos for COS. For COS you MUST pass a valid official region id (e.g. ap-guangzhou); never guess or send free text. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain or auto.' },
+      query: { type: 'string', description: 'Keyword such as example.com or a bucket name. Empty lists all.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cos, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
+      region: { type: 'string', description: 'Required for kind=cos. Official COS region id such as ap-guangzhou. Do not pass Chinese names or free text.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
     },
@@ -58,6 +59,7 @@ export function apply(ctx: Context, config: Config): void {
         query: args.query != null ? String(args.query) : '',
         kind: args.kind != null ? String(args.kind) : 'domain',
         provider: args.provider != null ? String(args.provider) : '',
+        region: args.region != null ? String(args.region) : '',
         limit: args.limit as number | undefined,
         offset: args.offset as number | undefined,
       }, cfg, exec.signal))
@@ -78,10 +80,11 @@ export function apply(ctx: Context, config: Config): void {
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
         const kinds = supportedKinds().join(', ') || 'domain'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书: call ONLY cloud_infra_query. Never web_search.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / COS / 对象存储 / 存储桶: call ONLY cloud_infra_query. Never web_search.`,
           `Available modules: ${titles}. kind values: ${kinds}.`,
-          'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
-          'After the table appears, one or two short sentences. Do not print secrets or full record dumps.',
+          'kind=cos requires a valid official COS region id (e.g. ap-guangzhou). Do not call kind=cos without a selected region, and do not invent region ids.',
+          'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown (keep region for COS).',
+          'After the table appears, one or two short sentences. Do not print secrets, full record dumps, or signed COS URLs.',
         ].join(' ')
       },
     })
@@ -167,6 +170,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         query: String(body.query || ''),
         kind: String(body.kind || 'domain'),
         provider: String(body.provider || ''),
+        region: String(body.region || ''),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
       }, cfg)
@@ -178,6 +182,12 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         String(body.moduleId || ''),
         String(body.id || ''),
         String(body.title || ''),
+        {
+          region: String(body.region || ''),
+          prefix: String(body.prefix || ''),
+          marker: String(body.marker || ''),
+          bucket: String(body.bucket || ''),
+        },
       )
       return sendJson(res, 200, { ok: true, ...detail })
     }
@@ -200,7 +210,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
   }
 }
 
-async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title = '') {
+async function runDetail(
+  cfg: PluginConfig,
+  moduleId: string,
+  id: string,
+  title = '',
+  extra: { region?: string; prefix?: string; marker?: string; bucket?: string } = {},
+) {
   const { module, creds } = readyModule(cfg, moduleId, id)
   if (!module.detail) throw new Error(`${module.title} 不支持详情`)
   return module.detail({
@@ -211,6 +227,10 @@ async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title 
     timeoutMs: cfg.timeoutMs,
     id,
     title: title || undefined,
+    region: extra.region || undefined,
+    prefix: extra.prefix || undefined,
+    marker: extra.marker || undefined,
+    bucket: extra.bucket || undefined,
   })
 }
 
@@ -230,6 +250,9 @@ async function runAction(
     limit: cfg.maxResults,
     timeoutMs: cfg.timeoutMs,
     id,
+    region: typeof payload.region === 'string' ? payload.region : undefined,
+    prefix: typeof payload.prefix === 'string' ? payload.prefix : undefined,
+    bucket: typeof payload.bucket === 'string' ? payload.bucket : undefined,
   })
 }
 

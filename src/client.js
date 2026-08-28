@@ -122,6 +122,25 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-regionbar{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
+.ci-regionbar label{color:var(--dsw-alias-label-tertiary);line-height:32px;flex:none}
+.ci-combo{position:relative;width:min(280px,100%)}
+.ci-combo input{height:32px;width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;font:inherit;background:var(--dsw-alias-bg-layer-1);color:inherit;box-sizing:border-box}
+.ci-combo input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-combo-list{position:absolute;left:0;right:0;top:36px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;max-height:200px;overflow:auto;z-index:3;margin:0;padding:4px 0;list-style:none}
+.ci-combo-list li{padding:6px 10px;cursor:pointer;font-size:13px}
+.ci-combo-list li.on,.ci-combo-list li:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-brand-primary)}
+.ci-combo-id{color:var(--dsw-alias-label-tertiary);margin-left:8px;font-size:12px}
+.ci-tool-left{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ci-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:8px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);font-size:13px;color:var(--dsw-alias-label-secondary)}
+.ci-crumbs button{background:none;border:0;padding:0;font:inherit;color:var(--dsw-alias-brand-primary);cursor:pointer}
+.ci-crumbs span{color:var(--dsw-alias-label-caption)}
+.ci-file-name{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.ci-more{position:relative;display:inline-block}
+.ci-more-list{position:absolute;right:0;top:22px;min-width:140px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:4px 0;z-index:4;box-shadow:var(--dsw-alias-shadow)}
+.ci-more-list button{display:block;width:100%;text-align:left;background:none;border:0;padding:6px 12px;font:inherit;cursor:pointer;color:inherit}
+.ci-more-list button:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-more-list button.danger{color:var(--dsw-alias-state-error-primary)}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -500,7 +519,7 @@ window.__ModuleLoader__.load({
               type: "text",
               placeholder: field.placeholder || "",
               value: draft[field.key] || "",
-              disabled: busy,
+              disabled: busy || !!field.disabled,
               onChange: (e) => setDraft({ ...draft, [field.key]: e.target.value }),
             }),
           )),
@@ -669,6 +688,584 @@ window.__ModuleLoader__.load({
       ];
     }
 
+    const COS_REGION_FALLBACK = [
+      { id: "ap-beijing", label: "北京", aliases: ["bj", "beijing"] },
+      { id: "ap-shanghai", label: "上海", aliases: ["sh", "shanghai"] },
+      { id: "ap-guangzhou", label: "广州", aliases: ["gz", "guangzhou"] },
+      { id: "ap-chengdu", label: "成都", aliases: ["cd", "chengdu"] },
+      { id: "ap-chongqing", label: "重庆", aliases: ["cq", "chongqing"] },
+      { id: "ap-nanjing", label: "南京", aliases: ["nj", "nanjing"] },
+      { id: "ap-hongkong", label: "中国香港", aliases: ["hk", "hongkong", "香港"] },
+      { id: "ap-singapore", label: "新加坡", aliases: ["sg", "singapore"] },
+      { id: "ap-tokyo", label: "东京", aliases: ["jp", "tokyo"] },
+      { id: "na-ashburn", label: "弗吉尼亚", aliases: ["ashburn", "virginia"] },
+    ];
+
+    function normRegion(value) {
+      return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+    }
+
+    function regionTokens(region) {
+      const id = normRegion(region.id);
+      return [id, id.replace(/-/g, ""), id.replace(/^ap-/, ""), normRegion(region.label)]
+        .concat((region.aliases || []).map(normRegion))
+        .filter(Boolean);
+    }
+
+    function matchCosRegion(region, needle) {
+      const q = normRegion(needle);
+      if (!q) return true;
+      return regionTokens(region).some((token) => token.includes(q));
+    }
+
+    function resolveCosRegion(raw, regions) {
+      const q = normRegion(raw);
+      if (!q) return null;
+      return (regions || []).find((region) => regionTokens(region).includes(q)) || null;
+    }
+
+    function displayRegion(region) {
+      return region ? `${region.label}（${region.id}）` : "";
+    }
+
+    function formatBytes(bytes) {
+      const n = Number(bytes);
+      if (!Number.isFinite(n)) return "-";
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+      return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function storageLabel(value) {
+      const raw = String(value || "STANDARD").toUpperCase();
+      if (raw === "STANDARD") return "标准存储";
+      if (raw === "STANDARD_IA") return "低频存储";
+      if (raw === "INTELLIGENT_TIERING") return "智能分层";
+      if (raw === "ARCHIVE") return "归档存储";
+      return raw;
+    }
+
+    function prefixCrumbs(prefix) {
+      const parts = String(prefix || "").split("/").filter(Boolean);
+      const crumbs = [{ label: "根目录", prefix: "" }];
+      let acc = "";
+      for (const part of parts) {
+        acc += `${part}/`;
+        crumbs.push({ label: part, prefix: acc });
+      }
+      return crumbs;
+    }
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("读取文件失败"));
+        reader.onload = () => {
+          const text = String(reader.result || "");
+          const idx = text.indexOf(",");
+          resolve(idx >= 0 ? text.slice(idx + 1) : text);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function CosRegionCombo({ regions, input, selected, open, highlight, onInput, onPick, onOpen, onHighlight }) {
+      const items = (regions || []).filter((region) => matchCosRegion(region, input));
+      return h("div", { className: "ci-regionbar" },
+        h("label", { htmlFor: "ci-cos-region" }, "地域"),
+        h("div", { className: "ci-combo" },
+          h("input", {
+            id: "ci-cos-region",
+            type: "text",
+            placeholder: "输入地域名称或 ID 补全",
+            autoComplete: "off",
+            value: selected && !open ? displayRegion(selected) : input,
+            onChange: (e) => onInput(e.target.value),
+            onFocus: () => onOpen(true),
+            onBlur: () => setTimeout(() => onOpen(false), 150),
+            onKeyDown: (e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                onHighlight(Math.min(items.length - 1, highlight + 1));
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                onHighlight(Math.max(0, highlight - 1));
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                const hit = items[highlight] || items[0];
+                if (hit) onPick(hit);
+              } else if (e.key === "Escape") onOpen(false);
+            },
+          }),
+          open && items.length ? h("ul", { className: "ci-combo-list", role: "listbox" },
+            items.map((region, idx) => h("li", {
+              key: region.id,
+              className: idx === highlight ? "on" : "",
+              onMouseDown: (e) => { e.preventDefault(); onPick(region); },
+            }, region.label, h("span", { className: "ci-combo-id" }, region.id))),
+          ) : null,
+        ),
+      );
+    }
+
+    function CosBucketTable({ items, pendingId, onOpen, onDelete }) {
+      const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, "该地域下没有存储桶");
+      return h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+        h("thead", null, h("tr", null,
+          h("th", null, "名称"),
+          h("th", null, "地域"),
+          h("th", null, "创建时间"),
+          h("th", null, "访问权限"),
+          h("th", null, "操作"),
+        )),
+        h("tbody", null, rows.map((item) => h("tr", { key: item.id },
+          h("td", null, h("button", {
+            type: "button",
+            className: "ci-name",
+            disabled: pendingId === item.id,
+            onClick: () => onOpen(item),
+          }, item.title)),
+          h("td", null, cellValue(item, "地域") || item.description || "-"),
+          h("td", null, cellValue(item, "创建时间") || "-"),
+          h("td", null, cellValue(item, "访问权限") || "-"),
+          h("td", { className: "ci-ops-cell" }, h("button", {
+            type: "button",
+            className: "ci-link danger",
+            disabled: pendingId === item.id,
+            onClick: () => onDelete(item),
+          }, "删除")),
+        ))),
+      ));
+    }
+
+    function CosFileTable({ entries, pendingKey, moreKey, onEnter, onStat, onDownload, onMore, onRename, onPresign, onDelete }) {
+      const rows = Array.isArray(entries) ? entries : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, "当前目录为空");
+      return h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+        h("thead", null, h("tr", null,
+          h("th", null, "文件名"),
+          h("th", null, "大小"),
+          h("th", null, "存储类型"),
+          h("th", null, "最后修改时间"),
+          h("th", null, "操作"),
+        )),
+        h("tbody", null, rows.map((row) => h("tr", { key: row.key },
+          h("td", null, h("span", { className: "ci-file-name" },
+            row.kind === "folder"
+              ? h("button", { type: "button", className: "ci-name", onClick: () => onEnter(row) }, "📁 ", row.name)
+              : h("span", null, "📄 ", row.name),
+          )),
+          h("td", null, row.kind === "folder" ? "-" : formatBytes(row.size)),
+          h("td", null, row.kind === "folder" ? "-" : storageLabel(row.storageClass)),
+          h("td", null, row.kind === "folder" ? "-" : (row.lastModified || "-")),
+          h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
+            row.kind === "folder"
+              ? [
+                h("button", { key: "in", type: "button", className: "ci-link", onClick: () => onEnter(row) }, "进入"),
+                h("button", { key: "del", type: "button", className: "ci-link danger", onClick: () => onDelete(row) }, "删除"),
+              ]
+              : [
+                h("button", { key: "st", type: "button", className: "ci-link", disabled: pendingKey === row.key, onClick: () => onStat(row) }, "详情"),
+                h("button", { key: "dl", type: "button", className: "ci-link", onClick: () => onDownload(row) }, "下载"),
+                h("span", { key: "more", className: "ci-more" },
+                  h("button", { type: "button", className: "ci-link", onClick: () => onMore(moreKey === row.key ? "" : row.key) }, "更多"),
+                  moreKey === row.key ? h("div", { className: "ci-more-list" },
+                    h("button", { type: "button", onClick: () => onRename(row) }, "重命名"),
+                    h("button", { type: "button", onClick: () => onPresign(row) }, "复制临时链接"),
+                    h("button", { type: "button", className: "danger", onClick: () => onDelete(row) }, "删除"),
+                  ) : null,
+                ),
+              ],
+          )),
+        ))),
+      ));
+    }
+
+    function CosConsoleView({ payload, args, skipConfirm, onSkipConfirm }) {
+      const pageSize = Math.max(1, Number(args.limit) || 12);
+      const [regions, setRegions] = useState(COS_REGION_FALLBACK);
+      const [input, setInput] = useState("");
+      const [selected, setSelected] = useState(null);
+      const [open, setOpen] = useState(false);
+      const [highlight, setHighlight] = useState(0);
+      const [rows, setRows] = useState([]);
+      const [total, setTotal] = useState(0);
+      const [offset, setOffset] = useState(0);
+      const [hasMore, setHasMore] = useState(false);
+      const [listBusy, setListBusy] = useState(false);
+      const [listErr, setListErr] = useState("");
+      const [draftQ, setDraftQ] = useState("");
+      const [activeQ, setActiveQ] = useState("");
+      const [session, setSession] = useState(null);
+      const [pendingId, setPendingId] = useState("");
+      const [pendingKey, setPendingKey] = useState("");
+      const [moreKey, setMoreKey] = useState("");
+      const [form, setForm] = useState(null);
+      const [confirm, setConfirm] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const [stat, setStat] = useState(null);
+      const fileRef = useRef(null);
+      const seq = useRef(0);
+      useEffect(() => {
+        api("meta", {}).then((d) => {
+          const mods = Array.isArray(d.modules) ? d.modules : [];
+          const cos = mods.find((m) => m && m.kind === "cos" && Array.isArray(m.regions) && m.regions.length);
+          if (cos) setRegions(cos.regions);
+          if (onSkipConfirm) onSkipConfirm(!!d.skipConfirm);
+        }).catch(() => {});
+      }, []);
+      const seedSig = `${payload?.kind || ""}|${args.region || ""}|${(payload?.items || []).map((i) => i.id).join(",")}`;
+      useEffect(() => {
+        const hinted = resolveCosRegion(args.region, regions);
+        if (hinted) {
+          setSelected(hinted);
+          setInput(displayRegion(hinted));
+          if (payload?.kind === "cos" && Array.isArray(payload.items)) {
+            setRows(payload.items);
+            setTotal(Number(payload.total) || payload.items.length);
+            setOffset(Number(payload.offset) || 0);
+            setHasMore(!!payload.hasMore);
+          }
+        }
+      }, [seedSig, regions]);
+      const fetchBuckets = async (region, nextOffset, q) => {
+        const n = ++seq.current;
+        setListBusy(true);
+        setListErr("");
+        try {
+          const result = await api("query", {
+            kind: "cos",
+            region: region.id,
+            query: q || "",
+            offset: nextOffset,
+            limit: pageSize,
+          });
+          if (n !== seq.current) return;
+          setRows(result.items || []);
+          setTotal(Number(result.total) || (result.items || []).length);
+          setHasMore(!!result.hasMore);
+          setOffset(Number(result.offset) || nextOffset);
+          setActiveQ(q || "");
+        } catch (e) {
+          if (n !== seq.current) return;
+          setListErr(publicErrorMessage(e));
+        } finally {
+          if (n === seq.current) setListBusy(false);
+        }
+      };
+      const pickRegion = (region) => {
+        setSelected(region);
+        setInput(displayRegion(region));
+        setOpen(false);
+        setSession(null);
+        fetchBuckets(region, 0, "");
+      };
+      const onRegionInput = (value) => {
+        setInput(value);
+        setSelected(null);
+        setRows([]);
+        setTotal(0);
+        setSession(null);
+        setOpen(true);
+        setHighlight(0);
+        setListErr("");
+      };
+      const loadFiles = async (item, prefix, marker) => {
+        setPendingId(item.id);
+        setSession((cur) => ({ item, prefix, marker: marker || "", loading: true, detail: cur && cur.item?.id === item.id ? cur.detail : null }));
+        try {
+          const detail = await api("detail", {
+            moduleId: item.moduleId,
+            id: item.id,
+            title: item.title,
+            bucket: item.title,
+            region: selected?.id || args.region,
+            prefix: prefix || "",
+            marker: marker || "",
+          });
+          setSession({ item, prefix: detail.prefix || prefix || "", loading: false, detail });
+        } catch (e) {
+          setSession({ item, prefix: prefix || "", loading: false, detail: null, error: publicErrorMessage(e) });
+        } finally {
+          setPendingId("");
+        }
+      };
+      const run = async (action, extra) => {
+        if (!selected && action.id !== "bucket.create") throw new Error("缺少合法地域，请先选择地域");
+        setBusy(true);
+        setErr("");
+        try {
+          const result = await api("action", {
+            moduleId: extra.moduleId || session?.item?.moduleId || "tencent.cos",
+            id: extra.id || session?.item?.id || "",
+            action: action.id,
+            payload: {
+              region: selected?.id || extra.region,
+              bucket: extra.bucket || session?.item?.title,
+              prefix: extra.prefix != null ? extra.prefix : session?.prefix,
+              ...extra.payload,
+            },
+          });
+          setForm(null);
+          setConfirm(null);
+          setMoreKey("");
+          if (action.id === "object.stat") setStat(result.data || null);
+          else if (action.id === "object.presign" || action.id === "object.download") {
+            const url = result.data && result.data.url;
+            if (action.id === "object.download" && url && typeof window !== "undefined") window.open(url, "_blank", "noopener");
+            if (action.id === "object.presign" && url && navigator.clipboard) {
+              await navigator.clipboard.writeText(url);
+              setStat({ copied: true, expiresSec: result.data.expiresSec });
+            } else if (action.id === "object.presign") setStat({ url, expiresSec: result.data?.expiresSec });
+          } else if (session?.item) await loadFiles(session.item, session.prefix || "");
+          else if (selected) await fetchBuckets(selected, 0, activeQ);
+          return result;
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+          throw e;
+        } finally {
+          setBusy(false);
+        }
+      };
+      const request = async (action, extra, text) => {
+        let skip = skipConfirm;
+        try {
+          const d = await api("meta", {});
+          skip = !!d.skipConfirm;
+          if (onSkipConfirm) onSkipConfirm(skip);
+        } catch { /* keep */ }
+        const must = action.confirm === "always" || (action.confirm === "default" && !skip);
+        if (!must) {
+          try { await run(action, extra); } catch { /* err shown */ }
+          return;
+        }
+        setConfirm({ action, extra, text, danger: action.confirm === "always" });
+      };
+      const counted = Number(total) || rows.length;
+      const pages = Math.max(1, Math.ceil(counted / pageSize) || 1);
+      const extra = hasMore && offset + rows.length >= counted ? 1 : 0;
+      const pageCount = Math.max(pages, Math.floor(offset / pageSize) + 1 + extra);
+      const page = Math.floor(offset / pageSize) + 1;
+      const fileEntries = (session?.detail?.entries || []).filter((row) => {
+        const q = String(draftQ || "").trim().toLowerCase();
+        if (!q || session) {
+          if (session && q) return String(row.name || "").toLowerCase().includes(q);
+        }
+        return true;
+      });
+      const crumbs = prefixCrumbs(session?.prefix || session?.detail?.prefix || "");
+      return [
+        session ? h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: () => { setSession(null); setDraftQ(""); setErr(""); } }, "返回"),
+          h("span", { className: "ci-head-t" }, session.item.title),
+        ) : h(CosRegionCombo, {
+          key: "region",
+          regions,
+          input,
+          selected,
+          open,
+          highlight,
+          onInput: onRegionInput,
+          onPick: pickRegion,
+          onOpen: setOpen,
+          onHighlight: setHighlight,
+        }),
+        session ? h("div", { key: "path", className: "ci-crumbs" },
+          crumbs.map((crumb, idx) => [
+            idx ? h("span", { key: "s" + idx }, "/") : null,
+            h("button", {
+              key: crumb.prefix || "root",
+              type: "button",
+              onClick: () => loadFiles(session.item, crumb.prefix),
+            }, crumb.label),
+          ]),
+        ) : null,
+        h("div", { key: "bar", className: "ci-bar" },
+          h("div", { className: "ci-tool-left" },
+            session ? [
+              h("button", {
+                key: "up",
+                type: "button",
+                className: "ci-mini primary",
+                onClick: () => fileRef.current && fileRef.current.click(),
+              }, "上传文件"),
+              h("button", {
+                key: "folder",
+                type: "button",
+                className: "ci-mini",
+                onClick: () => setForm({ kind: "folder", title: "创建文件夹", name: "" }),
+              }, "创建文件夹"),
+              h("input", {
+                key: "file",
+                ref: fileRef,
+                type: "file",
+                style: { display: "none" },
+                onChange: async (e) => {
+                  const file = e.target.files && e.target.files[0];
+                  e.target.value = "";
+                  if (!file) return;
+                  if (file.size > 20 * 1024 * 1024) {
+                    setErr("上传文件不能超过 20MB");
+                    return;
+                  }
+                  try {
+                    const contentBase64 = await readFileAsBase64(file);
+                    await run({ id: "object.upload", label: "上传文件", confirm: "default" }, {
+                      payload: { name: file.name, contentBase64, contentType: file.type || "application/octet-stream" },
+                    });
+                  } catch { /* err shown */ }
+                },
+              }),
+            ] : h("button", {
+              type: "button",
+              className: "ci-mini primary",
+              disabled: !selected,
+              onClick: () => setForm({ kind: "bucket", title: "创建存储桶", name: "", region: selected?.id }),
+            }, "创建存储桶"),
+          ),
+          h("div", { className: "ci-search-wrap" },
+            h(SearchIcon),
+            h("input", {
+              className: "ci-search",
+              type: "search",
+              placeholder: session ? "搜索文件名" : "请输入存储桶名称",
+              value: draftQ,
+              onChange: (e) => {
+                setDraftQ(e.target.value);
+                if (!session && selected) fetchBuckets(selected, 0, e.target.value);
+              },
+            }),
+          ),
+          session ? h("button", {
+            type: "button",
+            className: "ci-mini",
+            onClick: () => loadFiles(session.item, session.prefix || ""),
+          }, "刷新") : null,
+        ),
+        err ? h("div", { key: "err", className: "ci-err" }, err) : null,
+        listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
+        !session && !selected ? h("div", { key: "need-region", className: "ci-empty" }, "请输入并选择地域，再查看该地域下的存储桶。") : null,
+        !session && selected && listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : null,
+        !session && selected && !listBusy ? h(CosBucketTable, {
+          key: "buckets",
+          items: rows,
+          pendingId,
+          onOpen: (item) => { setDraftQ(""); loadFiles(item, ""); },
+          onDelete: (item) => request(
+            { id: "bucket.delete", label: "删除", confirm: "always" },
+            { moduleId: item.moduleId, id: item.id, bucket: item.title, payload: { bucket: item.title } },
+            `确定删除空存储桶 ${item.title}？非空桶会失败。`,
+          ),
+        }) : null,
+        !session && selected ? h(Pager, {
+          key: "pager",
+          total: counted,
+          page,
+          pages: pageCount,
+          busy: listBusy,
+          onPage: (next) => fetchBuckets(selected, (next - 1) * pageSize, activeQ),
+        }) : null,
+        session && session.loading ? h("div", { key: "fload", className: "ci-load" }, h(Spin), "加载文件列表…") : null,
+        session && session.error && !session.detail ? h("div", { key: "ferr", className: "ci-err" }, session.error) : null,
+        session && !session.loading && session.detail ? h(CosFileTable, {
+          key: "files",
+          entries: fileEntries,
+          pendingKey,
+          moreKey,
+          onEnter: (row) => loadFiles(session.item, row.key),
+          onStat: async (row) => {
+            setPendingKey(row.key);
+            try {
+              await run({ id: "object.stat", label: "详情", confirm: "default" }, { payload: { key: row.key } });
+            } catch { /* err */ }
+            finally { setPendingKey(""); }
+          },
+          onDownload: (row) => run({ id: "object.download", label: "下载", confirm: "default" }, { payload: { key: row.key } }).catch(() => {}),
+          onMore: setMoreKey,
+          onRename: (row) => { setMoreKey(""); setForm({ kind: "rename", title: "重命名", name: row.name, key: row.key }); },
+          onPresign: (row) => { setMoreKey(""); run({ id: "object.presign", label: "复制临时链接", confirm: "default" }, { payload: { key: row.key } }).catch(() => {}); },
+          onDelete: (row) => {
+            setMoreKey("");
+            request(
+              { id: row.kind === "folder" ? "folder.delete" : "object.delete", label: "删除", confirm: "always" },
+              { payload: { key: row.key } },
+              row.kind === "folder"
+                ? `确定删除文件夹 ${row.name} 及其下全部对象？此操作不可撤销。`
+                : `确定删除文件 ${row.name}？此操作不可撤销。`,
+            );
+          },
+        }) : null,
+        form ? h(RecordForm, {
+          key: "form",
+          action: {
+            id: form.kind,
+            label: form.title,
+            fields: form.kind === "bucket"
+              ? [
+                { key: "name", label: "名称", placeholder: "bucket-1250000000" },
+                { key: "region", label: "所属地域", disabled: true },
+              ]
+              : [{ key: "name", label: form.kind === "rename" ? "新名称" : "名称" }],
+          },
+          initial: form.kind === "bucket" ? { name: form.name, region: displayRegion(selected) } : { name: form.name || "" },
+          busy,
+          err,
+          onCancel: () => { if (!busy) setForm(null); },
+          onSubmit: async (draft) => {
+            if (form.kind === "bucket") {
+              await request(
+                { id: "bucket.create", label: "创建存储桶", confirm: "default" },
+                { payload: { name: draft.name, region: selected?.id } },
+                `确认在 ${selected?.label || ""} 创建存储桶 ${draft.name}？创建后地域不可改。`,
+              );
+              return;
+            }
+            if (form.kind === "folder") {
+              await request(
+                { id: "folder.create", label: "创建文件夹", confirm: "default" },
+                { payload: { name: draft.name } },
+                `确认创建文件夹 ${draft.name}？`,
+              );
+              return;
+            }
+            await request(
+              { id: "object.rename", label: "重命名", confirm: "default" },
+              { payload: { key: form.key, name: draft.name } },
+              `确认重命名为 ${draft.name}？`,
+            );
+          },
+        }) : null,
+        stat ? h("div", {
+          key: "stat",
+          className: "ci-modal-mask",
+          onClick: (e) => { if (e.target === e.currentTarget) setStat(null); },
+        }, h("div", { className: "ci-modal", role: "dialog" },
+          h("h3", null, stat.copied ? "临时链接" : "详情"),
+          stat.copied ? h("p", null, `已复制到剪贴板，约 ${Math.round((stat.expiresSec || 900) / 60)} 分钟有效。`) : null,
+          stat.url && !stat.copied ? h("p", null, "链接已生成，请尽快使用，约 15 分钟有效。") : null,
+          !stat.copied && !stat.url ? ["名称", "大小", "存储类型", "修改时间", "对象地址"].map((label) => {
+            const map = { 名称: stat.name, 大小: stat.sizeLabel, 存储类型: stat.storageClass, 修改时间: stat.lastModified, 对象地址: stat.url || stat.address };
+            return h("p", { key: label }, `${label}：${map[label] || "-"}`);
+          }) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini primary", onClick: () => setStat(null) }, "关闭"),
+          ),
+        )) : null,
+        h(ConfirmDialog, {
+          key: "confirm",
+          open: !!confirm,
+          title: confirm?.action?.label,
+          text: confirm?.text,
+          busy,
+          danger: !!confirm?.danger,
+          onCancel: () => { if (!busy) setConfirm(null); },
+          onConfirm: () => confirm && run(confirm.action, confirm.extra).catch(() => {}),
+        }),
+      ];
+    }
+
     function SearchToolView(props) {
       useEffect(() => ensureCss(), []);
       const payload = pickPayload(props);
@@ -779,6 +1376,18 @@ window.__ModuleLoader__.load({
         setSession((cur) => cur ? { ...cur, detail, loading: false } : cur);
       };
       if (running) return null;
+      if (kind === "cos") {
+        return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
+          h("div", { className: "ci-panel" },
+            h(CosConsoleView, {
+              payload,
+              args,
+              skipConfirm,
+              onSkipConfirm: setSkipConfirm,
+            }),
+          ),
+        ));
+      }
       const errors = payload?.errors || [];
       if (!fromTool?.length && !rows.length && !activeQ && !draftQ) {
         const msg = errors.map((e) => e.message).join("；");
