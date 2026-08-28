@@ -1,0 +1,187 @@
+import { publicErrorMessage } from '../../../core/safe-error.js'
+import type { ModuleError, ResourceAction, ResourceStatus } from '../../../core/types.js'
+import type { TencentCallContext, TencentCreds, TencentProductCall } from '../client.js'
+
+export const INSTANCE_ACTIONS: ResourceAction[] = [
+  { id: 'instance.start', label: '开机', confirm: 'default' },
+  { id: 'instance.stop', label: '关机', confirm: 'default' },
+  { id: 'instance.reboot', label: '重启', confirm: 'default' },
+]
+
+export const POWER_ACTIONS: Record<string, string> = {
+  'instance.start': 'StartInstances',
+  'instance.stop': 'StopInstances',
+  'instance.reboot': 'RebootInstances',
+}
+
+export interface CloudRegion {
+  region: string
+  regionName: string
+}
+
+export interface RegionItem {
+  Region?: string
+  RegionName?: string
+  RegionState?: string
+}
+
+export interface ZoneItem {
+  Zone?: string
+  ZoneName?: string
+}
+
+export function consoleRegionName(name?: string, region?: string): string {
+  const raw = String(name || region || '').replace(/\(/g, '（').replace(/\)/g, '）')
+  return raw || region || ''
+}
+
+export function consoleTime(value?: string): string {
+  if (!value) return ''
+  return value.replace('T', ' ').replace(/\.\d+Z$/, '').replace(/Z$/, '')
+}
+
+export function mapInstanceState(state?: string): { status: ResourceStatus; stateLabel: string } {
+  const value = String(state || '').toUpperCase()
+  if (value === 'RUNNING') return { status: 'enable', stateLabel: '运行中' }
+  if (value === 'STOPPED') return { status: 'pause', stateLabel: '已关机' }
+  if (value === 'STARTING') return { status: 'unknown', stateLabel: '开机中' }
+  if (value === 'STOPPING') return { status: 'unknown', stateLabel: '关机中' }
+  if (value === 'REBOOTING') return { status: 'unknown', stateLabel: '重启中' }
+  if (value === 'PENDING' || value === 'LAUNCH_FAILED') return { status: 'unknown', stateLabel: '创建中' }
+  if (value === 'SHUTDOWN' || value === 'EXPIRED' || value === 'TERMINATED') return { status: 'pause', stateLabel: '待回收' }
+  return { status: 'unknown', stateLabel: value || '未知' }
+}
+
+export function powerAllowed(stateLabel: string, actionId: string): boolean {
+  if (actionId === 'instance.start') return stateLabel === '已关机'
+  if (actionId === 'instance.stop' || actionId === 'instance.reboot') return stateLabel === '运行中'
+  return false
+}
+
+export function parseInstanceRef(id: string): { moduleId: string; region: string; instanceId: string } {
+  const parts = String(id || '').split(':')
+  if (parts.length >= 3) {
+    return {
+      moduleId: parts.slice(0, -2).join(':'),
+      region: parts[parts.length - 2],
+      instanceId: parts[parts.length - 1],
+    }
+  }
+  return {
+    moduleId: parts[0] || '',
+    region: '',
+    instanceId: parts[1] || parts[0] || '',
+  }
+}
+
+export function instanceCardId(moduleId: string, region: string, instanceId: string): string {
+  return `${moduleId}:${region}:${instanceId}`
+}
+
+export function matchInstanceQuery(haystacks: Array<string | undefined>, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return haystacks.some((value) => String(value || '').toLowerCase().includes(q))
+}
+
+export function chargeTypeLabel(type?: string): string {
+  const value = String(type || '').toUpperCase()
+  if (value === 'PREPAID') return '包年包月'
+  if (value === 'POSTPAID_BY_HOUR') return '按量计费'
+  if (value === 'SPOTPAID') return '竞价实例'
+  if (value === 'CDHPAID') return 'CDH 付费'
+  return type || '-'
+}
+
+export function formatSpec(cpu?: number, memory?: number, memoryUnit = 'GB'): string {
+  if (cpu == null && memory == null) return '-'
+  const cores = cpu != null ? `${cpu}核` : ''
+  const mem = memory != null ? `${memory}${memoryUnit}` : ''
+  return [cores, mem].filter(Boolean).join(' ')
+}
+
+export function firstIp(list?: string[]): string {
+  return list?.find((item) => item && item !== '-') || ''
+}
+
+export async function listRegions(
+  call: TencentProductCall,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<CloudRegion[]> {
+  const data = await call<{ RegionSet?: RegionItem[] }>('DescribeRegions', {}, creds, opts)
+  return (data.RegionSet || [])
+    .filter((item) => item.Region && String(item.RegionState || 'AVAILABLE').toUpperCase() !== 'UNAVAILABLE')
+    .map((item) => ({
+      region: String(item.Region),
+      regionName: consoleRegionName(item.RegionName, item.Region),
+    }))
+}
+
+export async function listZones(
+  call: TencentProductCall,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+  region: string,
+): Promise<Map<string, string>> {
+  try {
+    const data = await call<{ ZoneSet?: ZoneItem[] }>('DescribeZones', {}, creds, { ...opts, region })
+    const map = new Map<string, string>()
+    for (const item of data.ZoneSet || []) {
+      if (item.Zone) map.set(item.Zone, item.ZoneName || item.Zone)
+    }
+    return map
+  } catch {
+    return new Map()
+  }
+}
+
+export async function listAllPages<T>(
+  fetchPage: (offset: number, limit: number) => Promise<{ items: T[]; total?: number }>,
+  pageSize = 100,
+  cap = 500,
+): Promise<T[]> {
+  const all: T[] = []
+  let offset = 0
+  while (all.length < cap) {
+    const { items, total } = await fetchPage(offset, pageSize)
+    all.push(...items)
+    if (!items.length) break
+    if (total != null && all.length >= total) break
+    if (items.length < pageSize) break
+    offset += items.length
+  }
+  return all.slice(0, cap)
+}
+
+export async function listAcrossRegions<T>(
+  regions: CloudRegion[],
+  load: (region: CloudRegion) => Promise<T[]>,
+  moduleId: string,
+): Promise<{ items: T[]; errors: ModuleError[] }> {
+  const bags = await Promise.all(regions.map(async (region) => {
+    try {
+      return { items: await load(region), error: undefined as ModuleError | undefined }
+    } catch (err) {
+      return {
+        items: [] as T[],
+        error: {
+          moduleId,
+          message: `${region.regionName || region.region}：${publicErrorMessage(err)}`,
+        },
+      }
+    }
+  }))
+  return {
+    items: bags.flatMap((bag) => bag.items),
+    errors: bags.map((bag) => bag.error).filter((item): item is ModuleError => !!item),
+  }
+}
+
+export function credsOf(ctx: { creds: Record<string, string> }): TencentCreds {
+  return { secretId: ctx.creds.secretId, secretKey: ctx.creds.secretKey }
+}
+
+export function optsOf(ctx: { timeoutMs: number; signal?: AbortSignal }, region?: string): TencentCallContext {
+  return { timeoutMs: ctx.timeoutMs, signal: ctx.signal, region }
+}

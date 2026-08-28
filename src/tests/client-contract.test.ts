@@ -141,6 +141,100 @@ test('g2-g3 list chrome and in-card DetailView replace fullscreen drawer', () =>
   assert.doesNotMatch(client, /2147483|86vh/)
 })
 
+test('cvm and lighthouse consoles use two skins and console Chinese status', () => {
+  const client = read('src/client.js')
+  assert.match(client, /function CvmConsole/)
+  assert.match(client, /function LhConsole/)
+  assert.match(client, /function InstanceDetailView/)
+  assert.match(client, /function MoreMenu/)
+  assert.match(client, /ID\/名称/)
+  assert.match(client, /主IPv4地址/)
+  assert.match(client, /可用区/)
+  assert.match(client, /实例类型/)
+  assert.match(client, /实例配置/)
+  assert.match(client, /实例计费模式/)
+  assert.match(client, /全部地域/)
+  assert.match(client, /搜索 ID \/ 名称 \/ IP/)
+  assert.match(client, /卡片视图/)
+  assert.match(client, /列表视图/)
+  assert.match(client, /按地域分组/)
+  assert.match(client, /运行中/)
+  assert.match(client, /已关机/)
+  assert.match(client, /"更多"/)
+  assert.match(client, /instance\.start/)
+  assert.match(client, /instance\.stop/)
+  assert.match(client, /instance\.reboot/)
+  assert.match(client, /kind === "cvm"/)
+  assert.match(client, /kind === "lighthouse"/)
+  assert.match(client, /ci-dense/)
+  assert.match(client, /min-width:980px/)
+})
+
+test('instance detail uses official groups and never renders DNS records', () => {
+  const client = read('src/client.js')
+  const start = client.indexOf('function InstanceDetailView')
+  const end = client.indexOf('function SearchToolView', start)
+  assert.ok(start > 0 && end > start)
+  const body = client.slice(start, end)
+  assert.match(body, /返回实例列表/)
+  assert.match(body, /detail\?\.groups/)
+  assert.match(body, /开机/)
+  assert.match(body, /关机/)
+  assert.match(body, /重启/)
+  assert.doesNotMatch(body, /解析记录/)
+  assert.doesNotMatch(body, /添加记录/)
+  assert.doesNotMatch(body, /ci-chips/)
+})
+
+test('settings card still has no region picker or power buttons', () => {
+  const client = read('src/client.js')
+  const start = client.indexOf('function ConfigCard')
+  assert.ok(start > 0)
+  const body = client.slice(start)
+  assert.match(body, /产品模块/)
+  assert.match(body, /SecretId|provider\.fields/)
+  assert.doesNotMatch(body, /全部地域/)
+  assert.doesNotMatch(body, /instance\.start/)
+  assert.doesNotMatch(body, /卡片视图/)
+  assert.doesNotMatch(body, /开机/)
+  assert.doesNotMatch(body, /地域多选/)
+})
+
+test('instancePower and matchLocalInstance cover console states and IP search', () => {
+  const src = read('src/client.js')
+  const powerStart = src.indexOf('function instancePower')
+  const powerEnd = src.indexOf('\n    function groupByRegion', powerStart)
+  const power = new Function('item', `${src.slice(powerStart, powerEnd)}\nreturn instancePower(item)`) as (item: {
+    status?: string
+    stateLabel?: string
+  }) => { start: boolean; stop: boolean; reboot: boolean }
+  assert.deepEqual(power({ stateLabel: '运行中', status: 'enable' }), { start: true, stop: false, reboot: false })
+  assert.deepEqual(power({ stateLabel: '已关机', status: 'pause' }), { start: false, stop: true, reboot: true })
+  assert.deepEqual(power({ stateLabel: '开机中', status: 'unknown' }), { start: true, stop: true, reboot: true })
+  const matchStart = src.indexOf('function matchLocalInstance')
+  const matchEnd = src.indexOf('\n    function actionLabel', matchStart)
+  const match = new Function('item', 'q', `${src.slice(matchStart, matchEnd)}\nreturn matchLocalInstance(item, q)`) as (
+    item: { title?: string; instanceId?: string; id?: string; privateIp?: string; publicIp?: string },
+    q: string,
+  ) => boolean
+  assert.equal(match({ title: 'api-prod', instanceId: 'ins-8k2m1a', publicIp: '43.138.9.21' }, '43.138'), true)
+  assert.equal(match({ title: 'api-prod', instanceId: 'ins-8k2m1a' }, 'lhins-'), false)
+})
+
+test('host tool kind lists domain lighthouse cvm auto and default stays domain', () => {
+  const host = read('src/host.ts')
+  assert.match(host, /kind=domain/)
+  assert.match(host, /kind=cvm/)
+  assert.match(host, /kind=lighthouse/)
+  assert.match(host, /kind=auto/)
+  assert.match(host, /default domain/)
+  assert.match(host, /查一下我的服务器/)
+  assert.match(host, /never kind=domain/)
+  assert.match(host, /args\.kind != null \? String\(args\.kind\) : 'domain'/)
+  assert.match(host, /云服务器 \/ 轻量 \/ CVM \/ 实例/)
+  assert.doesNotMatch(host, /if\s*\(.*provider\s*===\s*['"]tencent['"]/)
+})
+
 test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () => {
   const client = read('src/client.js')
   assert.match(client, /min\(400px,100%\)/)

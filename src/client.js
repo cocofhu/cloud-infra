@@ -122,6 +122,37 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-select{height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;font:inherit;background:var(--dsw-alias-bg-layer-2);color:inherit;max-width:100%}
+.ci-select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-ghost{height:30px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:8px;padding:0 10px;cursor:pointer;font:inherit;color:inherit}
+.ci-ghost.on{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}
+.ci-id{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+.ci-id-sub{color:var(--dsw-alias-label-tertiary);font-size:12px;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ci-ip{display:block;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
+.ci-scroll{width:100%;overflow:auto}
+.ci-dense{width:100%;min-width:980px;border-collapse:collapse;font-size:13px}
+.ci-dense th,.ci-dense td{text-align:left;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:top;white-space:nowrap}
+.ci-dense th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px;background:var(--dsw-alias-bg-layer-2)}
+.ci-dense tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-more{position:relative;display:inline-block}
+.ci-menu{position:absolute;right:0;top:22px;z-index:3;min-width:88px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;box-shadow:var(--dsw-alias-shadow);padding:4px 0}
+.ci-menu button{display:block;width:100%;text-align:left;padding:8px 12px;border:0;background:transparent;cursor:pointer;font:inherit;color:inherit}
+.ci-menu button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
+.ci-menu button:disabled{color:var(--dsw-alias-label-caption);cursor:default}
+.ci-group{padding:10px 14px 4px;color:var(--dsw-alias-label-tertiary);font-weight:650;background:var(--dsw-alias-bg-layer-2);border-top:1px solid var(--dsw-alias-border-l1)}
+.ci-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:12px 14px}
+.ci-card{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:12px;background:var(--dsw-alias-bg-layer-1);min-width:0}
+.ci-card-h{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.ci-card-t{font-size:14px;font-weight:650;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit;text-align:left}
+.ci-card-t:hover{color:var(--dsw-alias-brand-primary)}
+.ci-kv{margin-top:8px;color:var(--dsw-alias-label-tertiary);font-size:12px}
+.ci-kv b{color:var(--dsw-alias-label-primary);font-weight:550}
+.ci-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px;padding:0 16px 16px}
+.ci-f{color:var(--dsw-alias-label-tertiary);font-size:12px}
+.ci-f b{display:block;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:550;margin-top:2px}
+.ci-sec-t{font-size:13px;font-weight:650;padding:12px 16px 4px}
+.ci-power{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.ci-foot-note{padding:8px 14px;color:var(--dsw-alias-label-caption);font-size:12px;border-top:1px solid var(--dsw-alias-border-l1)}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -323,12 +354,55 @@ window.__ModuleLoader__.load({
       return out;
     }
 
-    function StatusCell({ status }) {
-      if (!status) return h("span", null, "-");
+    function StatusCell({ status, label }) {
+      if (!status && !label) return h("span", null, "-");
       return h("span", { className: "ci-status" },
-        h("span", { className: "ci-dot " + status }),
-        statusText(status),
+        h("span", { className: "ci-dot " + (status || "") }),
+        label || statusText(status),
       );
+    }
+
+    function isInstanceKind(kind) {
+      return kind === "cvm" || kind === "lighthouse";
+    }
+
+    function instancePower(item) {
+      const label = String((item && item.stateLabel) || "");
+      const running = label === "运行中" || (!label && item && item.status === "enable");
+      const stopped = label === "已关机" || (!label && item && item.status === "pause");
+      return {
+        start: !stopped,
+        stop: !running,
+        reboot: !running,
+      };
+    }
+
+    function groupByRegion(items) {
+      const groups = [];
+      const index = new Map();
+      for (const item of Array.isArray(items) ? items : []) {
+        const key = item.regionName || item.region || "其他地域";
+        if (!index.has(key)) {
+          index.set(key, groups.length);
+          groups.push({ region: key, items: [] });
+        }
+        groups[index.get(key)].items.push(item);
+      }
+      return groups;
+    }
+
+    function matchLocalInstance(item, q) {
+      const needle = String(q || "").trim().toLowerCase();
+      if (!needle) return true;
+      return [item.title, item.instanceId, item.id, item.privateIp, item.publicIp]
+        .some((value) => String(value || "").toLowerCase().includes(needle));
+    }
+
+    function actionLabel(id) {
+      if (id === "instance.start") return "开机";
+      if (id === "instance.stop") return "关机";
+      if (id === "instance.reboot") return "重启";
+      return id;
     }
 
     class CiBoundary extends React.Component {
@@ -669,6 +743,284 @@ window.__ModuleLoader__.load({
       ];
     }
 
+    function MoreMenu({ item, disabled, onAction }) {
+      const [open, setOpen] = useState(false);
+      const box = useRef(null);
+      const power = instancePower(item);
+      useEffect(() => {
+        if (!open) return;
+        const onDoc = (e) => {
+          if (box.current && !box.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener("click", onDoc);
+        return () => document.removeEventListener("click", onDoc);
+      }, [open]);
+      return h("div", { className: "ci-more", ref: box },
+        h("button", {
+          type: "button",
+          className: "ci-link",
+          disabled,
+          onClick: (e) => { e.stopPropagation(); setOpen(!open); },
+        }, "更多"),
+        open ? h("div", { className: "ci-menu" },
+          [
+            ["instance.start", power.start],
+            ["instance.stop", power.stop],
+            ["instance.reboot", power.reboot],
+          ].map(([id, off]) => h("button", {
+            key: id,
+            type: "button",
+            disabled: !!off,
+            onClick: () => { setOpen(false); onAction(item, id); },
+          }, actionLabel(id))),
+        ) : null,
+      );
+    }
+
+    function MainIpv4({ item }) {
+      const pri = item.privateIp || "-";
+      const pub = item.publicIp || "-";
+      return [
+        h("span", { key: "pri", className: "ci-ip" }, "内网：" + pri),
+        h("span", { key: "pub", className: "ci-ip" }, "弹性：" + pub),
+      ];
+    }
+
+    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint }) {
+      const [region, setRegion] = useState("");
+      const [q, setQ] = useState("");
+      const regions = Array.from(new Set((items || []).map((row) => row.regionName || row.region).filter(Boolean)));
+      const rows = (items || []).filter((row) => {
+        if (region && (row.regionName || row.region) !== region) return false;
+        return matchLocalInstance(row, q);
+      });
+      return [
+        h("div", { key: "bar", className: "ci-bar" },
+          h("div", { className: "ci-bar-left" },
+            h("span", { className: "ci-bar-title" }, "实例"),
+            h("select", {
+              className: "ci-select",
+              value: region,
+              onChange: (e) => setRegion(e.target.value),
+            },
+              h("option", { value: "" }, "全部地域"),
+              regions.map((name) => h("option", { key: name, value: name }, name)),
+            ),
+          ),
+          h("div", { className: "ci-search-wrap" },
+            h(SearchIcon),
+            h("input", {
+              className: "ci-search",
+              type: "search",
+              placeholder: "搜索 ID / 名称 / IP",
+              value: q,
+              onChange: (e) => setQ(e.target.value),
+            }),
+            q ? h("button", {
+              type: "button",
+              className: "ci-search-x",
+              onClick: () => setQ(""),
+              "aria-label": "清空",
+            }, "×") : null,
+          ),
+        ),
+        rows.length ? h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
+          h("thead", null, h("tr", null,
+            ["ID/名称", "状态", "可用区", "实例类型", "操作系统", "实例配置", "主IPv4地址", "实例计费模式", "操作"]
+              .map((label) => h("th", { key: label }, label)),
+          )),
+          h("tbody", null, rows.map((item) => h("tr", { key: item.id },
+            h("td", null, h("div", { className: "ci-id" },
+              h("button", {
+                type: "button",
+                className: "ci-name",
+                disabled: pendingId === item.id,
+                onClick: () => onOpen(item),
+              }, item.instanceId || item.id),
+              h("span", { className: "ci-id-sub" }, item.title),
+            )),
+            h("td", null, h(StatusCell, { status: item.status, label: item.stateLabel })),
+            h("td", null, cellValue(item, "可用区") || "-"),
+            h("td", null, cellValue(item, "实例类型") || "-"),
+            h("td", null, cellValue(item, "操作系统") || "-"),
+            h("td", null, cellValue(item, "实例配置") || "-"),
+            h("td", null, h(MainIpv4, { item })),
+            h("td", null, cellValue(item, "实例计费模式") || "-"),
+            h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
+          ))),
+        )) : h("div", { key: "empty", className: "ci-empty" }, emptyHint || (q ? `没有匹配「${q}」的实例` : "没有匹配的实例")),
+        h("div", { key: "note", className: "ci-foot-note" }, "官方还可自定义监控、IPv6、网络计费、标签、项目 — 本期进详情，不挤进对话表。"),
+      ];
+    }
+
+    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint }) {
+      const [mode, setMode] = useState("card");
+      const groups = groupByRegion(items || []);
+      if (!(items || []).length) {
+        return h("div", { className: "ci-empty" }, emptyHint || "没有资源");
+      }
+      return [
+        h("div", { key: "bar", className: "ci-bar" },
+          h("div", { className: "ci-bar-left" },
+            h("span", { className: "ci-bar-title" }, "服务器"),
+            h("span", { className: "ci-bar-count" }, "按地域分组，对齐轻量控制台一页多地域"),
+          ),
+          h("div", { className: "ci-ops" },
+            h("button", {
+              type: "button",
+              className: "ci-ghost" + (mode === "card" ? " on" : ""),
+              onClick: () => setMode("card"),
+            }, "卡片视图"),
+            h("button", {
+              type: "button",
+              className: "ci-ghost" + (mode === "table" ? " on" : ""),
+              onClick: () => setMode("table"),
+            }, "列表视图"),
+          ),
+        ),
+        mode === "card" ? groups.map((group) => [
+          h("div", { key: group.region + "-g", className: "ci-group" }, group.region),
+          h("div", { key: group.region + "-c", className: "ci-cards" },
+            group.items.map((item) => h("div", { key: item.id, className: "ci-card" },
+              h("div", { className: "ci-card-h" },
+                h("div", { className: "ci-id" },
+                  h("button", {
+                    type: "button",
+                    className: "ci-card-t",
+                    disabled: pendingId === item.id,
+                    onClick: () => onOpen(item),
+                  }, item.title),
+                  h("span", { className: "ci-id-sub" }, item.instanceId || item.id),
+                ),
+                h(StatusCell, { status: item.status, label: item.stateLabel }),
+              ),
+              h("div", { className: "ci-kv" }, "公网 IP ", h("b", null, item.publicIp || cellValue(item, "公网 IP") || "-")),
+              h("div", { className: "ci-kv" }, "套餐 ", h("b", null, cellValue(item, "套餐") || "-")),
+              h("div", { className: "ci-kv" }, "到期时间 ", h("b", null, cellValue(item, "到期时间") || "-")),
+              h("div", { style: { marginTop: 10, textAlign: "right" } }, h(MoreMenu, {
+                item,
+                disabled: pendingId === item.id,
+                onAction,
+              })),
+            )),
+          ),
+        ]) : h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
+          h("thead", null, h("tr", null,
+            ["ID/名称", "状态", "地域", "公网 IP", "套餐", "到期时间", "操作"].map((label) => h("th", { key: label }, label)),
+          )),
+          h("tbody", null, (items || []).map((item) => h("tr", { key: item.id },
+            h("td", null, h("div", { className: "ci-id" },
+              h("button", {
+                type: "button",
+                className: "ci-name",
+                disabled: pendingId === item.id,
+                onClick: () => onOpen(item),
+              }, item.instanceId || item.id),
+              h("span", { className: "ci-id-sub" }, item.title),
+            )),
+            h("td", null, h(StatusCell, { status: item.status, label: item.stateLabel })),
+            h("td", null, item.regionName || item.region || "-"),
+            h("td", null, item.publicIp || cellValue(item, "公网 IP") || "-"),
+            h("td", null, cellValue(item, "套餐") || "-"),
+            h("td", null, cellValue(item, "到期时间") || "-"),
+            h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
+          ))),
+        )),
+      ];
+    }
+
+    function InstanceDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
+      const [confirm, setConfirm] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const card = detail?.card || item;
+      const groups = detail?.groups || [];
+      const power = instancePower(card);
+      const run = async (actionId) => {
+        setBusy(true);
+        setErr("");
+        try {
+          await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action: actionId,
+            payload: {
+              instanceId: card.instanceId || item.instanceId,
+              region: card.region || item.region,
+            },
+          });
+          setConfirm(null);
+          await onReload();
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      const request = async (actionId) => {
+        let skip = skipConfirm;
+        try {
+          const d = await api("meta", {});
+          skip = !!d.skipConfirm;
+          if (onSkipConfirm) onSkipConfirm(skip);
+        } catch { /* keep last known skipConfirm */ }
+        if (skip) return run(actionId);
+        setConfirm({
+          action: { id: actionId, label: actionLabel(actionId), confirm: "default" },
+          text: `确认${actionLabel(actionId)} ${card.title || item.title}？`,
+        });
+      };
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+          h("span", { className: "ci-head-t", title: card.title }, card.title),
+          h(StatusCell, { status: card.status, label: card.stateLabel }),
+          h("div", { className: "ci-power" },
+            h("button", {
+              type: "button",
+              className: "ci-mini",
+              disabled: busy || power.start,
+              onClick: () => request("instance.start"),
+            }, "开机"),
+            h("button", {
+              type: "button",
+              className: "ci-mini",
+              disabled: busy || power.stop,
+              onClick: () => request("instance.stop"),
+            }, "关机"),
+            h("button", {
+              type: "button",
+              className: "ci-mini primary",
+              disabled: busy || power.reboot,
+              onClick: () => request("instance.reboot"),
+            }, "重启"),
+          ),
+        ),
+        loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
+        err ? h("p", { key: "err", className: "ci-err" }, err) : null,
+        !loading && detail ? groups.map((group) => [
+          h("div", { key: group.title + "-t", className: "ci-sec-t" }, group.title),
+          h("div", { key: group.title + "-g", className: "ci-grid" },
+            (group.fields || []).map((row) => h("div", { key: row.label, className: "ci-f" },
+              row.label,
+              h("b", null, row.value),
+            )),
+          ),
+        ]) : null,
+        h(ConfirmDialog, {
+          key: "confirm",
+          open: !!confirm,
+          title: confirm?.action?.label,
+          text: confirm?.text,
+          busy,
+          danger: false,
+          onCancel: () => { if (!busy) setConfirm(null); },
+          onConfirm: () => confirm && run(confirm.action.id),
+        }),
+      ];
+    }
+
     function SearchToolView(props) {
       useEffect(() => ensureCss(), []);
       const payload = pickPayload(props);
@@ -778,6 +1130,39 @@ window.__ModuleLoader__.load({
         const detail = await api("detail", { moduleId: session.item.moduleId, id: session.item.id, title: session.item.title });
         setSession((cur) => cur ? { ...cur, detail, loading: false } : cur);
       };
+      const [powerConfirm, setPowerConfirm] = useState(null);
+      const [powerBusy, setPowerBusy] = useState(false);
+      const runListPower = async (item, actionId) => {
+        setPowerBusy(true);
+        try {
+          await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action: actionId,
+            payload: { instanceId: item.instanceId, region: item.region },
+          });
+          setPowerConfirm(null);
+          await fetchList(offset, String(activeQ || "").trim());
+        } catch (e) {
+          setListErr(publicErrorMessage(e));
+        } finally {
+          setPowerBusy(false);
+        }
+      };
+      const onInstanceAction = async (item, actionId) => {
+        let skip = skipConfirm;
+        try {
+          const d = await api("meta", {});
+          skip = !!d.skipConfirm;
+          setSkipConfirm(skip);
+        } catch { /* keep */ }
+        if (skip) return runListPower(item, actionId);
+        setPowerConfirm({
+          item,
+          action: { id: actionId, label: actionLabel(actionId) },
+          text: `确认${actionLabel(actionId)} ${item.title}？`,
+        });
+      };
       if (running) return null;
       const errors = payload?.errors || [];
       if (!fromTool?.length && !rows.length && !activeQ && !draftQ) {
@@ -786,9 +1171,15 @@ window.__ModuleLoader__.load({
       }
       const extraCols = columnLabels(rows);
       const showProvider = new Set((Array.isArray(rows) ? rows : []).map((item) => item && item.provider)).size > 1;
-      return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
-        h("div", { className: "ci-panel" },
-          session ? h(DetailView, {
+      const showCvm = kind === "cvm" || (kind !== "domain" && kind !== "lighthouse" && rows.some((row) => row && row.kind === "cvm"));
+      const showLh = kind === "lighthouse" || (kind !== "domain" && kind !== "cvm" && rows.some((row) => row && row.kind === "lighthouse"));
+      const showDomain = kind === "domain" || (!showCvm && !showLh);
+      const cvmRows = rows.filter((row) => row && row.kind === "cvm");
+      const lhRows = rows.filter((row) => row && row.kind === "lighthouse");
+      const domainRows = rows.filter((row) => row && !isInstanceKind(row.kind));
+      const detailNode = session
+        ? (isInstanceKind(session.item.kind)
+          ? h(InstanceDetailView, {
             item: session.item,
             detail: session.detail,
             loading: session.loading,
@@ -797,55 +1188,102 @@ window.__ModuleLoader__.load({
             onBack: () => setSession(null),
             onReload: reload,
             onSkipConfirm: setSkipConfirm,
-          }) : [
-            h("div", { key: "bar", className: "ci-bar" },
-              h("div", { className: "ci-bar-left" },
-                h("span", { className: "ci-bar-title" }, kind === "domain" ? "域名解析" : "云资源"),
-                h("span", { className: "ci-bar-count" }, `${counted} 条`),
-              ),
-              h("div", { className: "ci-search-wrap" },
-                h(SearchIcon),
-                h("input", {
-                  className: "ci-search",
-                  type: "search",
-                  placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
-                  value: draftQ,
-                  onChange: (e) => onDraft(e.target.value),
-                  onKeyDown: (e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      runSearch(draftQ);
-                    }
-                  },
-                }),
-                draftQ ? h("button", {
-                  type: "button",
-                  className: "ci-search-x",
-                  disabled: listBusy,
-                  onClick: () => { setDraftQ(""); runSearch(""); },
-                  "aria-label": "清空",
-                }, "×") : null,
-              ),
-            ),
-            listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
-            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ResourceTable, {
-              key: "table",
-              items: rows,
-              pendingId,
-              onOpen: openItem,
-              extraCols,
-              showProvider,
-              emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
+          })
+          : h(DetailView, {
+            item: session.item,
+            detail: session.detail,
+            loading: session.loading,
+            error: session.error,
+            skipConfirm,
+            onBack: () => setSession(null),
+            onReload: reload,
+            onSkipConfirm: setSkipConfirm,
+          }))
+        : null;
+      const instanceList = !session && (showCvm || showLh) ? [
+        listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
+        errors.length ? h("div", { key: "perr", className: "ci-err" }, errors.map((e) => e.message).join("；")) : null,
+        listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : [
+          showCvm ? h(CvmConsole, {
+            key: "cvm",
+            items: kind === "cvm" ? rows : cvmRows,
+            pendingId,
+            onOpen: openItem,
+            onAction: onInstanceAction,
+            emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
+          }) : null,
+          showLh ? h(LhConsole, {
+            key: "lh",
+            items: kind === "lighthouse" ? rows : lhRows,
+            pendingId,
+            onOpen: openItem,
+            onAction: onInstanceAction,
+            emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有资源",
+          }) : null,
+        ],
+        h(ConfirmDialog, {
+          key: "power",
+          open: !!powerConfirm,
+          title: powerConfirm?.action?.label,
+          text: powerConfirm?.text,
+          busy: powerBusy,
+          danger: false,
+          onCancel: () => { if (!powerBusy) setPowerConfirm(null); },
+          onConfirm: () => powerConfirm && runListPower(powerConfirm.item, powerConfirm.action.id),
+        }),
+      ] : null;
+      const domainList = !session && showDomain ? [
+        h("div", { key: "bar", className: "ci-bar" },
+          h("div", { className: "ci-bar-left" },
+            h("span", { className: "ci-bar-title" }, kind === "domain" ? "域名解析" : "云资源"),
+            h("span", { className: "ci-bar-count" }, `${counted} 条`),
+          ),
+          h("div", { className: "ci-search-wrap" },
+            h(SearchIcon),
+            h("input", {
+              className: "ci-search",
+              type: "search",
+              placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
+              value: draftQ,
+              onChange: (e) => onDraft(e.target.value),
+              onKeyDown: (e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  runSearch(draftQ);
+                }
+              },
             }),
-            h(Pager, {
-              key: "pager",
-              total: counted,
-              page,
-              pages: pageCount,
-              busy: listBusy,
-              onPage: goPage,
-            }),
-          ],
+            draftQ ? h("button", {
+              type: "button",
+              className: "ci-search-x",
+              disabled: listBusy,
+              onClick: () => { setDraftQ(""); runSearch(""); },
+              "aria-label": "清空",
+            }, "×") : null,
+          ),
+        ),
+        listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
+        listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ResourceTable, {
+          key: "table",
+          items: kind === "domain" ? rows : domainRows,
+          pendingId,
+          onOpen: openItem,
+          extraCols,
+          showProvider,
+          emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
+        }),
+        h(Pager, {
+          key: "pager",
+          total: counted,
+          page,
+          pages: pageCount,
+          busy: listBusy,
+          onPage: goPage,
+        }),
+      ] : null;
+      return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
+        h("div", { className: "ci-panel" },
+          detailNode || instanceList || domainList,
         ),
       ));
     }
@@ -967,7 +1405,7 @@ window.__ModuleLoader__.load({
           h("summary", { className: "ci-cfg-h" },
             h("span", { className: "ci-cfg-t" },
               h("span", { className: "ci-cfg-n" }, "云资源"),
-              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与解析记录。"),
+              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名、解析记录与云服务器。"),
             ),
             dirty ? h("span", { className: "ci-badge" }, "未保存") : null,
             h(ChevronDown, { className: "ci-cfg-ch" + (open ? " ci-cfg-ch-open" : "") }),

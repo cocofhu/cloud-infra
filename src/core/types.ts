@@ -32,6 +32,12 @@ export interface ResourceCard {
   columns?: ResourceColumn[]
   openLabel?: string
   expiresAt?: string
+  region?: string
+  regionName?: string
+  stateLabel?: string
+  instanceId?: string
+  privateIp?: string
+  publicIp?: string
 }
 
 export interface DnsRecord {
@@ -46,9 +52,15 @@ export interface DnsRecord {
   remark?: string
 }
 
+export interface FieldGroup {
+  title: string
+  fields: Array<{ label: string; value: string }>
+}
+
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
+  groups?: FieldGroup[]
   records?: DnsRecord[]
 }
 
@@ -64,6 +76,7 @@ export interface ListResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  errors?: ModuleError[]
 }
 
 export interface ModuleError {
