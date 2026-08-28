@@ -17,6 +17,7 @@ export interface QueryInput {
   query?: string
   offset?: number
   limit?: number
+  region?: string
 }
 
 export async function queryResources(
@@ -81,11 +82,15 @@ export async function queryResources(
         limit,
         timeoutMs: config.timeoutMs,
         signal,
+        region: input.region,
       })
       lists.push(result.items || [])
       if (result.total != null) total += result.total
       else total += result.items?.length || 0
       if (result.hasMore) hasMore = true
+      for (const message of result.warnings || []) {
+        errors.push({ moduleId: module.id, message })
+      }
     } catch (err) {
       errors.push({ moduleId: module.id, message: publicErrorMessage(err) })
     }
@@ -129,5 +134,8 @@ export function renderQuery(result: QueryResult): string {
     ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}，offset=${shown}。`
     : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
-  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} 用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。\n\n${lines.join('\n')}${err}`
+  const openHint = result.kind === 'cdb'
+    ? '请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。'
+    : '请用户点击「解析」或域名进行配置。'
+  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} 用一两句话概括即可，${openHint}不要打印密钥。\n\n${lines.join('\n')}${err}`
 }

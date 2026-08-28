@@ -32,6 +32,7 @@ export interface ResourceCard {
   columns?: ResourceColumn[]
   openLabel?: string
   expiresAt?: string
+  meta?: Record<string, string>
 }
 
 export interface DnsRecord {
@@ -50,6 +51,7 @@ export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
   records?: DnsRecord[]
+  extra?: Record<string, unknown>
 }
 
 export interface ResourceAction {
@@ -64,6 +66,7 @@ export interface ListResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  warnings?: string[]
 }
 
 export interface ModuleError {
@@ -90,9 +93,11 @@ export interface ModuleContext {
   signal?: AbortSignal
   id?: string
   title?: string
+  region?: string
+  tab?: string
 }
 
-export type ActionResult = { ok: true } | { ok: false; error: string }
+export type ActionResult = { ok: true; data?: unknown } | { ok: false; error: string }
 
 export interface ResourceModule {
   id: string

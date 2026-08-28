@@ -8,6 +8,7 @@ const SAFE_SNIPPETS = [
   '不支持',
   '未配置',
   '未注册',
+  '未登录',
   'unknown method',
 ]
 

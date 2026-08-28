@@ -12,6 +12,7 @@ export interface TencentCallOptions {
   signal?: AbortSignal
   timestamp?: number
   fetchImpl?: typeof fetch
+  region?: string
 }
 
 export class TencentApiError extends Error {
@@ -36,6 +37,7 @@ export async function callTencentApi<T = unknown>(options: TencentCallOptions): 
     payload,
     timestamp,
     version: options.version,
+    region: options.region,
   })
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), options.timeoutMs)
@@ -87,5 +89,54 @@ export function dnspodCall<T>(
     timeoutMs: opts.timeoutMs,
     signal: opts.signal,
     fetchImpl: opts.fetchImpl,
+  })
+}
+
+export interface TencentServiceOpts {
+  timeoutMs: number
+  signal?: AbortSignal
+  fetchImpl?: typeof fetch
+  region?: string
+}
+
+export function cdbCall<T>(
+  action: string,
+  payload: unknown,
+  creds: { secretId: string; secretKey: string },
+  opts: TencentServiceOpts,
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'cdb',
+    host: 'cdb.tencentcloudapi.com',
+    version: '2017-03-20',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+    region: opts.region,
+  })
+}
+
+export function monitorCall<T>(
+  action: string,
+  payload: unknown,
+  creds: { secretId: string; secretKey: string },
+  opts: TencentServiceOpts,
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'monitor',
+    host: 'monitor.tencentcloudapi.com',
+    version: '2018-07-24',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+    region: opts.region,
   })
 }

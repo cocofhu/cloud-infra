@@ -141,6 +141,37 @@ test('g2-g3 list chrome and in-card DetailView replace fullscreen drawer', () =>
   assert.doesNotMatch(client, /2147483|86vh/)
 })
 
+test('cdb conversation UI uses official login/manage and 11 tabs g1-g3', () => {
+  const client = read('src/client.js')
+  assert.match(client, /const CDB_OFFICIAL_TABS = \[/)
+  for (const tab of ['实例详情', '实例监控', '账号管理', '数据库管理', '安全组', '备份恢复', '日志中心', '只读实例', '数据库代理', '数据安全', '连接检查']) {
+    assert.match(client, new RegExp(tab))
+  }
+  assert.match(client, /登录/)
+  assert.match(client, /管理/)
+  assert.match(client, /实例 ID \/ 实例名 \/ 内网 IP/)
+  assert.match(client, /全部地域/)
+  assert.match(client, /登录数据库（DMC）/)
+  assert.match(client, /数据库类型/)
+  assert.match(client, /密码登录/)
+  assert.match(client, /SQL 窗口/)
+  assert.match(client, /kind === "cdb"/)
+  assert.doesNotMatch(client, /CDB_OFFICIAL_TABS[\s\S]{0,500}在线查询/)
+  assert.doesNotMatch(client, /CDB_OFFICIAL_TABS[\s\S]{0,500}慢查询/)
+  assert.doesNotMatch(client, /if\s*\(.*===\s*['"]tencent['"]/)
+})
+
+test('settings card still has no region or db account fields g4.1', () => {
+  const client = read('src/client.js')
+  const start = client.indexOf('function ConfigCard')
+  const end = client.indexOf('const inject')
+  const settings = client.slice(start, end)
+  assert.match(settings, /provider\.fields/)
+  assert.doesNotMatch(settings, /库账号|库密码|DMC/)
+  assert.doesNotMatch(settings, /placeholder: "ap-/)
+  assert.match(client, /腾讯云 CDB|matchModule/)
+})
+
 test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () => {
   const client = read('src/client.js')
   assert.match(client, /min\(400px,100%\)/)

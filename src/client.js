@@ -122,6 +122,28 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-tabs{display:flex;gap:0;border-bottom:1px solid var(--dsw-alias-border-l1);padding:0 8px;overflow:auto}
+.ci-tab{padding:10px 14px;white-space:nowrap;cursor:pointer;color:var(--dsw-alias-label-secondary);border:0;border-bottom:2px solid transparent;background:transparent;font:inherit}
+.ci-tab.on{color:var(--dsw-alias-brand-primary);border-bottom-color:var(--dsw-alias-brand-primary);font-weight:600}
+.ci-kv{display:grid;grid-template-columns:140px 1fr 140px 1fr;gap:10px 16px;padding:16px 14px}
+.ci-k{color:var(--dsw-alias-label-tertiary)}
+.ci-sub{display:block;color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:400}
+.ci-drop{position:relative}
+.ci-drop-menu{position:absolute;right:0;top:100%;z-index:5;min-width:168px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:4px 0;box-shadow:var(--dsw-alias-shadow)}
+.ci-drop-item{display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 12px;font:inherit;cursor:pointer;color:inherit}
+.ci-drop-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ci-sel{height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 8px;font:inherit}
+.ci-sql{width:100%;min-height:120px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;padding:8px;font:inherit;box-sizing:border-box;resize:vertical}
+.ci-dmc{display:grid;grid-template-columns:minmax(140px,200px) 1fr;min-height:280px}
+.ci-tree{border-right:1px solid var(--dsw-alias-border-l1);padding:8px;overflow:auto}
+.ci-tree button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:4px 6px;font:inherit;cursor:pointer;color:inherit}
+.ci-tree button:hover{color:var(--dsw-alias-brand-primary)}
+.ci-login-box{width:min(360px,100%);margin:24px auto;padding:8px 4px}
+.ci-check{width:15px;height:15px;accent-color:var(--dsw-alias-brand-primary)}
+.ci-idcell{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ci-pane{padding:12px 14px}
+.ci-subtabs{display:flex;gap:8px;margin:0 0 12px}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -669,6 +691,641 @@ window.__ModuleLoader__.load({
       ];
     }
 
+    const CDB_OFFICIAL_TABS = ["实例详情","实例监控","账号管理","数据库管理","安全组","备份恢复","日志中心","只读实例","数据库代理","数据安全","连接检查"];
+    const CDB_REGIONS = [
+      { id: "ap-guangzhou", name: "广州" },
+      { id: "ap-shanghai", name: "上海" },
+      { id: "ap-nanjing", name: "南京" },
+      { id: "ap-beijing", name: "北京" },
+      { id: "ap-chengdu", name: "成都" },
+      { id: "ap-chongqing", name: "重庆" },
+      { id: "ap-hongkong", name: "香港" },
+      { id: "ap-singapore", name: "新加坡" },
+      { id: "ap-jakarta", name: "雅加达" },
+      { id: "ap-seoul", name: "首尔" },
+      { id: "ap-tokyo", name: "东京" },
+      { id: "ap-bangkok", name: "曼谷" },
+      { id: "ap-mumbai", name: "孟买" },
+      { id: "na-siliconvalley", name: "硅谷" },
+      { id: "na-ashburn", name: "弗吉尼亚" },
+      { id: "sa-saopaulo", name: "圣保罗" },
+      { id: "eu-frankfurt", name: "法兰克福" },
+    ];
+
+    function regionName(id) {
+      return (CDB_REGIONS.find((row) => row.id === id) || {}).name || id || "";
+    }
+
+    function cdbMeta(item) {
+      return (item && item.meta) || {};
+    }
+
+    function isWriteSql(sql) {
+      const stripped = String(sql || "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "").trim();
+      return /^(insert|update|delete|replace|drop|alter|create|truncate|grant|revoke|rename|load|call|lock|unlock|set\s+global|set\s+persist)\b/i.test(stripped);
+    }
+
+    function CdbTable({ items, pendingId, selected, onToggle, onLogin, onManage, onMore, moreId, moreMenus }) {
+      const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, "没有实例");
+      const cols = ["实例 ID / 名称", "运行状态", "可用区", "数据库版本", "配置", "内网地址", "计费模式", "操作"];
+      return h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+        h("thead", null, h("tr", null,
+          h("th", null, ""),
+          cols.map((label) => h("th", { key: label }, label)),
+        )),
+        h("tbody", null, rows.map((item) => h("tr", { key: item.id },
+          h("td", null, h("input", {
+            className: "ci-check",
+            type: "checkbox",
+            checked: !!(selected && selected[item.id]),
+            onChange: () => onToggle(item),
+          })),
+          h("td", null, h("div", { className: "ci-idcell" },
+            h("button", { type: "button", className: "ci-name", onClick: () => onManage(item) }, item.title),
+            h("span", { className: "ci-sub" }, item.description || ""),
+          )),
+          h("td", null, h("span", { className: "ci-status" },
+            h("span", { className: "ci-dot " + (item.status || "unknown") }),
+            cellValue(item, "运行状态") || "-",
+          )),
+          h("td", null, cellValue(item, "可用区") || "-"),
+          h("td", null, cellValue(item, "数据库版本") || "-"),
+          h("td", null, cellValue(item, "配置") || "-"),
+          h("td", null, cellValue(item, "内网地址") || "-"),
+          h("td", null, cellValue(item, "计费模式") || "-"),
+          h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
+            h("button", { type: "button", className: "ci-link", disabled: pendingId === item.id, onClick: () => onLogin(item) }, "登录"),
+            h("button", { type: "button", className: "ci-link", disabled: pendingId === item.id, onClick: () => onManage(item) }, pendingId === item.id ? "加载中" : "管理"),
+            h("span", { className: "ci-drop" },
+              h("button", { type: "button", className: "ci-link", onClick: () => onMore(item) }, "更多"),
+              moreId === item.id ? h("div", { className: "ci-drop-menu" }, (moreMenus || []).map((row) => h("button", {
+                key: row.id,
+                type: "button",
+                className: "ci-drop-item" + (row.danger ? " ci-link danger" : ""),
+                onClick: () => row.onClick(item),
+              }, row.label))) : null,
+            ),
+          )),
+        ))),
+      ));
+    }
+
+    function GenericForm({ title, fields, initial, busy, err, onCancel, onSubmit }) {
+      const [draft, setDraft] = useState(() => {
+        const out = {};
+        for (const field of fields) out[field.key] = initial?.[field.key] || "";
+        return out;
+      });
+      const box = useOverlayKeys(true, busy, onCancel, false);
+      const node = h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, title),
+          fields.map((field) => h("div", { className: "ci-field", key: field.key },
+            h("label", null, field.label),
+            h("input", {
+              type: field.secret ? "password" : "text",
+              placeholder: field.placeholder || "",
+              value: draft[field.key] || "",
+              disabled: busy,
+              autoComplete: "off",
+              onChange: (e) => setDraft({ ...draft, [field.key]: e.target.value }),
+            }),
+          )),
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
+            h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: () => onSubmit(draft) }, busy ? "提交中" : "确定"),
+          ),
+        ),
+      );
+      return createPortal(node, document.body);
+    }
+
+    function NoticeDialog({ open, title, text, onClose }) {
+      if (!open) return null;
+      return h(ConfirmDialog, {
+        open: true,
+        title: title || "说明",
+        text,
+        busy: false,
+        onCancel: onClose,
+        onConfirm: onClose,
+      });
+    }
+
+    function CdbManageView({ item, detail, loading, error, skipConfirm, tab, onTab, onBack, onReload, onSkipConfirm, onLogin }) {
+      const [form, setForm] = useState(null);
+      const [confirm, setConfirm] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const extra = detail?.extra || {};
+      const tabData = extra.tabData || {};
+      const run = async (action, payload) => {
+        setBusy(true);
+        setErr("");
+        try {
+          const result = await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action: action.id,
+            payload: {
+              region: cdbMeta(item).region || extra.region,
+              instanceId: extra.instanceId || item.title,
+              ...payload,
+            },
+          });
+          setForm(null);
+          setConfirm(null);
+          if (action.id === "dmc.login") return result;
+          await onReload(tab);
+          return result;
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      const request = async (action, payload, text) => {
+        let skip = skipConfirm;
+        try {
+          const d = await api("meta", {});
+          skip = !!d.skipConfirm;
+          if (onSkipConfirm) onSkipConfirm(skip);
+        } catch { /* keep */ }
+        const must = action.confirm === "always" || (action.confirm === "default" && !skip);
+        if (!must) return run(action, payload);
+        setConfirm({ action, payload, text, danger: action.confirm === "always" });
+      };
+      const region = cdbMeta(item).region || extra.region || "";
+      const body = (() => {
+        if (tab === "实例详情") {
+          return [
+            h("div", { key: "kv", className: "ci-kv" }, (detail.fields || []).map((row) => [
+              h("div", { key: row.label + "k", className: "ci-k" }, row.label),
+              h("div", { key: row.label + "v" },
+                row.value,
+                row.label === "实例名称" ? h("button", { type: "button", className: "ci-link", style: { marginLeft: 8 }, onClick: () => setForm({
+                  title: "修改实例名称",
+                  fields: [{ key: "instanceName", label: "实例名称" }],
+                  initial: { instanceName: cdbMeta(item).instanceName || item.description || "" },
+                  action: { id: "instance.rename", label: "修改实例名称", confirm: "default" },
+                }) }, "修改") : null,
+                row.label === "内网地址" ? h("button", { type: "button", className: "ci-link", style: { marginLeft: 8 }, onClick: () => setForm({
+                  title: "修改端口",
+                  fields: [{ key: "port", label: "端口", placeholder: "3306" }],
+                  initial: { port: cdbMeta(item).port || "3306" },
+                  action: { id: "instance.port", label: "修改端口", confirm: "default" },
+                }) }, "修改端口") : null,
+                row.label === "项目 ID" ? h("button", { type: "button", className: "ci-link", style: { marginLeft: 8 }, onClick: () => setForm({
+                  title: "分配至项目",
+                  fields: [{ key: "projectId", label: "项目 ID", placeholder: "0" }],
+                  initial: { projectId: cdbMeta(item).projectId || row.value || "0" },
+                  action: { id: "instance.project", label: "分配至项目", confirm: "default" },
+                }) }, "分配") : null,
+                row.label === "外网地址" ? h("button", {
+                  type: "button",
+                  className: "ci-link",
+                  style: { marginLeft: 8 },
+                  onClick: () => request(
+                    { id: extra.wanOpen ? "instance.closeWan" : "instance.openWan", label: extra.wanOpen ? "关闭外网连接地址" : "开启外网连接地址", confirm: "default" },
+                    {},
+                    extra.wanOpen ? "确认关闭外网连接地址？" : "确认开启外网连接地址？",
+                  ),
+                }, extra.wanOpen ? "关闭外网连接地址" : "开启外网连接地址") : null,
+              ),
+            ])),
+            h("p", { key: "hint", className: "ci-hint", style: { margin: "0 14px 14px" } }, "顶栏 11 个名称与顺序来自官方操作总览。参数设置在「数据库管理」下；慢日志在「日志中心」；SQL 请走列表「登录」。"),
+          ];
+        }
+        if (tab === "实例监控") {
+          const rows = [
+            ["CPU", tabData.cpu],
+            ["内存", tabData.memory],
+            ["磁盘", tabData.disk],
+            ["连接数", tabData.connections],
+          ];
+          return h("div", { className: "ci-kv" }, rows.flatMap(([label, value]) => [
+            h("div", { key: label + "k", className: "ci-k" }, label),
+            h("div", { key: label + "v" }, value == null || value === "" ? "-" : String(value)),
+          ]));
+        }
+        if (tab === "账号管理") {
+          const accounts = tabData.accounts || [];
+          return [
+            h("div", { key: "sec", className: "ci-sec" },
+              h("span", { className: "ci-sec-t" }, "账号管理"),
+              h("button", { type: "button", className: "ci-mini primary", onClick: () => setForm({
+                title: "创建账号",
+                fields: [{ key: "user", label: "账号" }, { key: "host", label: "主机", placeholder: "%" }, { key: "password", label: "密码", secret: true }],
+                initial: { host: "%" },
+                action: { id: "account.create", label: "创建账号", confirm: "default" },
+              }) }, "创建账号"),
+            ),
+            accounts.length ? h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null, h("th", null, "账号"), h("th", null, "Host"), h("th", null, "操作"))),
+              h("tbody", null, accounts.map((row, idx) => h("tr", { key: (row.User || "") + (row.Host || "") + idx },
+                h("td", null, row.User || ""),
+                h("td", null, row.Host || ""),
+                h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
+                  h("button", { type: "button", className: "ci-link", onClick: () => setForm({
+                    title: "重置密码",
+                    fields: [{ key: "password", label: "新密码", secret: true }],
+                    initial: { user: row.User, host: row.Host },
+                    action: { id: "account.password", label: "重置密码", confirm: "always" },
+                  }) }, "重置密码"),
+                  h("button", { type: "button", className: "ci-link", onClick: () => setForm({
+                    title: "修改权限",
+                    fields: [{ key: "privileges", label: "全局权限", placeholder: "SELECT,INSERT,UPDATE,DELETE" }],
+                    initial: { user: row.User, host: row.Host },
+                    action: { id: "account.privileges", label: "修改权限", confirm: "default" },
+                  }) }, "修改权限"),
+                  h("button", { type: "button", className: "ci-link", onClick: () => setForm({
+                    title: "修改授权主机",
+                    fields: [{ key: "newHost", label: "新主机" }],
+                    initial: { user: row.User, host: row.Host, newHost: row.Host },
+                    action: { id: "account.host", label: "修改授权主机", confirm: "default" },
+                  }) }, "修改主机"),
+                  h("button", { type: "button", className: "ci-link danger", onClick: () => request(
+                    { id: "account.delete", label: "删除账号", confirm: "always" },
+                    { user: row.User, host: row.Host },
+                    `确定删除账号 ${row.User}@${row.Host}？`,
+                  ) }, "删除"),
+                )),
+              ))),
+            )) : h("div", { key: "empty", className: "ci-empty" }, "没有账号"),
+          ];
+        }
+        if (tab === "数据库管理") {
+          const dbs = tabData.databases || [];
+          const params = tabData.parameters || [];
+          return h("div", { className: "ci-pane" },
+            tabData.readonlyHint ? h("p", { className: "ci-hint" }, tabData.readonlyHint) : null,
+            h("div", { className: "ci-subtabs" },
+              h("span", { className: "ci-sec-t" }, "数据库列表"),
+              h("button", { type: "button", className: "ci-mini", onClick: () => onLogin(item) }, extra.dmc ? "进入 DMC 库表" : "先登录 DMC"),
+            ),
+            dbs.length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null, h("th", null, "数据库"), h("th", null, "字符集"), h("th", null, "操作"))),
+              h("tbody", null, dbs.map((row) => h("tr", { key: row.DatabaseName || row.DbName },
+                h("td", null, row.DatabaseName || row.DbName || ""),
+                h("td", null, row.CharacterSet || row.CharacterSetName || "-"),
+                h("td", null, h("button", { type: "button", className: "ci-link", onClick: () => onLogin(item, row.DatabaseName || row.DbName) }, extra.dmc ? "库表管理" : "请先登录")),
+              ))),
+            )) : h("div", { className: "ci-empty" }, extra.dmc ? "没有数据库" : "库列表需实例支持，或先登录 DMC"),
+            h("div", { className: "ci-sec" }, h("span", { className: "ci-sec-t" }, "参数设置")),
+            params.length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null, h("th", null, "参数"), h("th", null, "当前值"), h("th", null, "操作"))),
+              h("tbody", null, params.slice(0, 80).map((row) => h("tr", { key: row.Name },
+                h("td", null, row.Name || ""),
+                h("td", null, row.CurrentValue != null ? String(row.CurrentValue) : "-"),
+                h("td", null, h("button", { type: "button", className: "ci-link", onClick: () => setForm({
+                  title: "修改参数",
+                  fields: [{ key: "value", label: row.Name || "参数值" }],
+                  initial: { name: row.Name, value: row.CurrentValue != null ? String(row.CurrentValue) : "" },
+                  action: { id: "param.modify", label: "修改参数", confirm: "default" },
+                }) }, "修改")),
+              ))),
+            )) : h("div", { className: "ci-empty" }, "没有可展示的参数"),
+          );
+        }
+        if (tab === "安全组") {
+          const groups = tabData.groups || [];
+          return h("div", { className: "ci-pane" },
+            h("div", { className: "ci-sec" },
+              h("span", { className: "ci-sec-t" }, "安全组"),
+              h("button", { type: "button", className: "ci-mini", onClick: () => setForm({
+                title: "配置安全组",
+                fields: [{ key: "securityGroupIds", label: "安全组 ID", placeholder: "sg-xxx,sg-yyy" }],
+                initial: { securityGroupIds: groups.map((g) => g.SecurityGroupId).filter(Boolean).join(",") },
+                action: { id: "sg.bind", label: "配置安全组", confirm: "default" },
+              }) }, "配置安全组"),
+            ),
+            groups.length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null, h("th", null, "安全组 ID"), h("th", null, "名称"))),
+              h("tbody", null, groups.map((row) => h("tr", { key: row.SecurityGroupId },
+                h("td", null, row.SecurityGroupId || ""),
+                h("td", null, row.SecurityGroupName || ""),
+              ))),
+            )) : h("div", { className: "ci-empty" }, "未绑定安全组"),
+          );
+        }
+        if (tab === "备份恢复") {
+          const backups = tabData.backups || [];
+          return h("div", { className: "ci-pane" },
+            h("div", { className: "ci-sec" },
+              h("span", { className: "ci-sec-t" }, "备份恢复"),
+              h("button", { type: "button", className: "ci-mini primary", onClick: () => request({ id: "backup.create", label: "手动备份", confirm: "default" }, {}, "确认发起手动备份？") }, "手动备份"),
+            ),
+            h("p", { className: "ci-hint" }, tabData.note || "回档、克隆、跨地域不在插件内做完整向导。"),
+            backups.length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null, h("th", null, "备份 ID"), h("th", null, "类型"), h("th", null, "时间"), h("th", null, "操作"))),
+              h("tbody", null, backups.map((row) => h("tr", { key: row.BackupId },
+                h("td", null, String(row.BackupId ?? "")),
+                h("td", null, row.Way || row.Type || ""),
+                h("td", null, row.Date || row.StartTime || ""),
+                h("td", null, /manual|手动/i.test(String(row.Way || row.Type || "")) ? h("button", {
+                  type: "button",
+                  className: "ci-link danger",
+                  onClick: () => request({ id: "backup.delete", label: "删除手动备份", confirm: "always" }, { backupId: row.BackupId }, "确定删除该手动备份？"),
+                }, "删除") : "-"),
+              ))),
+            )) : h("div", { className: "ci-empty" }, "没有备份"),
+          );
+        }
+        if (tab === "日志中心") {
+          const slow = tabData.slowLogs || [];
+          const errors = tabData.errorLogs || [];
+          return h("div", { className: "ci-pane" },
+            h("p", { className: "ci-hint" }, "慢查询在日志中心，不是顶栏页签。"),
+            h("div", { className: "ci-sec-t" }, "慢日志"),
+            slow.length ? h("pre", { className: "ci-hint" }, JSON.stringify(slow.slice(0, 8), null, 2)) : h("div", { className: "ci-empty" }, "没有慢日志"),
+            h("div", { className: "ci-sec-t" }, "错误日志"),
+            errors.length ? h("pre", { className: "ci-hint" }, JSON.stringify(errors.slice(0, 8), null, 2)) : h("div", { className: "ci-empty" }, "没有错误日志"),
+          );
+        }
+        if (tab === "只读实例") {
+          const rows = tabData.readonlyInstances || [];
+          return rows.length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+            h("thead", null, h("tr", null, h("th", null, "实例 ID"), h("th", null, "名称"), h("th", null, "地址"))),
+            h("tbody", null, rows.map((row) => h("tr", { key: row.InstanceId },
+              h("td", null, row.InstanceId || ""),
+              h("td", null, row.InstanceName || ""),
+              h("td", null, row.Vip ? `${row.Vip}:${row.Vport || 3306}` : "-"),
+            ))),
+          )) : h("div", { className: "ci-empty" }, tabData.empty || "暂无只读实例");
+        }
+        if (tab === "数据库代理" || tab === "数据安全") {
+          const opened = tab === "数据库代理" ? !!tabData.opened : !!(tabData.audit && tabData.audit.opened !== false && tabData.features);
+          return h("div", { className: "ci-pane" },
+            h("p", null, tab === "数据库代理" ? (tabData.opened ? "已开通数据库代理" : (tabData.proxy && tabData.proxy.note) || "未开通数据库代理") : "数据安全开通状态"),
+            tab === "数据安全" ? h("div", { className: "ci-kv" },
+              h("div", { className: "ci-k" }, "审计"),
+              h("div", null, tabData.audit && tabData.audit.opened === false ? "未开通" : "见实例特性"),
+              h("div", { className: "ci-k" }, "说明"),
+              h("div", null, tabData.note || "展示开通状态"),
+            ) : null,
+            opened ? null : null,
+          );
+        }
+        if (tab === "连接检查") {
+          const inner = tabData.inner || {};
+          const outer = tabData.outer || {};
+          return h("div", { className: "ci-pane" },
+            h("div", { className: "ci-kv" },
+              h("div", { className: "ci-k" }, "内网"),
+              h("div", null, inner.ok ? `连通 ${inner.latencyMs}ms` : (inner.error || "失败")),
+              h("div", { className: "ci-k" }, "外网"),
+              h("div", null, outer.ok ? `连通 ${outer.latencyMs}ms` : (outer.error || "失败")),
+            ),
+            h("button", { type: "button", className: "ci-mini", onClick: () => request({ id: "check.connect", label: "连接检查", confirm: "default" }, {
+              host: cdbMeta(item).vip,
+              port: cdbMeta(item).port,
+            }, "发起连接检查？") }, "重新检查"),
+          );
+        }
+        return h("div", { className: "ci-empty" }, extra.tabError || "没有内容");
+      })();
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+          h("span", { className: "ci-head-t" }, item.title),
+          h("span", { className: "ci-sub" }, `${item.description || ""} · ${regionName(region)}`),
+        ),
+        h("div", { key: "tabs", className: "ci-tabs" }, CDB_OFFICIAL_TABS.map((name) => h("button", {
+          key: name,
+          type: "button",
+          className: "ci-tab" + (name === tab ? " on" : ""),
+          onClick: () => onTab(name),
+        }, name))),
+        loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
+        err ? h("p", { key: "err", className: "ci-err" }, err) : null,
+        !loading && detail ? body : null,
+        form ? h(GenericForm, {
+          key: "form",
+          title: form.title,
+          fields: form.fields,
+          initial: form.initial,
+          busy,
+          err,
+          onCancel: () => { if (!busy) setForm(null); },
+          onSubmit: (draft) => request(form.action, { ...form.initial, ...draft }, `确认${form.action.label}？`),
+        }) : null,
+        h(ConfirmDialog, {
+          key: "confirm",
+          open: !!confirm,
+          title: confirm?.action?.label,
+          text: confirm?.text,
+          busy,
+          danger: !!confirm?.danger,
+          onCancel: () => { if (!busy) setConfirm(null); },
+          onConfirm: () => confirm && run(confirm.action, confirm.payload),
+        }),
+      ];
+    }
+
+    function DmcWorkbench({ item, skipConfirm, onBack, onSkipConfirm, initialDb }) {
+      const meta = cdbMeta(item);
+      const [user, setUser] = useState("root");
+      const [password, setPassword] = useState("");
+      const [session, setSession] = useState(null);
+      const [sql, setSql] = useState("SELECT 1");
+      const [result, setResult] = useState(null);
+      const [dbs, setDbs] = useState([]);
+      const [tables, setTables] = useState([]);
+      const [db, setDb] = useState(initialDb || "");
+      const [rows, setRows] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const [confirm, setConfirm] = useState(null);
+      const [form, setForm] = useState(null);
+      const payloadBase = () => ({
+        region: meta.region,
+        instanceId: item.title,
+        host: meta.vip,
+        port: meta.port,
+      });
+      const run = async (action, payload) => {
+        setBusy(true);
+        setErr("");
+        try {
+          const out = await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action,
+            payload: { ...payloadBase(), ...payload },
+          });
+          setConfirm(null);
+          return out;
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      const requestWrite = async (action, payload, text) => {
+        let skip = skipConfirm;
+        try {
+          const d = await api("meta", {});
+          skip = !!d.skipConfirm;
+          if (onSkipConfirm) onSkipConfirm(skip);
+        } catch { /* keep */ }
+        if (skip && action !== "dmc.row.write") return run(action, payload);
+        setConfirm({ action, payload, text, danger: true });
+      };
+      const login = async () => {
+        const out = await run("dmc.login", { user, password });
+        if (!out || !out.ok) return;
+        setPassword("");
+        setSession(out.data);
+        const schema = await run("dmc.schema", {});
+        if (schema && schema.data) setDbs(schema.data.databases || []);
+      };
+      const loadTables = async (name) => {
+        setDb(name);
+        const schema = await run("dmc.schema", { database: name });
+        if (schema && schema.data) setTables(schema.data.tables || []);
+      };
+      const loadRows = async (table) => {
+        const out = await run("dmc.rows", { database: db, table, limit: 50, offset: 0 });
+        if (out && out.data) setRows({ table, ...out.data });
+      };
+      const execSql = async () => {
+        if (isWriteSql(sql)) return requestWrite("dmc.sql", { sql, database: db }, "该 SQL 会修改数据，确认执行？");
+        const out = await run("dmc.sql", { sql, database: db });
+        if (out && out.data) setResult(out.data);
+      };
+      if (!session) {
+        return [
+          h("div", { key: "crumb", className: "ci-crumb" },
+            h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+            h("span", { className: "ci-head-t" }, "登录数据库（DMC）"),
+          ),
+          h("div", { key: "login", className: "ci-login-box" },
+            h("h3", null, "登录数据库（DMC）"),
+            h("div", { className: "ci-field" }, h("label", null, "数据库类型"), h("select", { className: "ci-sel", disabled: true }, h("option", null, "MySQL"))),
+            h("div", { className: "ci-field" }, h("label", null, "地域"), h("select", { className: "ci-sel", disabled: true }, h("option", null, regionName(meta.region)))),
+            h("div", { className: "ci-field" }, h("label", null, "实例"), h("select", { className: "ci-sel", disabled: true }, h("option", null, `${item.title} / ${item.description || ""}`))),
+            h("div", { className: "ci-field" }, h("label", null, "登录方式"), h("select", { className: "ci-sel", disabled: true }, h("option", null, "密码登录"))),
+            h("div", { className: "ci-field" }, h("label", null, "账号"), h("input", { value: user, autoComplete: "off", onChange: (e) => setUser(e.target.value) })),
+            h("div", { className: "ci-field" }, h("label", null, "密码"), h("input", { type: "password", value: password, autoComplete: "off", onChange: (e) => setPassword(e.target.value) })),
+            err ? h("p", { className: "ci-err" }, err) : null,
+            h("div", { className: "ci-modal-actions" },
+              h("button", { type: "button", className: "ci-mini", onClick: onBack }, "取消"),
+              h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: login }, busy ? "登录中" : "登录"),
+            ),
+            h("p", { className: "ci-hint", style: { marginTop: 10 } }, "登录后才进入 SQL 窗口与库表管理。账密不写设置。"),
+          ),
+        ];
+      }
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+          h("span", { className: "ci-head-t" }, "SQL 窗口"),
+          h("span", { className: "ci-sub" }, `${item.title} · ${session.user}`),
+          h("button", { type: "button", className: "ci-mini", onClick: () => run("dmc.logout", {}).then(() => setSession(null)) }, "退出登录"),
+        ),
+        err ? h("p", { key: "err", className: "ci-err" }, err) : null,
+        h("div", { key: "dmc", className: "ci-dmc" },
+          h("div", { className: "ci-tree" },
+            h("div", { className: "ci-sec-t" }, "库表目录"),
+            dbs.map((name) => h("button", { key: name, type: "button", onClick: () => loadTables(name) }, name)),
+            tables.map((name) => h("button", { key: "t" + name, type: "button", onClick: () => loadRows(name) }, db ? `${db}.${name}` : name)),
+          ),
+          h("div", { className: "ci-pane" },
+            h("textarea", { className: "ci-sql", value: sql, onChange: (e) => setSql(e.target.value) }),
+            h("div", { className: "ci-actions" },
+              h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: execSql }, "执行"),
+            ),
+            result ? [
+              result.affected != null ? h("p", { key: "aff", className: "ci-hint" }, `影响 ${result.affected} 行`) : null,
+              result.columns && result.columns.length ? h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+                h("thead", null, h("tr", null, result.columns.map((col) => h("th", { key: col }, col)))),
+                h("tbody", null, (result.rows || []).map((row, idx) => h("tr", { key: idx }, (row || []).map((cell, cidx) => h("td", { key: cidx }, cell == null ? "NULL" : String(cell)))))),
+              )) : null,
+            ] : null,
+            rows ? [
+              h("div", { key: "rs", className: "ci-sec" },
+                h("span", { className: "ci-sec-t" }, `表 ${rows.table}`),
+                h("button", { type: "button", className: "ci-mini", onClick: () => setForm({
+                  title: "插入行",
+                  fields: (rows.columns || []).map((col) => ({ key: col, label: col })),
+                  table: rows.table,
+                  op: "insert",
+                }) }, "插入"),
+              ),
+              h("div", { key: "rt", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+                h("thead", null, h("tr", null, (rows.columns || []).map((col) => h("th", { key: col }, col)), h("th", null, "操作"))),
+                h("tbody", null, (rows.rows || []).map((row, idx) => {
+                  const rec = {};
+                  (rows.columns || []).forEach((col, i) => { rec[col] = row[i]; });
+                  return h("tr", { key: idx },
+                    (row || []).map((cell, cidx) => h("td", { key: cidx }, cell == null ? "NULL" : String(cell))),
+                    h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
+                      h("button", { type: "button", className: "ci-link", onClick: () => setForm({
+                        title: "改行",
+                        fields: (rows.columns || []).map((col) => ({ key: col, label: col })),
+                        initial: rec,
+                        table: rows.table,
+                        op: "update",
+                        where: rec,
+                      }) }, "改行"),
+                      h("button", { type: "button", className: "ci-link danger", onClick: () => requestWrite("dmc.row.write", {
+                        database: db,
+                        table: rows.table,
+                        op: "delete",
+                        where: rec,
+                      }, "确认删除该行？") }, "删除"),
+                    )),
+                  );
+                })),
+              )),
+            ] : null,
+          ),
+        ),
+        form ? h(GenericForm, {
+          key: "rowform",
+          title: form.title,
+          fields: form.fields,
+          initial: form.initial,
+          busy,
+          err,
+          onCancel: () => { if (!busy) setForm(null); },
+          onSubmit: (draft) => requestWrite("dmc.row.write", {
+            database: db,
+            table: form.table,
+            op: form.op,
+            values: draft,
+            where: form.where || {},
+          }, `确认${form.title}？`).then((out) => {
+            if (out && out.ok) {
+              setForm(null);
+              if (form.table) loadRows(form.table);
+            }
+          }),
+        }) : null,
+        h(ConfirmDialog, {
+          key: "confirm",
+          open: !!confirm,
+          title: "写操作确认",
+          text: confirm?.text,
+          busy,
+          danger: true,
+          onCancel: () => { if (!busy) setConfirm(null); },
+          onConfirm: async () => {
+            const out = await run(confirm.action, confirm.payload);
+            if (out && out.data && confirm.action === "dmc.sql") setResult(out.data);
+            if (out && out.ok && confirm.action === "dmc.row.write" && rows) loadRows(rows.table);
+          },
+        }),
+      ];
+    }
+
     function SearchToolView(props) {
       useEffect(() => ensureCss(), []);
       const payload = pickPayload(props);
@@ -690,6 +1347,12 @@ window.__ModuleLoader__.load({
       const [listErr, setListErr] = useState("");
       const [draftQ, setDraftQ] = useState(initialQuery);
       const [activeQ, setActiveQ] = useState(initialQuery);
+      const [region, setRegion] = useState("");
+      const [selected, setSelected] = useState({});
+      const [moreId, setMoreId] = useState("");
+      const [notice, setNotice] = useState("");
+      const [listConfirm, setListConfirm] = useState(null);
+      const [listBusyAct, setListBusyAct] = useState(false);
       const seq = useRef(0);
       const debounce = useRef(0);
       const refreshSkip = () => {
@@ -716,7 +1379,7 @@ window.__ModuleLoader__.load({
         setListErr("");
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
-      const fetchList = async (nextOffset, q) => {
+      const fetchList = async (nextOffset, q, regionOverride) => {
         const n = ++seq.current;
         setListBusy(true);
         setListErr("");
@@ -725,9 +1388,15 @@ window.__ModuleLoader__.load({
             query: q,
             kind,
             provider,
+            region: kind === "cdb" ? (regionOverride !== undefined ? regionOverride : region) : undefined,
             offset: nextOffset,
             limit: pageSize,
           });
+          if (n !== seq.current) return;
+          const warns = (result.errors || []).map((e) => e.message).filter(Boolean).join("；");
+          if ((result.items || []).length && warns) setListErr("");
+          if (warns && !(result.items || []).length) throw new Error(warns);
+          if (warns && (result.items || []).length) setListErr(warns);
           if (n !== seq.current) return;
           setRows(result.items || []);
           setTotal(Number(result.total) || (result.items || []).length);
@@ -760,23 +1429,66 @@ window.__ModuleLoader__.load({
       const pageCount = Math.max(pages, Math.floor(offset / pageSize) + 1 + extra);
       const page = Math.floor(offset / pageSize) + 1;
       const goPage = (next) => fetchList((next - 1) * pageSize, String(activeQ || "").trim());
-      const openItem = async (item) => {
+      const openItem = async (item, tab) => {
         setPendingId(item.id);
-        setSession({ item, loading: true, detail: null });
+        setMoreId("");
+        const nextTab = tab || "实例详情";
+        setSession({ item, loading: true, detail: null, mode: "manage", tab: nextTab });
         refreshSkip();
         try {
-          const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: item.title });
-          setSession({ item, loading: false, detail });
+          const detail = await api("detail", {
+            moduleId: item.moduleId,
+            id: item.id,
+            title: item.title,
+            region: cdbMeta(item).region,
+            tab: item.kind === "cdb" ? nextTab : undefined,
+          });
+          setSession({ item, loading: false, detail, mode: "manage", tab: nextTab });
         } catch (e) {
-          setSession({ item, loading: false, detail: null, error: publicErrorMessage(e) });
+          setSession({ item, loading: false, detail: null, error: publicErrorMessage(e), mode: "manage", tab: nextTab });
         } finally {
           setPendingId("");
         }
       };
-      const reload = async () => {
+      const openLogin = (item, database) => {
+        setMoreId("");
+        setSession({ item, mode: "dmc", database });
+      };
+      const reload = async (tab) => {
         if (!session?.item) return;
-        const detail = await api("detail", { moduleId: session.item.moduleId, id: session.item.id, title: session.item.title });
-        setSession((cur) => cur ? { ...cur, detail, loading: false } : cur);
+        const nextTab = tab || session.tab || "实例详情";
+        const detail = await api("detail", {
+          moduleId: session.item.moduleId,
+          id: session.item.id,
+          title: session.item.title,
+          region: cdbMeta(session.item).region,
+          tab: session.item.kind === "cdb" ? nextTab : undefined,
+        });
+        setSession((cur) => cur ? { ...cur, detail, loading: false, tab: nextTab } : cur);
+      };
+      const selectedItems = rows.filter((item) => selected[item.id]);
+      const buyNotice = "购买类操作不在插件内下单，请到腾讯云控制台完成。";
+      const runListAction = async (item, action, payload) => {
+        setListBusyAct(true);
+        try {
+          await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action,
+            payload: { region: cdbMeta(item).region, instanceId: item.title, ...payload },
+          });
+          setListConfirm(null);
+          await fetchList(offset, String(activeQ || "").trim());
+        } catch (e) {
+          setListErr(publicErrorMessage(e));
+          setListConfirm(null);
+        } finally {
+          setListBusyAct(false);
+        }
+      };
+      const askListAction = (item, action, text, payload, always) => {
+        setMoreId("");
+        setListConfirm({ item, action, text, payload: payload || {}, always: !!always });
       };
       if (running) return null;
       const errors = payload?.errors || [];
@@ -786,57 +1498,137 @@ window.__ModuleLoader__.load({
       }
       const extraCols = columnLabels(rows);
       const showProvider = new Set((Array.isArray(rows) ? rows : []).map((item) => item && item.provider)).size > 1;
+      const isCdb = kind === "cdb" || (!!session && session.item && session.item.kind === "cdb");
+      const sessionView = session
+        ? (session.mode === "dmc" || (isCdb && session.mode === "dmc")
+          ? h(DmcWorkbench, {
+            item: session.item,
+            skipConfirm,
+            initialDb: session.database,
+            onBack: () => setSession(null),
+            onSkipConfirm: setSkipConfirm,
+          })
+          : isCdb
+            ? h(CdbManageView, {
+              item: session.item,
+              detail: session.detail,
+              loading: session.loading,
+              error: session.error,
+              skipConfirm,
+              tab: session.tab || "实例详情",
+              onTab: (name) => reload(name),
+              onBack: () => setSession(null),
+              onReload: reload,
+              onSkipConfirm: setSkipConfirm,
+              onLogin: (item, database) => openLogin(item, database),
+            })
+            : h(DetailView, {
+              item: session.item,
+              detail: session.detail,
+              loading: session.loading,
+              error: session.error,
+              skipConfirm,
+              onBack: () => setSession(null),
+              onReload: reload,
+              onSkipConfirm: setSkipConfirm,
+            }))
+        : null;
+      const cdbMore = [
+        { id: "sg", label: "配置安全组", onClick: (item) => openItem(item, "安全组") },
+        { id: "protect", label: "设置实例销毁保护", onClick: (item) => askListAction(item, "instance.protect", "确认开启实例销毁保护？", { enable: true }) },
+        { id: "destroy", label: "销毁实例", danger: true, onClick: (item) => askListAction(item, "instance.destroy", `确定销毁实例 ${item.title}？此操作不可撤销。`, {}, true) },
+        { id: "buySame", label: "购买相同配置", onClick: () => setNotice(buyNotice) },
+      ];
       return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
         h("div", { className: "ci-panel" },
-          session ? h(DetailView, {
-            item: session.item,
-            detail: session.detail,
-            loading: session.loading,
-            error: session.error,
-            skipConfirm,
-            onBack: () => setSession(null),
-            onReload: reload,
-            onSkipConfirm: setSkipConfirm,
-          }) : [
+          session ? sessionView : [
             h("div", { key: "bar", className: "ci-bar" },
               h("div", { className: "ci-bar-left" },
-                h("span", { className: "ci-bar-title" }, kind === "domain" ? "域名解析" : "云资源"),
+                h("span", { className: "ci-bar-title" }, kind === "cdb" ? "云数据库 MySQL" : (kind === "domain" ? "域名解析" : "云资源")),
                 h("span", { className: "ci-bar-count" }, `${counted} 条`),
               ),
-              h("div", { className: "ci-search-wrap" },
-                h(SearchIcon),
-                h("input", {
-                  className: "ci-search",
-                  type: "search",
-                  placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
-                  value: draftQ,
-                  onChange: (e) => onDraft(e.target.value),
-                  onKeyDown: (e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      runSearch(draftQ);
-                    }
+              h("div", { className: "ci-tools" },
+                kind === "cdb" ? h("select", {
+                  className: "ci-sel",
+                  value: region,
+                  onChange: (e) => {
+                    const next = e.target.value;
+                    setRegion(next);
+                    fetchList(0, String(activeQ || draftQ || "").trim(), next);
                   },
-                }),
-                draftQ ? h("button", {
-                  type: "button",
-                  className: "ci-search-x",
-                  disabled: listBusy,
-                  onClick: () => { setDraftQ(""); runSearch(""); },
-                  "aria-label": "清空",
-                }, "×") : null,
+                },
+                  h("option", { value: "" }, "全部地域"),
+                  CDB_REGIONS.map((row) => h("option", { key: row.id, value: row.id }, row.name)),
+                ) : null,
+                kind === "cdb" ? [
+                  h("button", { key: "n", type: "button", className: "ci-mini primary", onClick: () => setNotice(buyNotice) }, "新建实例"),
+                  h("button", { key: "r", type: "button", className: "ci-mini", onClick: () => setNotice(buyNotice) }, "续费"),
+                  h("button", { key: "reb", type: "button", className: "ci-mini", onClick: () => {
+                    const target = selectedItems[0];
+                    if (!target) return setNotice("请先选择实例");
+                    askListAction(target, "instance.restart", `确认重启实例 ${target.title}？`);
+                  } }, "重启"),
+                  h("button", { key: "p", type: "button", className: "ci-mini", onClick: () => {
+                    const target = selectedItems[0] || rows[0];
+                    if (!target) return setNotice("请先选择实例");
+                    openItem(target, "数据库管理");
+                  } }, "参数设置"),
+                  h("button", { key: "proj", type: "button", className: "ci-mini", onClick: () => {
+                    const target = selectedItems[0];
+                    if (!target) return setNotice("请先选择实例");
+                    openItem(target, "实例详情");
+                  } }, "分配至项目"),
+                ] : null,
+                h("div", { className: "ci-search-wrap" },
+                  h(SearchIcon),
+                  h("input", {
+                    className: "ci-search",
+                    type: "search",
+                    placeholder: kind === "cdb" ? "实例 ID / 实例名 / 内网 IP" : (kind === "domain" ? "请输入域名关键字" : "搜索"),
+                    value: draftQ,
+                    onChange: (e) => onDraft(e.target.value),
+                    onKeyDown: (e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        runSearch(draftQ);
+                      }
+                    },
+                  }),
+                  draftQ ? h("button", {
+                    type: "button",
+                    className: "ci-search-x",
+                    disabled: listBusy,
+                    onClick: () => { setDraftQ(""); runSearch(""); },
+                    "aria-label": "清空",
+                  }, "×") : null,
+                ),
               ),
             ),
             listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
-            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ResourceTable, {
-              key: "table",
-              items: rows,
-              pendingId,
-              onOpen: openItem,
-              extraCols,
-              showProvider,
-              emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
-            }),
+            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : (
+              kind === "cdb"
+                ? h(CdbTable, {
+                  key: "cdb-table",
+                  items: rows,
+                  pendingId,
+                  selected,
+                  moreId,
+                  moreMenus: cdbMore,
+                  onToggle: (item) => setSelected((cur) => ({ ...cur, [item.id]: !cur[item.id] })),
+                  onLogin: openLogin,
+                  onManage: (item) => openItem(item),
+                  onMore: (item) => setMoreId((cur) => cur === item.id ? "" : item.id),
+                })
+                : h(ResourceTable, {
+                  key: "table",
+                  items: rows,
+                  pendingId,
+                  onOpen: openItem,
+                  extraCols,
+                  showProvider,
+                  emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
+                })
+            ),
             h(Pager, {
               key: "pager",
               total: counted,
@@ -844,6 +1636,23 @@ window.__ModuleLoader__.load({
               pages: pageCount,
               busy: listBusy,
               onPage: goPage,
+            }),
+            h(NoticeDialog, {
+              key: "notice",
+              open: !!notice,
+              title: "说明",
+              text: notice,
+              onClose: () => setNotice(""),
+            }),
+            h(ConfirmDialog, {
+              key: "lconfirm",
+              open: !!listConfirm,
+              title: listConfirm?.action === "instance.destroy" ? "销毁实例" : "确认",
+              text: listConfirm?.text,
+              busy: listBusyAct,
+              danger: !!listConfirm?.always,
+              onCancel: () => { if (!listBusyAct) setListConfirm(null); },
+              onConfirm: () => listConfirm && runListAction(listConfirm.item, listConfirm.action, listConfirm.payload),
             }),
           ],
         ),
@@ -967,7 +1776,7 @@ window.__ModuleLoader__.load({
           h("summary", { className: "ci-cfg-h" },
             h("span", { className: "ci-cfg-t" },
               h("span", { className: "ci-cfg-n" }, "云资源"),
-              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与解析记录。"),
+              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名、解析记录与云数据库。"),
             ),
             dirty ? h("span", { className: "ci-badge" }, "未保存") : null,
             h(ChevronDown, { className: "ci-cfg-ch" + (open ? " ci-cfg-ch-open" : "") }),

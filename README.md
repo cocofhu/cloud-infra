@@ -1,14 +1,15 @@
 # cloud-infra
 
-DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名等资源，以控制台风格的可翻页列表展示；在设置页配置各云 AccessKey。
+DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名与云数据库等资源，以控制台风格的可翻页列表展示；在设置页配置各云 AccessKey。
 
-首期实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录。架构按厂商 / 凭证 / 产品三层解耦，后续加云不必改 Host 与 Client。
+已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名解析，以及 [腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦。
 
 ## 功能
 
 - 对话里查询域名，按控制台列表展示状态、套餐、记录数，可翻页
 - 点击域名或「解析」配置解析记录：添加、修改、启停、删除（删除始终确认）
-- 设置页按厂商 schema 填写 AKSK，密钥只保存在本机
+- 对话里查询 CDB：列表为「登录 / 管理」，管理页为官方 11 个页签；SQL 走 DMC 登录，库账号只在进程内存
+- 设置页按厂商 schema 填写 AKSK，密钥只保存在本机；不新增地域或库账号字段
 - 预留阿里云凭证字段，产品模块尚未实现
 
 ## 环境要求
@@ -28,7 +29,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 ## 使用
 
-打开 **设置 → 插件 → 插件配置 → 云资源**，填写腾讯云 SecretId / SecretKey。CAM 需包含 DNSPod 读权限；改记录还需写权限。
+打开 **设置 → 插件 → 插件配置 → 云资源**，填写腾讯云 SecretId / SecretKey。CAM 需包含 DNSPod / CDB 对应权限。设置页不填写地域或库账号。
 
 然后可以直接对 Agent 说：
 
@@ -36,9 +37,11 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 > 列出我的解析域名
 
+> 查一下我的 CDB
+
 > 还有吗
 
-插件向 Agent 提供 `cloud_infra_query`。查询完成后对话中会显示可翻页列表；点击域名或「解析」即可配置解析记录。
+插件向 Agent 提供 `cloud_infra_query`（域名 `kind=domain`，云数据库 `kind=cdb`）。查询完成后对话中会显示可翻页列表；域名点「解析」，CDB 点「登录」进 DMC 或点「管理」进实例管理页。
 
 ## 配置
 

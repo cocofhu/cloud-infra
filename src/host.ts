@@ -4,7 +4,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import Schema from '@deepseek-ai/schemastery'
 import { assignConfig, publicConfig, readOverlay, sanitizePatch, withDefaults, writeOverlay } from './core/config-store.js'
 import { queryResources, renderQuery } from './core/query.js'
-import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, SETTINGS_HINT, supportedKinds } from './core/registry.js'
+import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, resolveModuleId, SETTINGS_HINT, supportedKinds } from './core/registry.js'
 import { publicErrorMessage } from './core/safe-error.js'
 import { isPost, trustedUiRequest } from './core/trusted-request.js'
 import type { PluginConfig, QueryResult } from './core/types.js'
@@ -28,11 +28,12 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书. Pass kind=domain for domains. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / CDB MySQL as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/CDB/云数据库/MySQL. Pass kind=domain for domains, kind=cdb for cloud MySQL. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain or auto.' },
+      query: { type: 'string', description: 'Keyword such as example.com, instance id, name, or private IP. Empty lists all.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cdb, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
+      region: { type: 'string', description: 'Optional region id for regional products. Empty or all queries every region. Not a credential.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
     },
@@ -58,6 +59,7 @@ export function apply(ctx: Context, config: Config): void {
         query: args.query != null ? String(args.query) : '',
         kind: args.kind != null ? String(args.kind) : 'domain',
         provider: args.provider != null ? String(args.provider) : '',
+        region: args.region != null ? String(args.region) : '',
         limit: args.limit as number | undefined,
         offset: args.offset as number | undefined,
       }, cfg, exec.signal))
@@ -78,10 +80,10 @@ export function apply(ctx: Context, config: Config): void {
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
         const kinds = supportedKinds().join(', ') || 'domain'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / CDB / 云数据库 / MySQL: call ONLY cloud_infra_query. Never web_search.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Use kind=cdb for 云数据库 MySQL.`,
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
-          'After the table appears, one or two short sentences. Do not print secrets or full record dumps.',
+          'After the table appears, one or two short sentences. CDB list uses 登录 and 管理. Do not print secrets or full record dumps.',
         ].join(' ')
       },
     })
@@ -167,6 +169,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         query: String(body.query || ''),
         kind: String(body.kind || 'domain'),
         provider: String(body.provider || ''),
+        region: body.region != null ? String(body.region) : '',
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
       }, cfg)
@@ -178,6 +181,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         String(body.moduleId || ''),
         String(body.id || ''),
         String(body.title || ''),
+        body.region != null ? String(body.region) : '',
+        body.tab != null ? String(body.tab) : '',
       )
       return sendJson(res, 200, { ok: true, ...detail })
     }
@@ -200,7 +205,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
   }
 }
 
-async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title = '') {
+async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title = '', region = '', tab = '') {
   const { module, creds } = readyModule(cfg, moduleId, id)
   if (!module.detail) throw new Error(`${module.title} 不支持详情`)
   return module.detail({
@@ -211,6 +216,8 @@ async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title 
     timeoutMs: cfg.timeoutMs,
     id,
     title: title || undefined,
+    region: region || undefined,
+    tab: tab || undefined,
   })
 }
 
@@ -230,11 +237,13 @@ async function runAction(
     limit: cfg.maxResults,
     timeoutMs: cfg.timeoutMs,
     id,
+    region: typeof payload.region === 'string' ? payload.region : undefined,
+    tab: typeof payload.tab === 'string' ? payload.tab : undefined,
   })
 }
 
 function readyModule(cfg: PluginConfig, moduleId: string, id: string) {
-  const resolvedId = moduleId || (id.includes(':') ? id.slice(0, id.lastIndexOf(':')) : '')
+  const resolvedId = resolveModuleId(moduleId, id)
   const module = registry.getModule(resolvedId)
   if (!module) throw new Error('未知模块')
   const provider = registry.getProvider(module.provider)
