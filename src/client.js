@@ -105,6 +105,17 @@ window.__ModuleLoader__.load({
 .ci-cfg-hint{margin:0;color:var(--dsw-alias-label-caption);font-size:12px}
 .ci-cfg-src{display:flex;flex-wrap:wrap;gap:10px 16px}
 .ci-cfg-src label{display:flex;gap:6px;align-items:center;font-weight:400;cursor:pointer}
+.ci-cfg-mod-hint{margin:0 0 8px;color:var(--dsw-alias-label-caption);font-size:12px;line-height:1.5;font-weight:400}
+.ci-cfg-mod-q{width:100%;height:34px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font:inherit;font-size:13px;box-sizing:border-box;margin-bottom:8px;appearance:none;-webkit-appearance:none}
+.ci-cfg-mod-q::-webkit-search-cancel-button,.ci-cfg-mod-q::-webkit-search-decoration{appearance:none;-webkit-appearance:none;display:none}
+.ci-cfg-mod-q:focus{outline:none;border-color:var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb)}
+.ci-cfg-mod-list{max-height:196px;overflow-y:auto;overflow-x:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-3);padding:4px 0}
+.ci-cfg-mod-row{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;font-size:13px;font-weight:400;color:var(--dsw-alias-label-primary);min-width:0;margin:0}
+.ci-cfg-mod-row:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.04))}
+.ci-cfg-mod-row input{accent-color:var(--dsw-alias-brand-primary-new-colorprimary-new-color,#2563eb);width:15px;height:15px;flex:none}
+.ci-cfg-mod-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.ci-cfg-mod-empty{padding:8px 12px;color:var(--dsw-alias-label-caption);font-size:13px}
+.ci-cfg-mod-meta{margin-top:6px;color:var(--dsw-alias-label-caption);font-size:12px;font-weight:400}
 .ci-cfg-ft{border-top:1px solid var(--dsw-alias-border-l2);justify-content:flex-end;gap:8px;padding:12px 0 4px;display:flex}
 .ci-cfg-save{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border:1px solid transparent;border-radius:8px;padding:5px 14px;font:inherit;cursor:pointer}
 .ci-cfg-disc{background:var(--dsw-alias-button-elevated-fill);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);border-radius:8px;padding:5px 14px;font:inherit;cursor:pointer}
@@ -792,6 +803,14 @@ window.__ModuleLoader__.load({
       ));
     }
 
+    function matchModule(module, q) {
+      const needle = String(q || "").trim().toLowerCase();
+      if (!needle) return true;
+      const title = String(module.title || "").toLowerCase();
+      const id = String(module.id || "").toLowerCase();
+      return title.includes(needle) || id.includes(needle);
+    }
+
     function configToDraft(d) {
       const providers = {};
       const list = (d.providers || []).filter((item) => item && item.id);
@@ -829,6 +848,7 @@ window.__ModuleLoader__.load({
       const [draft, setDraft] = useState(null);
       const [saving, setSaving] = useState(false);
       const [err, setErr] = useState("");
+      const [modQ, setModQ] = useState("");
       useEffect(() => {
         let live = true;
         api("config", {}).then((d) => {
@@ -885,6 +905,9 @@ window.__ModuleLoader__.load({
         );
       }
       const modules = (meta.modules || []).filter((m) => m.implemented !== false);
+      const visibleModules = modules.filter((m) => matchModule(m, modQ));
+      const enabledModCount = modules.filter((m) => draft.modules[m.id] !== false).length;
+      const filtering = !!String(modQ || "").trim();
       return h("li", { className: "ci-cfg-item" },
         h("details", {
           className: "ci-cfg",
@@ -941,19 +964,33 @@ window.__ModuleLoader__.load({
               );
             }),
             modules.length ? h("div", { className: "ci-cfg-f" },
-              h("label", null, "产品模块"),
-              h("div", { className: "ci-cfg-src" },
-                modules.map((module) => h("label", { key: module.id },
-                  h("input", {
-                    type: "checkbox",
-                    checked: draft.modules[module.id] !== false,
-                    onChange: () => setDraft({
-                      ...draft,
-                      modules: { ...draft.modules, [module.id]: draft.modules[module.id] === false },
+              h("label", { htmlFor: "ci-mod-q" }, "产品模块"),
+              h("p", { className: "ci-cfg-mod-hint" }, "勾选后参与对话查询。条目增多时在框内滚动，不撑高整张设置卡。"),
+              h("input", {
+                id: "ci-mod-q",
+                className: "ci-cfg-mod-q",
+                type: "search",
+                placeholder: "筛选模块名称",
+                value: modQ,
+                onChange: (e) => setModQ(e.target.value),
+              }),
+              h("div", { className: "ci-cfg-mod-list" },
+                visibleModules.length
+                  ? visibleModules.map((module) => h("label", { key: module.id, className: "ci-cfg-mod-row" },
+                    h("input", {
+                      type: "checkbox",
+                      checked: draft.modules[module.id] !== false,
+                      onChange: () => setDraft({
+                        ...draft,
+                        modules: { ...draft.modules, [module.id]: draft.modules[module.id] === false },
+                      }),
                     }),
-                  }),
-                  module.title || module.id,
-                )),
+                    h("span", { className: "ci-cfg-mod-title", title: module.title || module.id }, module.title || module.id),
+                  ))
+                  : h("div", { className: "ci-cfg-mod-empty" }, "没有匹配的模块"),
+              ),
+              h("div", { className: "ci-cfg-mod-meta" },
+                `已启用 ${enabledModCount} / ${modules.length}` + (filtering ? " · 筛选中" : ""),
               ),
             ) : null,
             h("div", { className: "ci-cfg-f" },
