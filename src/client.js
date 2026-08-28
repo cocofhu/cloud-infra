@@ -102,8 +102,12 @@ window.__ModuleLoader__.load({
 .ci-cfg-f:first-child{border-top:0}
 .ci-cfg-f label{font-size:13px;font-weight:500;color:var(--dsw-alias-label-secondary)}
 .ci-cfg-f input[type=text],.ci-cfg-f input[type=password],.ci-cfg-f input[type=number]{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);height:34px;font:inherit;border-radius:8px;padding:0 12px;font-size:13px}
+.ci-cfg-row{display:grid;grid-template-columns:9.5em 1fr;align-items:center;gap:10px;margin:0;padding:0;width:100%;min-width:0;max-width:100%;box-sizing:border-box;float:none;position:static;vertical-align:stretch}
+.ci-cfg-row>label{display:block;width:auto;min-width:0;max-width:100%;margin:0;padding:0;box-sizing:border-box;float:none;position:static;vertical-align:middle;line-height:1.4;overflow-wrap:anywhere;white-space:normal;font-size:13px;font-weight:500;color:var(--dsw-alias-label-secondary)}
+.ci-cfg-row>input[type=text],.ci-cfg-row>input[type=password],.ci-cfg-row>input[type=number]{display:block;width:100%;min-width:0;max-width:100%;margin:0;box-sizing:border-box;float:none;position:static;vertical-align:middle}
 .ci-cfg-hint{margin:0;color:var(--dsw-alias-label-caption);font-size:12px}
-.ci-cfg-src{display:flex;flex-wrap:wrap;gap:10px 16px}
+.ci-cfg-src{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;float:none;position:static}
+.ci-cfg-src>input[type=checkbox]{float:none;position:static;vertical-align:middle;margin:0}
 .ci-cfg-src label{display:flex;gap:6px;align-items:center;font-weight:400;cursor:pointer}
 .ci-cfg-ft{border-top:1px solid var(--dsw-alias-border-l2);justify-content:flex-end;gap:8px;padding:12px 0 4px;display:flex}
 .ci-cfg-save{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border:1px solid transparent;border-radius:8px;padding:5px 14px;font:inherit;cursor:pointer}
@@ -918,7 +922,7 @@ window.__ModuleLoader__.load({
                   }),
                   "启用",
                 ),
-                (provider.fields || []).map((field) => h("div", { key: field.key },
+                (provider.fields || []).map((field) => h("div", { key: field.key, className: "ci-cfg-row" },
                   h("label", { htmlFor: `ci-${provider.id}-${field.key}` }, field.label),
                   h("input", {
                     id: `ci-${provider.id}-${field.key}`,
@@ -957,15 +961,17 @@ window.__ModuleLoader__.load({
               ),
             ) : null,
             h("div", { className: "ci-cfg-f" },
-              h("label", { htmlFor: "ci-max" }, "每页条数"),
-              h("input", {
-                id: "ci-max",
-                type: "number",
-                min: 1,
-                max: 80,
-                value: draft.maxResults,
-                onChange: (e) => setDraft({ ...draft, maxResults: Number(e.target.value) || 12 }),
-              }),
+              h("div", { className: "ci-cfg-row" },
+                h("label", { htmlFor: "ci-max" }, "每页条数"),
+                h("input", {
+                  id: "ci-max",
+                  type: "number",
+                  min: 1,
+                  max: 80,
+                  value: draft.maxResults,
+                  onChange: (e) => setDraft({ ...draft, maxResults: Number(e.target.value) || 12 }),
+                }),
+              ),
             ),
             h("div", { className: "ci-cfg-f" },
               h("label", { className: "ci-cfg-src" },
