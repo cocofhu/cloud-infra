@@ -61,8 +61,20 @@ window.__ModuleLoader__.load({
 .ci-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 4px}
 .ci-chip{font-size:12px;padding:4px 8px;border-radius:7px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-caption)}
 .ci-chip b{color:var(--dsw-alias-label-primary);margin-left:4px;font-weight:600}
-.ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
-.ci-sec-t{font-size:13px;font-weight:650}
+.ci-sec-list{padding:2px 0 8px}
+.ci-sec{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px}
+.ci-sec + .ci-sec{border-top:1px solid var(--dsw-alias-border-l1)}
+.ci-sec-meta{min-width:0;flex:1}
+.ci-sec-t{font-size:13px;font-weight:650;line-height:20px;color:var(--dsw-alias-label-primary)}
+.ci-sec-d{margin:4px 0 0;color:var(--dsw-alias-label-caption);font-size:12px;line-height:18px}
+.ci-kv{display:grid;grid-template-columns:108px 1fr;gap:8px 12px;padding:12px 14px 14px}
+.ci-kv-k{font-size:12px;line-height:20px;color:var(--dsw-alias-label-tertiary)}
+.ci-kv-v{font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary);word-break:break-all}
+.ci-toggle{width:36px;height:20px;border:0;border-radius:999px;background:var(--dsw-alias-bg-layer-3);cursor:pointer;flex:none;padding:2px}
+.ci-toggle.on{background:var(--dsw-alias-brand-primary)}
+.ci-toggle:disabled{opacity:.4;cursor:not-allowed}
+.ci-toggle i{display:block;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-bg-layer-1);box-shadow:var(--dsw-alias-shadow);transform:translateX(0);transition:transform .16s}
+.ci-toggle.on i{transform:translateX(16px)}
 .ci-table-wrap{width:100%;overflow:auto}
 .ci-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
 .ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle}
@@ -816,7 +828,7 @@ window.__ModuleLoader__.load({
       const extras = detail?.card?.extras || item.extras || {};
       const updateLock = extras.updateLock === true;
       const transferLock = extras.transferLock === true;
-      const autoRenew = extras.autoRenew === true;
+      const basicFields = (detail?.fields || []).filter((row) => row.label !== "禁止更新锁" && row.label !== "禁止转移锁");
       const run = async (action, payload) => {
         setBusy(true);
         setErr("");
@@ -855,63 +867,57 @@ window.__ModuleLoader__.load({
             h("button", { type: "button", className: "ci-tab" + (tab === "basic" ? " active" : ""), onClick: () => setTab("basic") }, "基本信息"),
             h("button", { type: "button", className: "ci-tab" + (tab === "security" ? " active" : ""), onClick: () => setTab("security") }, "域名安全"),
           ),
-          tab === "basic" ? h("div", { key: "chips", className: "ci-chips" },
-            (detail.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" },
-              row.label,
-              h("b", null, row.value),
-            )),
-          ) : h("div", { key: "sec", style: { padding: "12px 14px" } },
-            h("p", { className: "ci-hint" }, "两锁在域名安全页签改。更新锁已开时不能改转移锁。"),
-            h("div", { className: "ci-field" },
-              h("label", { className: "ci-cfg-src" },
-                h("input", {
-                  type: "checkbox",
-                  checked: updateLock,
-                  disabled: busy,
-                  onChange: () => request(
-                    { id: "lock.update", label: "禁止更新锁", confirm: "always" },
-                    { enabled: !updateLock },
-                    `确认${updateLock ? "关闭" : "开启"} ${item.title} 禁止更新锁？`,
-                  ),
-                }),
-                "禁止更新锁",
+          tab === "basic" ? h("div", { key: "basic", className: "ci-kv" },
+            basicFields.map((row) => [
+              h("div", { key: `${row.label}-k`, className: "ci-kv-k" }, row.label),
+              h("div", { key: `${row.label}-v`, className: "ci-kv-v" }, row.value),
+            ]),
+          ) : h("div", { key: "sec", className: "ci-sec-list" },
+            h("div", { className: "ci-sec" },
+              h("div", { className: "ci-sec-meta" },
+                h("div", { className: "ci-sec-t" }, "禁止更新锁"),
+                h("p", { className: "ci-sec-d" }, "开启后将禁止修改域名信息、设置及 DNS 服务器。"),
               ),
+              h("button", {
+                type: "button",
+                role: "switch",
+                "aria-checked": updateLock,
+                "aria-label": "禁止更新锁",
+                className: "ci-toggle" + (updateLock ? " on" : ""),
+                disabled: busy,
+                onClick: () => request(
+                  { id: "lock.update", label: "禁止更新锁", confirm: "always" },
+                  { enabled: !updateLock },
+                  `确认${updateLock ? "关闭" : "开启"} ${item.title} 禁止更新锁？`,
+                ),
+              }, h("i", { "aria-hidden": true })),
             ),
-            h("div", { className: "ci-field" },
-              h("label", { className: "ci-cfg-src" },
-                h("input", {
-                  type: "checkbox",
-                  checked: transferLock,
-                  disabled: busy || updateLock,
-                  onChange: () => {
-                    if (updateLock) {
-                      setErr("更新锁已开，不能改转移锁");
-                      return;
-                    }
-                    request(
-                      { id: "lock.transfer", label: "禁止转移锁", confirm: "always" },
-                      { enabled: !transferLock },
-                      `确认${transferLock ? "关闭" : "开启"} ${item.title} 禁止转移锁？`,
-                    );
-                  },
-                }),
-                "禁止转移锁",
+            h("div", { className: "ci-sec" },
+              h("div", { className: "ci-sec-meta" },
+                h("div", { className: "ci-sec-t" }, "禁止转移锁"),
+                h("p", { className: "ci-sec-d" }, updateLock
+                  ? "更新锁已开，不能改转移锁。"
+                  : "开启后将禁止该域名从腾讯云转出到其他注册商。"),
               ),
-            ),
-            h("div", { className: "ci-field" },
-              h("label", { className: "ci-cfg-src" },
-                h("input", {
-                  type: "checkbox",
-                  checked: autoRenew,
-                  disabled: busy,
-                  onChange: () => request(
-                    { id: "autorenew.set", label: "自动续费", confirm: "always" },
-                    { autoRenew: !autoRenew },
-                    `确认${autoRenew ? "关闭" : "开启"} ${item.title} 自动续费？开启后将按续费价格从账户余额扣费。`,
-                  ),
-                }),
-                "自动续费",
-              ),
+              h("button", {
+                type: "button",
+                role: "switch",
+                "aria-checked": transferLock,
+                "aria-label": "禁止转移锁",
+                className: "ci-toggle" + (transferLock ? " on" : ""),
+                disabled: busy || updateLock,
+                onClick: () => {
+                  if (updateLock) {
+                    setErr("更新锁已开，不能改转移锁");
+                    return;
+                  }
+                  request(
+                    { id: "lock.transfer", label: "禁止转移锁", confirm: "always" },
+                    { enabled: !transferLock },
+                    `确认${transferLock ? "关闭" : "开启"} ${item.title} 禁止转移锁？`,
+                  );
+                },
+              }, h("i", { "aria-hidden": true })),
             ),
           ),
           err ? h("p", { key: "err", className: "ci-err" }, err) : null,
