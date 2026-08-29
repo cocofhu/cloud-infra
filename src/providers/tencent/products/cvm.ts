@@ -20,6 +20,7 @@ import {
   matchRegion,
   optsOf,
   paginateItems,
+  pickRegions,
   parseInstanceRef,
   powerAllowed,
   type CloudRegion,
@@ -166,7 +167,8 @@ export function createCvmModule(call: TencentProductCall = cvmCall): ResourceMod
     actions: INSTANCE_ACTIONS,
     async list(ctx) {
       const regions = await listRegions(call, credsOf(ctx), optsOf(ctx))
-      const { items, errors } = await listAcrossRegions(regions, async (region) => {
+      const scoped = pickRegions(regions, ctx.region)
+      const { items, errors } = await listAcrossRegions(scoped, async (region) => {
         const mapped = await loadCvmRegion(call, ctx, module.id, region)
         return mapped.filter((card) => matchCvmQuery(card, ctx.query) && matchRegion(card, ctx.region))
       }, module.id)

@@ -153,6 +153,10 @@ window.__ModuleLoader__.load({
 .ci-sec-t{font-size:13px;font-weight:650;padding:12px 16px 4px}
 .ci-power{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
 .ci-foot-note{padding:8px 14px;color:var(--dsw-alias-label-caption);font-size:12px;border-top:1px solid var(--dsw-alias-border-l1)}
+.ci-tabs{display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--dsw-alias-border-l1);padding:0 10px;overflow-x:auto;background:var(--dsw-alias-bg-layer-1)}
+.ci-tab{border:0;background:none;padding:10px 14px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-secondary);border-bottom:2px solid transparent;white-space:nowrap;flex:none}
+.ci-tab:hover{color:var(--dsw-alias-brand-primary)}
+.ci-tab.on{color:var(--dsw-alias-brand-primary);border-bottom-color:var(--dsw-alias-brand-primary);font-weight:650}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -364,6 +368,46 @@ window.__ModuleLoader__.load({
 
     function isInstanceKind(kind) {
       return kind === "cvm" || kind === "lighthouse";
+    }
+
+    function shortRegion(name) {
+      const m = String(name || "").match(/（([^）]+)）/);
+      return m ? m[1] : String(name || "");
+    }
+
+    function defaultRegionName(names) {
+      const list = (Array.isArray(names) ? names : []).filter(Boolean);
+      return list.find((name) => /广州/.test(name) || name === "ap-guangzhou") || list[0] || "华南地区（广州）";
+    }
+
+    function RegionTabs({ regions, value, onChange }) {
+      const names = Array.from(new Set((Array.isArray(regions) ? regions : []).filter(Boolean)));
+      if (!names.length) return null;
+      const current = value && names.includes(value) ? value : defaultRegionName(names);
+      return h("div", { className: "ci-tabs" },
+        names.map((name) => h("button", {
+          type: "button",
+          key: name,
+          className: "ci-tab" + (name === current ? " on" : ""),
+          onClick: () => { if (onChange && name !== current) onChange(name); },
+        }, shortRegion(name) || name)),
+      );
+    }
+
+    function KindTabs({ showCvm, showLh, value, onChange }) {
+      if (!(showCvm && showLh)) return null;
+      return h("div", { className: "ci-tabs" },
+        h("button", {
+          type: "button",
+          className: "ci-tab" + (value === "cvm" ? " on" : ""),
+          onClick: () => onChange && onChange("cvm"),
+        }, "云服务器"),
+        h("button", {
+          type: "button",
+          className: "ci-tab" + (value === "lighthouse" ? " on" : ""),
+          onClick: () => onChange && onChange("lighthouse"),
+        }, "轻量应用服务器"),
+      );
     }
 
     function instancePower(item) {
@@ -787,9 +831,9 @@ window.__ModuleLoader__.load({
     }
 
     function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery }) {
-      const [localRegion, setLocalRegion] = useState("");
+      const [localRegion, setLocalRegion] = useState("华南地区（广州）");
       const [localQ, setLocalQ] = useState("");
-      const regionValue = onRegion ? (region || "") : localRegion;
+      const regionValue = onRegion ? (region || defaultRegionName(regions)) : localRegion;
       const qValue = onQuery ? (q || "") : localQ;
       const regionNames = Array.from(new Set([
         ...(Array.isArray(regions) ? regions : []),
@@ -813,14 +857,6 @@ window.__ModuleLoader__.load({
         h("div", { key: "bar", className: "ci-bar" },
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, "实例"),
-            h("select", {
-              className: "ci-select",
-              value: regionValue,
-              onChange: (e) => setRegion(e.target.value),
-            },
-              h("option", { value: "" }, "全部地域"),
-              regionNames.map((name) => h("option", { key: name, value: name }, name)),
-            ),
           ),
           h("div", { className: "ci-search-wrap" },
             h(SearchIcon),
@@ -839,6 +875,7 @@ window.__ModuleLoader__.load({
             }, "×") : null,
           ),
         ),
+        h(RegionTabs, { key: "rtabs", regions: regionNames, value: regionValue, onChange: setRegion }),
         rows.length ? h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
             ["ID/名称", "状态", "可用区", "实例类型", "操作系统", "实例配置", "主IPv4地址", "实例计费模式", "操作"]
@@ -868,17 +905,14 @@ window.__ModuleLoader__.load({
       ];
     }
 
-    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint }) {
+    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion }) {
       const [mode, setMode] = useState("card");
+      const regionValue = region || defaultRegionName(regions);
       const groups = groupByRegion(items || []);
-      if (!(items || []).length) {
-        return h("div", { className: "ci-empty" }, emptyHint || "没有资源");
-      }
       return [
         h("div", { key: "bar", className: "ci-bar" },
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, "服务器"),
-            h("span", { className: "ci-bar-count" }, "按地域分组，对齐轻量控制台一页多地域"),
           ),
           h("div", { className: "ci-ops" },
             h("button", {
@@ -893,7 +927,10 @@ window.__ModuleLoader__.load({
             }, "列表视图"),
           ),
         ),
-        mode === "card" ? groups.map((group) => [
+        h(RegionTabs, { key: "rtabs", regions, value: regionValue, onChange: onRegion }),
+        !(items || []).length
+          ? h("div", { key: "empty", className: "ci-empty" }, emptyHint || "没有资源")
+          : mode === "card" ? groups.map((group) => [
           h("div", { key: group.region + "-g", className: "ci-group" }, group.region),
           h("div", { key: group.region + "-c", className: "ci-cards" },
             group.items.map((item) => h("div", { key: item.id, className: "ci-card" },
@@ -1057,8 +1094,9 @@ window.__ModuleLoader__.load({
       const [listErr, setListErr] = useState("");
       const [draftQ, setDraftQ] = useState(initialQuery);
       const [activeQ, setActiveQ] = useState(initialQuery);
-      const [listRegion, setListRegion] = useState("");
+      const [listRegion, setListRegion] = useState("华南地区（广州）");
       const [regionOptions, setRegionOptions] = useState(Array.isArray(payload?.regions) ? payload.regions : []);
+      const [kindTab, setKindTab] = useState(kind === "lighthouse" ? "lighthouse" : "cvm");
       const seq = useRef(0);
       const debounce = useRef(0);
       const refreshSkip = () => {
@@ -1082,13 +1120,17 @@ window.__ModuleLoader__.load({
         setHasMore(!!payload?.hasMore);
         setDraftQ(initialQuery);
         setActiveQ(initialQuery);
-        setRegionOptions(Array.isArray(payload?.regions) ? payload.regions : []);
+        const names = Array.isArray(payload?.regions) ? payload.regions : [];
+        setRegionOptions(names);
+        setListRegion((cur) => names.includes(cur) ? cur : defaultRegionName(names));
+        if (kind === "lighthouse") setKindTab("lighthouse");
+        else if (kind === "cvm" || kind === "auto") setKindTab("cvm");
         setListErr("");
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
       const fetchList = async (nextOffset, q, region) => {
         const n = ++seq.current;
-        const useRegion = region !== undefined ? region : listRegion;
+        const useRegion = region !== undefined ? region : (listRegion || "华南地区（广州）");
         setListBusy(true);
         setListErr("");
         try {
@@ -1222,17 +1264,24 @@ window.__ModuleLoader__.load({
           }))
         : null;
       const instanceList = !session && (showCvm || showLh) ? [
+        h(KindTabs, {
+          key: "ktabs",
+          showCvm,
+          showLh,
+          value: kindTab,
+          onChange: setKindTab,
+        }),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
         errors.length ? h("div", { key: "perr", className: "ci-err" }, errors.map((e) => e.message).join("；")) : null,
         listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : [
-          showCvm ? h(CvmConsole, {
+          showCvm && (!showLh || kindTab === "cvm") ? h(CvmConsole, {
             key: "cvm",
             items: kind === "cvm" ? rows : cvmRows,
             pendingId,
             onOpen: openItem,
             onAction: onInstanceAction,
             emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
-            region: listRegion,
+            region: listRegion || defaultRegionName(regionOptions),
             regions: regionOptions,
             onRegion: (next) => {
               setListRegion(next);
@@ -1241,13 +1290,19 @@ window.__ModuleLoader__.load({
             q: draftQ,
             onQuery: onDraft,
           }) : null,
-          showLh ? h(LhConsole, {
+          showLh && (!showCvm || kindTab === "lighthouse") ? h(LhConsole, {
             key: "lh",
             items: kind === "lighthouse" ? rows : lhRows,
             pendingId,
             onOpen: openItem,
             onAction: onInstanceAction,
             emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有资源",
+            region: listRegion || defaultRegionName(regionOptions),
+            regions: regionOptions,
+            onRegion: (next) => {
+              setListRegion(next);
+              fetchList(0, String(activeQ || "").trim(), next);
+            },
           }) : null,
         ],
         h(Pager, {

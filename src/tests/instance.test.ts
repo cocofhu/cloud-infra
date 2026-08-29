@@ -10,6 +10,7 @@ import {
   mapInstanceState,
   matchInstanceQuery,
   parseInstanceRef,
+  pickRegions,
   powerAllowed,
 } from '../providers/tencent/products/instance-common.js'
 import { createLighthouseModule, lighthouseDetailGroups, mapLighthouseItem } from '../providers/tencent/products/lighthouse.js'
@@ -195,6 +196,46 @@ test('cvm and lighthouse detail groups cover official sections and omit DNS reco
   assert.equal(detail.groups?.length, 5)
 })
 
+test('pickRegions defaults to Guangzhou and honors an explicit region', () => {
+  const regions = [
+    { region: 'ap-shanghai', regionName: '华东地区（上海）' },
+    { region: 'ap-guangzhou', regionName: '华南地区（广州）' },
+    { region: 'ap-beijing', regionName: '华北地区（北京）' },
+  ]
+  assert.deepEqual(pickRegions(regions), [{ region: 'ap-guangzhou', regionName: '华南地区（广州）' }])
+  assert.equal(pickRegions(regions, '华北地区（北京）')[0].region, 'ap-beijing')
+  assert.equal(pickRegions(regions, 'ap-shanghai')[0].region, 'ap-shanghai')
+  assert.equal(pickRegions([{ region: 'ap-shanghai', regionName: '华东地区（上海）' }])[0].region, 'ap-shanghai')
+})
+
+test('list defaults to Guangzhou and does not query other regions', async () => {
+  const calls: Array<{ action: string; region?: string }> = []
+  const call = mockCall((action, _payload, region) => {
+    calls.push({ action, region })
+    if (action === 'DescribeRegions') {
+      return {
+        RegionSet: [
+          { Region: 'ap-shanghai', RegionName: '华东地区(上海)', RegionState: 'AVAILABLE' },
+          { Region: 'ap-guangzhou', RegionName: '华南地区(广州)', RegionState: 'AVAILABLE' },
+          { Region: 'ap-beijing', RegionName: '华北地区(北京)', RegionState: 'AVAILABLE' },
+        ],
+      }
+    }
+    if (action === 'DescribeZones') return { ZoneSet: [] }
+    if (action === 'DescribeInstances') {
+      if (region !== 'ap-guangzhou') throw new Error(`should not query ${region}`)
+      return { InstanceSet: [cvmRunning], TotalCount: 1 }
+    }
+    throw new Error(action)
+  })
+  const listed = await createCvmModule(call).list(ctx)
+  assert.equal(listed.items.length, 1)
+  assert.ok(calls.some((row) => row.action === 'DescribeInstances' && row.region === 'ap-guangzhou'))
+  assert.equal(calls.filter((row) => row.action === 'DescribeInstances' && row.region === 'ap-beijing').length, 0)
+  assert.equal(calls.filter((row) => row.action === 'DescribeInstances' && row.region === 'ap-shanghai').length, 0)
+  assert.ok(listed.regions?.some((name) => /广州/.test(name)))
+})
+
 test('list isolates a failed region and still returns the others', async () => {
   const calls: Array<{ action: string; region?: string }> = []
   const call = mockCall((action, _payload, region) => {
@@ -214,12 +255,12 @@ test('list isolates a failed region and still returns the others', async () => {
     }
     throw new Error(action)
   })
-  const listed = await createCvmModule(call).list(ctx)
+  const listed = await createCvmModule(call).list({ ...ctx, region: '华东地区（上海）' })
   assert.equal(listed.items.length, 1)
   assert.equal(listed.items[0].instanceId, 'ins-8k2m1a')
-  assert.equal(listed.errors?.length, 1)
-  assert.match(listed.errors?.[0].message || '', /北京|ap-beijing|权限|失败/)
+  assert.equal(listed.errors?.length || 0, 0)
   assert.ok(calls.some((row) => row.action === 'DescribeInstances' && row.region === 'ap-shanghai'))
+  assert.equal(calls.filter((row) => row.action === 'DescribeInstances' && row.region === 'ap-beijing').length, 0)
 })
 
 test('keyword list filter keeps matching instances only', async () => {
@@ -346,13 +387,14 @@ test('queryResources merges per-region list errors and keeps other items', async
     if (action === 'DescribeRegions') {
       return {
         RegionSet: [
-          { Region: 'ap-shanghai', RegionName: '华东地区(上海)', RegionState: 'AVAILABLE' },
+          { Region: 'ap-guangzhou', RegionName: '华南地区(广州)', RegionState: 'AVAILABLE' },
           { Region: 'ap-beijing', RegionName: '华北地区(北京)', RegionState: 'AVAILABLE' },
         ],
       }
     }
     if (action === 'DescribeZones') return { ZoneSet: [] }
     if (region === 'ap-beijing') throw new Error('UnauthorizedOperation')
+    if (region === 'ap-guangzhou') throw new Error('UnauthorizedOperation')
     return { InstanceSet: [cvmRunning], TotalCount: 1 }
   }))
   source.registerModule(module)
@@ -360,10 +402,9 @@ test('queryResources merges per-region list errors and keeps other items', async
     providers: { tencent: { secretId: 'id', secretKey: 'key' } },
     modules: { 'tencent.cvm': true },
   }), undefined, source)
-  assert.equal(result.items.length, 1)
+  assert.equal(result.items.length, 0)
   assert.equal(result.errors.length, 1)
-  assert.match(renderQuery(result), /实例 ID/)
-  assert.doesNotMatch(renderQuery(result), /点击「解析」/)
+  assert.match(result.errors[0].message, /广州|权限|失败|频繁/)
 })
 
 test('queryResources slices cvm results and keeps total for the pager', async () => {

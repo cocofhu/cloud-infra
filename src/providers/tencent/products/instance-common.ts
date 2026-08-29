@@ -90,6 +90,35 @@ export function matchRegion(card: { region?: string; regionName?: string }, regi
   return card.region === want || card.regionName === want
 }
 
+export const DEFAULT_REGION = 'ap-guangzhou'
+export const DEFAULT_REGION_LABEL = '华南地区（广州）'
+
+export function isGuangzhou(region: { region?: string; regionName?: string } | string): boolean {
+  const text = typeof region === 'string'
+    ? region
+    : `${region.region || ''} ${region.regionName || ''}`
+  return /ap-guangzhou\b/.test(text) || /广州/.test(text)
+}
+
+export function pickRegions(regions: CloudRegion[], wanted?: string): CloudRegion[] {
+  if (!regions.length) return []
+  const want = String(wanted || '').trim()
+  if (want) {
+    return regions.filter((row) => (
+      row.region === want
+      || row.regionName === want
+      || (isGuangzhou(want) && isGuangzhou(row))
+    ))
+  }
+  const gz = regions.find((row) => isGuangzhou(row))
+  return [gz || regions[0]]
+}
+
+export function defaultRegionName(names: string[]): string {
+  const list = names.filter(Boolean)
+  return list.find((name) => isGuangzhou(name)) || list[0] || DEFAULT_REGION_LABEL
+}
+
 export function paginateItems<T>(items: T[], offset: number, limit: number): {
   items: T[]
   total: number

@@ -20,6 +20,7 @@ import {
   matchRegion,
   optsOf,
   paginateItems,
+  pickRegions,
   parseInstanceRef,
   powerAllowed,
   type CloudRegion,
@@ -163,7 +164,8 @@ export function createLighthouseModule(call: TencentProductCall = lighthouseCall
     actions: INSTANCE_ACTIONS,
     async list(ctx) {
       const regions = await listRegions(call, credsOf(ctx), optsOf(ctx))
-      const { items, errors } = await listAcrossRegions(regions, async (region) => {
+      const scoped = pickRegions(regions, ctx.region)
+      const { items, errors } = await listAcrossRegions(scoped, async (region) => {
         const mapped = await loadLhRegion(call, ctx, module.id, region)
         return mapped.filter((card) => matchLighthouseQuery(card, ctx.query) && matchRegion(card, ctx.region))
       }, module.id)
