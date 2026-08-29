@@ -8,11 +8,11 @@ window.__ModuleLoader__.load({
     const CSS = `
 .ci-root,.ci-tool{font-family:inherit;color:var(--dsw-alias-label-primary);width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:2px 0 6px}
 .ci-panel{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);overflow:hidden;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
-.ci-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;min-width:0;flex-wrap:wrap}
-.ci-bar-left{display:flex;align-items:baseline;gap:8px;min-width:0}
+.ci-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;min-width:0;flex-wrap:nowrap}
+.ci-bar-left{display:flex;align-items:baseline;gap:8px;flex:none;white-space:nowrap}
 .ci-bar-title{font-size:14px;font-weight:650;line-height:22px;color:var(--dsw-alias-label-primary)}
 .ci-bar-count{color:var(--dsw-alias-label-tertiary);font-size:12px}
-.ci-search-wrap{position:relative;width:min(220px,100%);flex:none}
+.ci-search-wrap{position:relative;flex:1 1 140px;width:auto;min-width:112px;max-width:200px}
 .ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption);pointer-events:none}
 .ci-search{width:100%;height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 28px 0 32px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none}
 .ci-search::-webkit-search-cancel-button,.ci-search::-webkit-search-decoration{appearance:none;-webkit-appearance:none;display:none}
@@ -71,7 +71,7 @@ window.__ModuleLoader__.load({
 .ci-table td.ci-ops-cell{white-space:nowrap;word-break:normal}
 .ci-table tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-rec-page{margin:0}
-.ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+.ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px;flex:none;white-space:nowrap}
 .ci-mini.primary{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border-color:transparent}
 .ci-mini.danger{color:var(--dsw-alias-state-error-primary)}
 .ci-mini:disabled{opacity:.4;cursor:default}
@@ -138,8 +138,8 @@ window.__ModuleLoader__.load({
 .ci-drop-menu{position:absolute;right:0;top:100%;z-index:5;min-width:168px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:4px 0;box-shadow:var(--dsw-alias-shadow)}
 .ci-drop-item{display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 12px;font:inherit;cursor:pointer;color:inherit}
 .ci-drop-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
-.ci-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.ci-sel{height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 8px;font:inherit}
+.ci-tools{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;min-width:0}
+.ci-sel{height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 8px;font:inherit;flex:none}
 .ci-sql{width:100%;min-height:120px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;padding:8px;font:inherit;box-sizing:border-box;resize:vertical}
 .ci-dmc{display:grid;grid-template-columns:minmax(140px,200px) 1fr;min-height:280px}
 .ci-tree{border-right:1px solid var(--dsw-alias-border-l1);padding:8px;overflow:auto}
@@ -915,12 +915,6 @@ window.__ModuleLoader__.load({
                   initial: { port: cdbMeta(item).port || "3306" },
                   action: { id: "instance.port", label: "修改端口", confirm: "default" },
                 }) }, "修改端口") : null,
-                row.label === "项目 ID" ? h("button", { type: "button", className: "ci-link", style: { marginLeft: 8 }, onClick: () => setForm({
-                  title: "分配至项目",
-                  fields: [{ key: "projectId", label: "项目 ID", placeholder: "0" }],
-                  initial: { projectId: cdbMeta(item).projectId || row.value || "0" },
-                  action: { id: "instance.project", label: "分配至项目", confirm: "default" },
-                }) }, "分配") : null,
                 row.label === "外网地址" ? h("button", {
                   type: "button",
                   className: "ci-link",
@@ -1030,15 +1024,7 @@ window.__ModuleLoader__.load({
         if (tab === "安全组") {
           const groups = tabData.groups || [];
           return h("div", { className: "ci-pane" },
-            h("div", { className: "ci-sec" },
-              h("span", { className: "ci-sec-t" }, "安全组"),
-              h("button", { type: "button", className: "ci-mini", onClick: () => setForm({
-                title: "配置安全组",
-                fields: [{ key: "securityGroupIds", label: "安全组 ID", placeholder: "sg-xxx,sg-yyy" }],
-                initial: { securityGroupIds: groups.map((g) => g.SecurityGroupId).filter(Boolean).join(",") },
-                action: { id: "sg.bind", label: "配置安全组", confirm: "default" },
-              }) }, "配置安全组"),
-            ),
+            h("div", { className: "ci-sec" }, h("span", { className: "ci-sec-t" }, "安全组")),
             groups.length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
               h("thead", null, h("tr", null, h("th", null, "安全组 ID"), h("th", null, "名称"))),
               h("tbody", null, groups.map((row) => h("tr", { key: row.SecurityGroupId },
@@ -1418,7 +1404,6 @@ window.__ModuleLoader__.load({
       const [moreId, setMoreId] = useState("");
       const [notice, setNotice] = useState("");
       const [listConfirm, setListConfirm] = useState(null);
-      const [listForm, setListForm] = useState(null);
       const [listBusyAct, setListBusyAct] = useState(false);
       const seq = useRef(0);
       const detailSeq = useRef(0);
@@ -1556,7 +1541,6 @@ window.__ModuleLoader__.load({
             payload: { region: cdbMeta(item).region, instanceId: item.title, ...payload },
           });
           setListConfirm(null);
-          setListForm(null);
           await fetchList(offset, String(activeQ || "").trim());
         } catch (e) {
           setListErr(publicErrorMessage(e));
@@ -1613,7 +1597,6 @@ window.__ModuleLoader__.load({
             }))
         : null;
       const cdbMore = [
-        { id: "sg", label: "配置安全组", onClick: (item) => openItem(item, "安全组") },
         { id: "protect", label: (item) => destroyProtectOn(item) ? "关闭实例销毁保护" : "开启实例销毁保护", onClick: (item) => {
           const on = destroyProtectOn(item);
           askListAction(item, "instance.protect", on ? "确认关闭实例销毁保护？" : "确认开启实例销毁保护？", { enable: !on });
@@ -1652,18 +1635,6 @@ window.__ModuleLoader__.load({
                     if (!target) return setNotice("请先选择实例");
                     openItem(target, "数据库管理");
                   } }, "参数设置"),
-                  h("button", { key: "proj", type: "button", className: "ci-mini", onClick: () => {
-                    const target = selectedItems[0];
-                    if (!target) return setNotice("请先选择实例");
-                    setMoreId("");
-                    setListForm({
-                      item: target,
-                      title: "分配至项目",
-                      fields: [{ key: "projectId", label: "项目 ID", placeholder: "0" }],
-                      initial: { projectId: cdbMeta(target).projectId || "0" },
-                      action: "instance.project",
-                    });
-                  } }, "分配至项目"),
                 ] : null,
                 h("div", { className: "ci-search-wrap" },
                   h(SearchIcon),
@@ -1730,16 +1701,6 @@ window.__ModuleLoader__.load({
               text: notice,
               onClose: () => setNotice(""),
             }),
-            listForm ? h(GenericForm, {
-              key: "lform",
-              title: listForm.title,
-              fields: listForm.fields,
-              initial: listForm.initial,
-              busy: listBusyAct,
-              err: listErr,
-              onCancel: () => { if (!listBusyAct) setListForm(null); },
-              onSubmit: (draft) => runListAction(listForm.item, listForm.action, { ...listForm.initial, ...draft }),
-            }) : null,
             h(ConfirmDialog, {
               key: "lconfirm",
               open: !!listConfirm,
