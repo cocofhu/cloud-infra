@@ -124,3 +124,14 @@ export const CERT_CREDENTIAL_HINT = '请使用已有腾讯云 SecretId/SecretKey
 export function credentialHint(kind?: string): string {
   return kind === 'cert' ? CERT_CREDENTIAL_HINT : SETTINGS_HINT
 }
+
+export function resolveModuleId(moduleId: string, resourceId: string, source: Registry = registry): string {
+  if (moduleId && source.getModule(moduleId)) return moduleId
+  const matches = source.listModules()
+    .map((module) => module.id)
+    .filter((id) => resourceId === id || resourceId.startsWith(`${id}:`))
+    .sort((a, b) => b.length - a.length)
+  if (matches[0]) return matches[0]
+  if (resourceId.includes(':')) return resourceId.slice(0, resourceId.lastIndexOf(':'))
+  return moduleId
+}

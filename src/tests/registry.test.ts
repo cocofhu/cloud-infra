@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { withDefaults } from '../core/config-store.js'
 import { queryResources, renderQuery } from '../core/query.js'
-import { createRegistry } from '../core/registry.js'
+import { createRegistry, resolveModuleId } from '../core/registry.js'
 import type { ResourceModule } from '../core/types.js'
 
 test('queryResources fans out to a newly registered fake cloud without core changes', async () => {
@@ -114,4 +114,27 @@ test('cert missing credentials mention existing SecretId/SecretKey not 设置页
   const text = renderQuery(result)
   assert.doesNotMatch(text, /设置/)
   assert.doesNotMatch(text, /设置页/)
+})
+
+test('resolveModuleId prefers the longest registered module prefix', () => {
+  const source = createRegistry()
+  source.registerProvider({ id: 'tencent', title: '腾讯云', fields: [] })
+  source.registerModule({
+    id: 'tencent.cdb',
+    provider: 'tencent',
+    kind: 'cdb',
+    title: '腾讯云 CDB',
+    implemented: true,
+    async list() { return { items: [] } },
+  })
+  source.registerModule({
+    id: 'tencent.domain',
+    provider: 'tencent',
+    kind: 'domain',
+    title: '腾讯云域名',
+    implemented: true,
+    async list() { return { items: [] } },
+  })
+  assert.equal(resolveModuleId('', 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1', source), 'tencent.cdb')
+  assert.equal(resolveModuleId('', 'tencent.domain:12614766', source), 'tencent.domain')
 })
