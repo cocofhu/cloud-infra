@@ -81,9 +81,8 @@ window.__ModuleLoader__.load({
 .ci-actions{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 .ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;margin:8px 14px}
 .ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
-.ci-list-body{position:relative;min-height:160px}
-.ci-list-mask{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:8px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 82%,transparent);color:var(--dsw-alias-label-caption);font-size:13px;z-index:2}
-.ci-list-mask .ci-spin{margin:0}
+.ci-list-body{min-height:160px}
+.ci-list-body .ci-load{min-height:160px;box-sizing:border-box}
 .ci-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:ci-spin .7s linear infinite;vertical-align:-1px;margin-right:6px}
 @keyframes ci-spin{to{transform:rotate(360deg)}}
 .ci-modal-mask{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--dsw-alias-bg-mask-3);box-sizing:border-box}
@@ -361,8 +360,9 @@ window.__ModuleLoader__.load({
 
     function ListPane({ busy, children }) {
       return h("div", { className: "ci-list-body" },
-        children,
-        busy ? h("div", { className: "ci-list-mask", "aria-live": "polite" }, h(Spin), "加载列表…") : null,
+        busy
+          ? h("div", { className: "ci-load", "aria-live": "polite" }, h(Spin), "加载列表…")
+          : children,
       );
     }
 
@@ -1371,14 +1371,14 @@ window.__ModuleLoader__.load({
             busy: listBusy,
           }) : null,
         ],
-        h(Pager, {
+        !listBusy ? h(Pager, {
           key: "pager",
           total: counted,
           page,
           pages: pageCount,
           busy: listBusy,
           onPage: goPage,
-        }),
+        }) : null,
         h(ConfirmDialog, {
           key: "power",
           open: !!powerConfirm,
@@ -1415,14 +1415,14 @@ window.__ModuleLoader__.load({
             emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
           }),
         ),
-        h(Pager, {
+        !listBusy ? h(Pager, {
           key: "pager",
           total: counted,
           page,
           pages: pageCount,
           busy: listBusy,
           onPage: goPage,
-        }),
+        }) : null,
       ] : null;
       return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
         h("div", { className: "ci-panel" },
