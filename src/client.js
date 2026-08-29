@@ -866,11 +866,56 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       });
     }
 
-    // 服务器 CVM/轻量地域选择:统一改用 RegionCombo,保留『全部地域』首项与默认地域。
+    // 常见 city 短名 → 控制台全称;数据源已返回全称时按原样匹配,否则把「广州」此类短名归一。
+    const REGION_CITY_TO_DISPLAY = [
+      ["广州", "华南地区（广州）"],
+      ["上海", "华东地区（上海）"],
+      ["北京", "华北地区（北京）"],
+      ["成都", "西南地区（成都）"],
+      ["重庆", "西南地区（重庆）"],
+      ["南京", "华东地区（南京）"],
+      ["香港", "港澳台地区（中国香港）"],
+      ["新加坡", "亚太东南（新加坡）"],
+      ["东京", "亚太东北（东京）"],
+      ["硅谷", "美国西部（硅谷）"],
+      ["弗吉尼亚", "美国东部（弗吉尼亚）"],
+      ["法兰克福", "欧洲地区（法兰克福）"],
+      ["雅加达", "亚太东南（雅加达）"],
+      ["孟买", "亚太南部（孟买）"],
+      ["首尔", "亚太东北（首尔）"],
+      ["曼谷", "亚太东南（曼谷）"],
+      ["深圳", "华南地区（深圳）"],
+      ["金融", "华南地区（深圳金融）"],
+    ];
+    function canonicalRegionName(name) {
+      const raw = String(name || "").trim();
+      if (!raw) return "";
+      // 已是「xx地区（城市）/xx（城市）」形式视为控制台全称,仅统一全角括号。
+      if (/（[^）]+）/.test(raw) || /\([^)]+\)/.test(raw)) {
+        return raw.replace(/\(/g, "（").replace(/\)/g, "）");
+      }
+      // 官方 region id(如 ap-guangzhou)直接保留,供服务端按 id 过滤。
+      if (/^(ap|eu|na|sa|in|jp)-[a-z-]+$/.test(raw)) return raw;
+      for (const [city, display] of REGION_CITY_TO_DISPLAY) {
+        if (raw === city) return display;
+      }
+      return raw;
+    }
+
+    // 服务器 CVM/轻量地域选择:统一改用 RegionCombo,并按控制台全称归一去重。
     function RegionSelect({ regions, value, onChange }) {
-      const names = Array.from(new Set((Array.isArray(regions) ? regions : []).filter(Boolean)));
+      const raw = (Array.isArray(regions) ? regions : []).filter(Boolean);
+      const seen = new Set();
+      const names = [];
+      for (const item of raw) {
+        const canonical = canonicalRegionName(item);
+        if (canonical && !seen.has(canonical)) {
+          seen.add(canonical);
+          names.push(canonical);
+        }
+      }
       const items = names.map((name) => ({ id: name, label: name }));
-      const current = value || defaultRegionName(names);
+      const current = canonicalRegionName(value) || defaultRegionName(names);
       return h(RegionComboById, {
         options: items,
         value: current === "all" ? REGION_ALL_ID : current,
@@ -879,8 +924,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       });
     }
 
-    function KindTabs({ showCvm, showLh, value, onChange }) {
-      if (!(showCvm && showLh)) return null;
+    function KindTabs({ value, onChange }) {
       return h("div", { className: "ci-tabs" },
         h("button", {
           type: "button",
@@ -3259,44 +3303,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ];
     }
 
-    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery, onSubmit, busy }) {
-      const [localRegion, setLocalRegion] = useState("华南地区（广州）");
-      const [localQ, setLocalQ] = useState("");
-      const regionValue = onRegion ? (region || defaultRegionName(regions)) : localRegion;
-      const qValue = onQuery ? (q || "") : localQ;
-      const regionNames = Array.from(new Set([
-        ...(Array.isArray(regions) ? regions : []),
-        ...(items || []).map((row) => row.regionName || row.region).filter(Boolean),
-      ]));
-      const rows = onRegion || onQuery
-        ? (items || [])
-        : (items || []).filter((row) => {
-          if (regionValue && (row.regionName || row.region) !== regionValue) return false;
-          return matchLocalInstance(row, qValue);
-        });
-      const setRegion = (next) => {
-        if (onRegion) onRegion(next);
-        else setLocalRegion(next);
-      };
-      const setQ = (next) => {
-        if (onQuery) onQuery(next);
-        else setLocalQ(next);
-      };
-      return [
-        h("div", { key: "bar", className: "ci-bar" },
-          h("div", { className: "ci-bar-left" },
-            h("span", { className: "ci-bar-title" }, "实例"),
-            h(RegionSelect, { regions: regionNames, value: regionValue, onChange: setRegion }),
-          ),
-          h(SearchField, {
-            value: qValue,
-            onChange: setQ,
-            onSubmit: onSubmit,
-            placeholder: "搜索 ID / 名称 / IP",
-          }),
-        ),
-        h(ListPane, { key: "body", busy },
-          rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
+    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, q, busy }) {
+      const rows = Array.isArray(items) ? items : [];
+      return h(ListPane, { busy },
+        rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
             ["ID/名称", "状态", "可用区", "实例类型", "操作系统", "实例配置", "主IPv4地址", "实例计费模式", "操作"]
               .map((label) => h("th", { key: label }, label)),
@@ -3320,32 +3330,16 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("td", null, cellValue(item, "实例计费模式") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : h("div", { className: "ci-empty" }, emptyHint || (qValue ? `没有匹配「${qValue}」的实例` : "没有匹配的实例")),
-        ),
-      ];
+        )) : h("div", { className: "ci-empty" }, emptyHint || ((q || "").trim() ? `没有匹配「${String(q).trim()}」的实例` : "没有匹配的实例")),
+      );
     }
 
-    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery, onSubmit, busy }) {
-      const regionValue = region || defaultRegionName(regions);
-      const qValue = onQuery ? (q || "") : "";
+    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, q, busy }) {
       const rows = Array.isArray(items) ? items : [];
-      return [
-        h("div", { key: "bar", className: "ci-bar" },
-          h("div", { className: "ci-bar-left" },
-            h("span", { className: "ci-bar-title" }, "服务器"),
-            h(RegionSelect, { regions, value: regionValue, onChange: onRegion }),
-          ),
-          h(SearchField, {
-            value: qValue,
-            onChange: onQuery,
-            onSubmit: onSubmit,
-            placeholder: "搜索 ID / 名称 / IP",
-          }),
-        ),
-        h(ListPane, { key: "body", busy },
-          rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
+      return h(ListPane, { busy },
+        rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
-            ["ID/名称", "状态", "地域", "公网 IP", "套餐", "到期时间", "操作"].map((label) => h("th", { key: label }, label)),
+            ["ID/名称", "状态", "可用区", "套餐", "公网 IP", "到期时间", "操作"].map((label) => h("th", { key: label }, label)),
           )),
           h("tbody", null, rows.map((item) => h("tr", { key: item.id },
             h("td", null, h("div", { className: "ci-id" },
@@ -3358,15 +3352,14 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               h("span", { className: "ci-id-sub" }, item.title),
             )),
             h("td", null, h(StatusCell, { status: item.status, label: item.stateLabel })),
-            h("td", null, item.regionName || item.region || "-"),
-            h("td", null, item.publicIp || cellValue(item, "公网 IP") || "-"),
+            h("td", null, cellValue(item, "可用区") || "-"),
             h("td", null, cellValue(item, "套餐") || "-"),
+            h("td", null, item.publicIp || cellValue(item, "公网 IP") || "-"),
             h("td", null, cellValue(item, "到期时间") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : h("div", { className: "ci-empty" }, emptyHint || "没有资源"),
-        ),
-      ];
+        )) : h("div", { className: "ci-empty" }, emptyHint || ((q || "").trim() ? `没有匹配「${String(q).trim()}」的实例` : "没有匹配的实例")),
+      );
     }
 
     function InstanceDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
@@ -7306,54 +7299,52 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const instanceList = !session && (showCvm || showLh) ? [
         h(KindTabs, {
           key: "ktabs",
-          showCvm,
-          showLh,
           value: kindTab,
           onChange: (next) => {
+            if (next === kindTab) return;
             setKindTab(next);
             fetchList(0, String(activeQ || "").trim(), undefined, next);
           },
         }),
+        h("div", { key: "bar", className: "ci-bar" },
+          h("div", { className: "ci-bar-left" },
+            h(RegionSelect, {
+              regions: regionOptions,
+              value: listRegion || defaultRegionName(regionOptions),
+              onChange: (next) => {
+                setListRegion(next);
+                fetchList(0, String(activeQ || "").trim(), next);
+              },
+            }),
+          ),
+          h(SearchField, {
+            value: draftQ,
+            onChange: onDraft,
+            onSubmit: runSearch,
+            placeholder: "搜索 ID / 名称 / IP",
+          }),
+        ),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
         errors.length ? h("div", { key: "perr", className: "ci-err" }, errors.map((e) => e.message).join("；")) : null,
-        [
-          showCvm && (!showLh || kindTab === "cvm") ? h(CvmConsole, {
-            key: "cvm",
-            items: kind === "cvm" ? rows : cvmRows,
-            pendingId,
-            onOpen: openItem,
-            onAction: onInstanceAction,
-            emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
-            region: listRegion || defaultRegionName(regionOptions),
-            regions: regionOptions,
-            onRegion: (next) => {
-              setListRegion(next);
-              fetchList(0, String(activeQ || "").trim(), next);
-            },
-            q: draftQ,
-            onQuery: onDraft,
-            onSubmit: runSearch,
-            busy: listBusy,
-          }) : null,
-          showLh && (!showCvm || kindTab === "lighthouse") ? h(LhConsole, {
-            key: "lh",
-            items: kind === "lighthouse" ? rows : lhRows,
-            pendingId,
-            onOpen: openItem,
-            onAction: onInstanceAction,
-            emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有资源",
-            region: listRegion || defaultRegionName(regionOptions),
-            regions: regionOptions,
-            onRegion: (next) => {
-              setListRegion(next);
-              fetchList(0, String(activeQ || "").trim(), next);
-            },
-            q: draftQ,
-            onQuery: onDraft,
-            onSubmit: runSearch,
-            busy: listBusy,
-          }) : null,
-        ],
+        kindTab === "cvm" ? h(CvmConsole, {
+          key: "cvm",
+          items: kind === "cvm" ? rows : cvmRows,
+          pendingId,
+          onOpen: openItem,
+          onAction: onInstanceAction,
+          emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
+          q: activeQ || draftQ,
+          busy: listBusy,
+        }) : h(LhConsole, {
+          key: "lh",
+          items: kind === "lighthouse" ? rows : lhRows,
+          pendingId,
+          onOpen: openItem,
+          onAction: onInstanceAction,
+          emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
+          q: activeQ || draftQ,
+          busy: listBusy,
+        }),
         !listBusy ? h(Pager, {
           key: "pager",
           total: counted,
