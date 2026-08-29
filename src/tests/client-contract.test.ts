@@ -162,6 +162,8 @@ test('g3 COS console two pages use region combo and file list, not an expand tre
   assert.match(client, /function CosRegionCombo/)
   assert.match(client, /function CosBucketTable/)
   assert.match(client, /function CosFileTable/)
+  assert.match(client, /\.ci-table-wrap\{[^}]*overflow-x:auto/)
+  assert.match(client, /\.ci-table th,\.ci-table td\{[^}]*white-space:nowrap/)
   assert.match(client, /请输入并选择地域/)
   assert.match(client, /DEFAULT_COS_REGION_ID = "ap-guangzhou"/)
   assert.match(client, /function defaultCosRegion/)
