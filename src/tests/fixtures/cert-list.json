@@ -1,0 +1,45 @@
+{
+  "TotalCount": 2,
+  "Certificates": [
+    {
+      "CertificateId": "QL8k2m",
+      "Domain": "www.example.com",
+      "Alias": "prod",
+      "Status": 1,
+      "StatusName": "已签发",
+      "StatusMsg": "issued",
+      "CertificateType": "SVR",
+      "ProductZhName": "TrustAsia C1 DV Free",
+      "From": "trustasia",
+      "CertBeginTime": "2026-02-28 08:00:00",
+      "CertEndTime": "2026-09-12 07:59:59",
+      "ValidityPeriod": "3",
+      "InsertTime": "2026-02-27 10:00:00",
+      "Deployable": true,
+      "RenewAble": true,
+      "AllowDownload": true,
+      "IsDv": true,
+      "IsWildcard": false,
+      "SubjectAltName": ["example.com"],
+      "BoundResource": ["cdn-www.example.com"],
+      "ProjectInfo": { "ProjectName": "默认项目", "ProjectId": "0" },
+      "VerifyType": "DNS_AUTO"
+    },
+    {
+      "CertificateId": "AP1pend",
+      "Domain": "pending.example.com",
+      "Alias": "wait",
+      "Status": 0,
+      "StatusName": "审核中",
+      "CertificateType": "SVR",
+      "ProductZhName": "TrustAsia C1 DV Free",
+      "From": "trustasia",
+      "InsertTime": "2026-08-20 10:00:00",
+      "Deployable": false,
+      "RenewAble": false,
+      "IsDv": true,
+      "VerifyType": "DNS",
+      "DVAuthDeadline": "2026-08-30 10:00:00"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "Topics": [
+    {
+      "LogsetId": "4d07fba0-b71e-4c11-9aa0-0f6d8e2aa001",
+      "TopicId": "cce2db26-4a11-43f3-ae7d-3502a4b424fd",
+      "TopicName": "nginx-access",
+      "StorageType": "hot",
+      "Period": 30,
+      "CreateTime": "2026-01-12 10:03:11",
+      "Status": true,
+      "BizType": 0
+    },
+    {
+      "LogsetId": "75f531f6-3644-45e5-8717-af1dc294cc93",
+      "TopicId": "75f531f6-3644-45e5-8717-af1dc294cc93",
+      "TopicName": "app-error",
+      "StorageType": "hot",
+      "Period": 14,
+      "CreateTime": "2026-02-03 18:22:09",
+      "Status": true,
+      "BizType": 0
+    },
+    {
+      "LogsetId": "ops-logset-0001",
+      "TopicId": "601c2a87-ca8e-49c9-81aa-27286a970db5",
+      "TopicName": "cvm-syslog",
+      "StorageType": "cold",
+      "Period": 90,
+      "CreateTime": "2025-11-20 09:14:00",
+      "Status": true,
+      "BizType": 0
+    },
+    {
+      "LogsetId": "metric-set",
+      "TopicId": "metric-topic-should-skip",
+      "TopicName": "cpu-metric",
+      "StorageType": "hot",
+      "Period": 7,
+      "CreateTime": "2026-01-01 00:00:00",
+      "Status": true,
+      "BizType": 1
+    }
+  ],
+  "TotalCount": 3
+}

@@ -15,6 +15,27 @@ export interface TencentCallOptions {
   region?: string
 }
 
+export interface TencentCreds {
+  secretId: string
+  secretKey: string
+}
+
+export interface TencentCallContext {
+  timeoutMs: number
+  signal?: AbortSignal
+  fetchImpl?: typeof fetch
+  region?: string
+}
+
+export type TencentServiceOpts = TencentCallContext
+
+export type TencentProductCall = <T = unknown>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+) => Promise<T>
+
 export class TencentApiError extends Error {
   constructor(
     message: string,
@@ -72,16 +93,73 @@ export async function callTencentApi<T = unknown>(options: TencentCallOptions): 
   }
 }
 
+function serviceCall<T>(
+  service: string,
+  host: string,
+  version: string,
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return callTencentApi<T>({
+    service,
+    host,
+    version,
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+    region: opts.region,
+  })
+}
+
 export function dnspodCall<T>(
   action: string,
   payload: unknown,
-  creds: { secretId: string; secretKey: string },
-  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch },
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('dnspod', 'dnspod.tencentcloudapi.com', '2021-03-23', action, payload, creds, opts)
+}
+
+export function tkeCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext & { region: string; version?: string },
+): Promise<T> {
+  const region = String(opts.region || '').trim()
+  if (!region) throw new TencentApiError('缺少地域')
+  return callTencentApi<T>({
+    service: 'tke',
+    host: 'tke.tencentcloudapi.com',
+    version: opts.version || '2018-05-25',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+    region,
+  })
+}
+
+/** 腾讯云域名注册 Domain API：domain.tencentcloudapi.com / 2018-08-08 */
+export function domainCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
 ): Promise<T> {
   return callTencentApi<T>({
-    service: 'dnspod',
-    host: 'dnspod.tencentcloudapi.com',
-    version: '2021-03-23',
+    service: 'domain',
+    host: 'domain.tencentcloudapi.com',
+    version: '2018-08-08',
     action,
     payload,
     secretId: creds.secretId,
@@ -91,6 +169,7 @@ export function dnspodCall<T>(
     fetchImpl: opts.fetchImpl,
   })
 }
+
 
 export interface DbbrainCallOptions {
   timeoutMs: number
@@ -119,5 +198,85 @@ export function dbbrainCall<T>(
     signal: opts.signal,
     fetchImpl: opts.fetchImpl,
     region,
+  })
+}
+
+export function sslCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'ssl',
+    host: 'ssl.tencentcloudapi.com',
+    version: '2019-12-05',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+  })
+}
+
+export function cdbCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('cdb', 'cdb.tencentcloudapi.com', '2017-03-20', action, payload, creds, opts)
+}
+
+export function monitorCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('monitor', 'monitor.tencentcloudapi.com', '2018-07-24', action, payload, creds, opts)
+}
+
+export function lighthouseCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('lighthouse', 'lighthouse.tencentcloudapi.com', '2020-03-24', action, payload, creds, opts)
+}
+
+export function cvmCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('cvm', 'cvm.tencentcloudapi.com', '2017-03-12', action, payload, creds, opts)
+}
+
+export const CLS_HOST = 'cls.tencentcloudapi.com'
+export const CLS_VERSION = '2020-10-16'
+
+export function clsCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext & { region: string },
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'cls',
+    host: CLS_HOST,
+    version: CLS_VERSION,
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    region: opts.region,
+    fetchImpl: opts.fetchImpl,
   })
 }

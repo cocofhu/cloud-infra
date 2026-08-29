@@ -1,0 +1,27 @@
+{
+  "TotalCount": 2,
+  "DomainSet": [
+    {
+      "AutoRenew": 1,
+      "IsPremium": false,
+      "DomainId": "domain-acme1",
+      "ExpirationDate": "2027-08-11",
+      "DomainName": "acme.cn",
+      "CodeTld": "cn",
+      "CreationDate": "2024-08-11",
+      "Tld": ".cn",
+      "BuyStatus": "ok"
+    },
+    {
+      "AutoRenew": 0,
+      "IsPremium": false,
+      "DomainId": "domain-other2",
+      "ExpirationDate": "2026-01-01",
+      "DomainName": "other.com",
+      "CodeTld": "com",
+      "CreationDate": "2023-01-01",
+      "Tld": ".com",
+      "BuyStatus": "AboutToExpire"
+    }
+  ]
+}
