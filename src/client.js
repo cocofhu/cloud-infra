@@ -76,7 +76,7 @@ window.__ModuleLoader__.load({
 .ci-mini.danger{color:var(--dsw-alias-state-error-primary)}
 .ci-mini:disabled{opacity:.4;cursor:default}
 .ci-actions{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
-.ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;margin:8px 14px}
+.ci-root .ci-err,.ci-panel .ci-err,.ci-tool .ci-err,.ci-image .ci-err,.ci-root p.ci-err,.ci-panel p.ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;font-weight:400;line-height:18px;margin:8px 14px}
 .ci-trunc{margin:0 0 10px;color:var(--dsw-alias-label-caption);font-size:12px}
 .ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
 .ci-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:ci-spin .7s linear infinite;vertical-align:-1px;margin-right:6px}
@@ -144,7 +144,7 @@ html[data-theme=dark] .ci-image,.ci-image[data-theme=dark]{--ci-title:#f7f8fb}
 .ci-search-wide input{flex:1;min-width:0;border:0;outline:none;background:transparent;color:var(--ci-title);font:inherit}
 .ci-search-wide input::placeholder{color:var(--ci-faint)}
 .ci-tabs{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.ci-tab{height:30px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--ci-muted);font:inherit;cursor:pointer}
+.ci-tab{height:30px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--ci-muted);font:inherit;font-size:13px;line-height:30px;font-weight:400;cursor:pointer}
 .ci-tab.on{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);color:var(--dsw-alias-brand-primary);font-weight:600}
 .ci-image-body{padding:16px}
 .ci-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -1150,7 +1150,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("button", { type: "button", className: "ci-tab" + (view === "ns" ? " on" : ""), onClick: () => changeView("ns") }, "命名空间"),
             h("button", { type: "button", className: "ci-tab" + (view === "repo" || view === "detail" ? " on" : ""), onClick: () => changeView("repo") }, "镜像仓库"),
           ),
-          err ? h("div", { className: "ci-err" }, err) : null,
+          err ? h("div", { className: "ci-err", style: { fontSize: 12, lineHeight: "18px", fontWeight: 400 } }, err) : null,
           h("div", { className: "ci-image-body" }, body()),
         ),
         h(ConfirmDialog, {
