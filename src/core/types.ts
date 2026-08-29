@@ -32,6 +32,8 @@ export interface ResourceCard {
   columns?: ResourceColumn[]
   openLabel?: string
   expiresAt?: string
+  region?: string
+  product?: string
 }
 
 export interface DnsRecord {
@@ -46,10 +48,46 @@ export interface DnsRecord {
   remark?: string
 }
 
+export interface DetailTab {
+  id: string
+  label: string
+}
+
+export interface DetailTable {
+  id?: string
+  title?: string
+  columns: string[]
+  rows: Array<Record<string, string>>
+  empty?: string
+}
+
+export interface DetailFormField {
+  key: string
+  label: string
+  placeholder?: string
+  kind?: 'text' | 'textarea'
+}
+
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
   records?: DnsRecord[]
+  tabs?: DetailTab[]
+  activeTab?: string
+  subTabs?: DetailTab[]
+  activeSubTab?: string
+  ranges?: DetailTab[]
+  activeRange?: string
+  tables?: DetailTable[]
+  hints?: string[]
+  form?: {
+    id: string
+    title: string
+    submitLabel?: string
+    action?: string
+    fields: DetailFormField[]
+    values?: Record<string, string>
+  }
 }
 
 export interface ResourceAction {
@@ -90,6 +128,7 @@ export interface ModuleContext {
   signal?: AbortSignal
   id?: string
   title?: string
+  filters?: Record<string, string>
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string }

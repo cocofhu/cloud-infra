@@ -175,6 +175,28 @@ test('g2-g3 list chrome and in-card DetailView replace fullscreen drawer', () =>
   assert.doesNotMatch(client, /2147483|86vh/)
 })
 
+test('g6 dbbrain stays in the chat card with type+region filters and tabs', () => {
+  const client = read('src/client.js')
+  assert.match(client, /kind === "dbbrain"/)
+  assert.match(client, /实例管理/)
+  assert.match(client, /全地域/)
+  assert.match(client, /诊断优化/)
+  assert.match(client, /function DbbrainDetailView/)
+  assert.match(client, /function DbbrainTable/)
+  assert.match(client, /异常诊断/)
+  assert.match(client, /内存分析/)
+  assert.match(client, /索引推荐/)
+  assert.match(client, /session\.kill/)
+  assert.match(client, /confirm === "always"/)
+  assert.match(client, /实例 ID \/ 名称/)
+  assert.match(client, /地域只在对话卡片里选，不进设置/)
+  assert.doesNotMatch(client, /ci-sidenav|实例概览|监控告警/)
+  assert.doesNotMatch(client, /if\s*\(.*===\s*['"]tencent['"]/)
+  const card = client.slice(client.indexOf('function ConfigCard()'))
+  assert.doesNotMatch(card, /htmlFor:\s*"ci-.*region"/)
+  assert.doesNotMatch(card, /className:\s*"ci-cfg-row"[\s\S]{0,80}地域/)
+})
+
 test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () => {
   const client = read('src/client.js')
   assert.match(client, /min\(400px,100%\)/)
@@ -184,4 +206,14 @@ test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () =>
   assert.match(client, /function publicErrorMessage/)
   assert.match(client, /写操作免确认（删除仍会确认）/)
   assert.match(client, /未保存/)
+})
+
+test('g6 host query tool hits dbbrain keywords without vendor branches', () => {
+  const host = read('src/host.ts')
+  const query = read('src/core/query.ts')
+  assert.match(host, /kind=dbbrain/)
+  assert.match(host, /慢SQL/)
+  assert.match(host, /异常诊断/)
+  assert.match(query, /kind === 'dbbrain'/)
+  assert.doesNotMatch(host, /if\s*\(.*provider\s*===\s*['"]tencent['"]/)
 })
