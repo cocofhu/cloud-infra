@@ -5,7 +5,7 @@ import Schema from '@deepseek-ai/schemastery'
 import { assignConfig, publicConfig, readOverlay, sanitizePatch, withDefaults, writeOverlay } from './core/config-store.js'
 import { queryResources, renderQuery } from './core/query.js'
 import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, SETTINGS_HINT, supportedKinds } from './core/registry.js'
-import { publicErrorMessage } from './core/safe-error.js'
+import { actionErrorMessage, publicErrorMessage } from './core/safe-error.js'
 import { isPost, trustedUiRequest } from './core/trusted-request.js'
 import type { PluginConfig, QueryResult } from './core/types.js'
 import './providers/index.js'
@@ -193,7 +193,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
           ? body.payload as Record<string, unknown>
           : {},
       )
-      if (!result.ok) return sendJson(res, 400, { ok: false, error: publicErrorMessage(result.error) })
+      if (!result.ok) return sendJson(res, 400, { ok: false, error: actionErrorMessage(result.error) })
       return sendJson(res, 200, result)
     }
     sendJson(res, 400, { ok: false, error: 'unknown method' })

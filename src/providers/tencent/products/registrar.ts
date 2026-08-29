@@ -187,6 +187,16 @@ export function buyStatusLabel(status?: string): string {
   return value || '-'
 }
 
+export function realNameLabel(status?: string): string {
+  const value = String(status || '').trim()
+  if (!value) return ''
+  const key = value.toLowerCase()
+  if (key === 'approved' || key === 'ok') return '已实名'
+  if (key === 'pending' || key === 'auditing' || key === 'waitaudit' || key === 'inreview') return '审核中'
+  if (key === 'reject' || key === 'rejected' || key === 'unapproved' || key === 'notaudit' || key === 'unaudited') return '未实名'
+  return value
+}
+
 export function isOnFlag(value: unknown): boolean {
   if (value === true || value === 1 || value === '1') return true
   const text = String(value || '').toLowerCase()
@@ -207,9 +217,9 @@ export function mapOwnedDomain(item: DomainListRow, moduleId = MY_DOMAIN_MODULE_
     status: item.BuyStatus === 'Expired' ? 'error' : item.BuyStatus === 'AboutToExpire' ? 'pause' : 'enable',
     badges: [autoRenew ? '自动续费' : ''].filter(Boolean) as string[],
     columns: [
+      { label: '状态', value: buyStatusLabel(item.BuyStatus) },
       { label: '到期', value: item.ExpirationDate || '-' },
       { label: '自动续费', value: autoRenew ? '开' : '关' },
-      { label: '状态', value: buyStatusLabel(item.BuyStatus) },
     ],
     openLabel: '管理',
     expiresAt: item.ExpirationDate || undefined,
@@ -307,10 +317,10 @@ export function createRegistrarModule(call: typeof domainCall = domainCall): Res
     },
     async execute(actionId, payload, ctx) {
       try {
-        if (actionId === 'templates.list') return listTemplates(call, ctx)
-        if (actionId === 'order.preview') return previewOrder(call, payload, ctx)
-        if (actionId === 'order.create') return createOrder(call, payload, ctx)
-        if (actionId === 'order.status') return orderStatus(call, payload, ctx)
+        if (actionId === 'templates.list') return await listTemplates(call, ctx)
+        if (actionId === 'order.preview') return await previewOrder(call, payload, ctx)
+        if (actionId === 'order.create') return await createOrder(call, payload, ctx)
+        if (actionId === 'order.status') return await orderStatus(call, payload, ctx)
         return { ok: false, error: `未知动作 ${actionId}` }
       } catch (err) {
         return { ok: false, error: publicErrorMessage(err) }
@@ -331,11 +341,8 @@ export function createMyDomainModule(call: typeof domainCall = domainCall): Reso
     async list(ctx) {
       const keyword = normalizeKeyword(ctx.query)
       if (keyword) {
-        const data = await call<{ DomainSet?: DomainListRow[]; TotalCount?: number }>('DescribeDomainNameList', {
-          Offset: 0,
-          Limit: 100,
-        }, creds(ctx), opts(ctx))
-        const filtered = filterOwned(data.DomainSet || [], keyword)
+        const data = await listOwnedPages(call, ctx)
+        const filtered = filterOwned(data.rows, keyword)
         const start = ctx.offset
         const slice = filtered.slice(start, start + ctx.limit)
         return {
@@ -385,7 +392,7 @@ export function createMyDomainModule(call: typeof domainCall = domainCall): Reso
         { label: '域名', value: name },
         { label: '域名 ID', value: String(base.DomainId || domainId) },
         { label: '状态', value: buyStatusLabel(base.BuyStatus || base.Status || base.DomainStatus) },
-        { label: '实名', value: String(base.RealNameAuditStatus || base.RealNameAudit || '') },
+        { label: '实名', value: realNameLabel(base.RealNameAuditStatus || base.RealNameAudit) },
         { label: '注册时间', value: base.CreationDate || '' },
         { label: '到期时间', value: base.ExpirationDate || base.Expire || '' },
         { label: '自动续费', value: Number(base.AutoRenew) === 1 ? '开' : '关' },
@@ -404,9 +411,9 @@ export function createMyDomainModule(call: typeof domainCall = domainCall): Reso
     },
     async execute(actionId, payload, ctx) {
       try {
-        if (actionId === 'autorenew.set') return setAutoRenew(call, payload, ctx)
-        if (actionId === 'lock.update') return setLock(call, 'UpdateProhibitionBatch', payload, ctx)
-        if (actionId === 'lock.transfer') return setTransferLock(call, payload, ctx)
+        if (actionId === 'autorenew.set') return await setAutoRenew(call, payload, ctx)
+        if (actionId === 'lock.update') return await setLock(call, 'UpdateProhibitionBatch', payload, ctx)
+        if (actionId === 'lock.transfer') return await setTransferLock(call, payload, ctx)
         return { ok: false, error: `未知动作 ${actionId}` }
       } catch (err) {
         return { ok: false, error: publicErrorMessage(err) }
@@ -440,8 +447,9 @@ async function previewOrder(call: typeof domainCall, payload: Record<string, unk
     return { ok: false, error: '未勾选协议，不能提交订单' }
   }
   const period = clampPeriod(Number(payload.period), domains)
-  if (Number(payload.period) > maxPeriodYears(domains)) {
-    return { ok: false, error: '.co 域名时长最多 5 年' }
+  const maxYears = maxPeriodYears(domains)
+  if (Number(payload.period) > maxYears) {
+    return { ok: false, error: `时长最多 ${maxYears} 年` }
   }
   const checked = await Promise.all(domains.map(async (name) => {
     const data = await call<CheckDomainResult>('CheckDomain', { DomainName: name, Period: String(period) }, creds(ctx), opts(ctx))
@@ -541,6 +549,33 @@ async function orderStatus(call: typeof domainCall, payload: Record<string, unkn
   }
 }
 
+async function listOwnedPages(call: typeof domainCall, ctx: ModuleContext): Promise<{ rows: DomainListRow[]; total: number }> {
+  const pageSize = 100
+  const rows: DomainListRow[] = []
+  let offset = 0
+  let total = Number.POSITIVE_INFINITY
+  while (offset < total) {
+    const data = await call<{ DomainSet?: DomainListRow[]; TotalCount?: number }>('DescribeDomainNameList', {
+      Offset: offset,
+      Limit: pageSize,
+    }, creds(ctx), opts(ctx))
+    const chunk = data.DomainSet || []
+    const reported = Number(data.TotalCount)
+    total = Number.isFinite(reported) ? reported : offset + chunk.length
+    rows.push(...chunk)
+    if (!chunk.length) break
+    offset += chunk.length
+  }
+  return { rows, total: Number.isFinite(total) ? total : rows.length }
+}
+
+async function describeBaseInfo(call: typeof domainCall, domain: string, ctx: ModuleContext): Promise<DomainBaseInfo> {
+  const info = await call<{ DomainInfo?: DomainBaseInfo } & DomainBaseInfo>('DescribeDomainBaseInfo', {
+    Domain: domain,
+  }, creds(ctx), opts(ctx))
+  return info.DomainInfo || info
+}
+
 async function setAutoRenew(call: typeof domainCall, payload: Record<string, unknown>, ctx: ModuleContext) {
   const domainId = String(payload.domainId || parseOwnedRef(String(ctx.id || '')).domainId || '').trim()
   if (!domainId) return { ok: false, error: '缺少域名' }
@@ -569,7 +604,11 @@ async function setLock(
 }
 
 async function setTransferLock(call: typeof domainCall, payload: Record<string, unknown>, ctx: ModuleContext) {
-  if (payload.updateLock === true || payload.updateLock === 1 || payload.updateLock === '1') {
+  const domain = String(payload.domain || payload.title || '').trim().toLowerCase()
+  if (!domain) return { ok: false, error: '缺少域名' }
+  const base = await describeBaseInfo(call, domain, ctx)
+  const updateLock = isOnFlag(base.UpdateProhibition ?? base.UpdateProhibitionStatus)
+  if (updateLock) {
     return { ok: false, error: '更新锁已开，不能改转移锁' }
   }
   return setLock(call, 'TransferProhibitionBatch', payload, ctx)

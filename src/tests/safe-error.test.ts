@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { publicErrorMessage } from '../core/safe-error.js'
+import { actionErrorMessage, publicErrorMessage } from '../core/safe-error.js'
 import { TencentApiError } from '../providers/tencent/client.js'
 
 test('publicErrorMessage keeps local hints and drops upstream / secrets', () => {
@@ -22,4 +22,39 @@ test('publicErrorMessage maps vendor codes and never echoes secrets', () => {
   assert.equal(publicErrorMessage(new Error('timeout 20000ms')), '云厂商请求超时')
   assert.equal(publicErrorMessage(new Error('HTTP 502')), '云厂商请求失败')
   assert.doesNotMatch(publicErrorMessage(new Error('got AKIDabcdefghijklmnop')), /AKID/)
+})
+
+test('balance and register failures map to readable copy without secrets', () => {
+  assert.equal(
+    publicErrorMessage(new TencentApiError('balance not enough AKID12345678', 'ResourceInsufficient')),
+    '账户余额不足',
+  )
+  assert.equal(
+    publicErrorMessage(new TencentApiError('no money', 'FailedOperation.InsufficientBalance')),
+    '账户余额不足',
+  )
+  assert.match(
+    publicErrorMessage(new TencentApiError('register failed', 'FailedOperation.RegisterDomainFailed')),
+    /账户余额不足|注册失败/,
+  )
+  assert.doesNotMatch(
+    publicErrorMessage(new TencentApiError('got AKIDabcdefghijklmnop', 'FailedOperation.RegisterDomainFailed')),
+    /AKID/,
+  )
+})
+
+test('actionErrorMessage keeps module business copy for the HTTP 400 path', () => {
+  assert.equal(actionErrorMessage('未勾选协议，不能提交订单'), '未勾选协议，不能提交订单')
+  assert.equal(actionErrorMessage('购物车为空，不能提交订单'), '购物车为空，不能提交订单')
+  assert.equal(actionErrorMessage('hot.xyz 是溢价词，不可加购'), 'hot.xyz 是溢价词，不可加购')
+  assert.equal(actionErrorMessage('taken.cn 已被注册'), 'taken.cn 已被注册')
+  assert.equal(actionErrorMessage('更新锁已开，不能改转移锁'), '更新锁已开，不能改转移锁')
+  assert.equal(actionErrorMessage('账户余额不足'), '账户余额不足')
+  assert.equal(actionErrorMessage('时长最多 10 年'), '时长最多 10 年')
+  assert.equal(actionErrorMessage(new Error('HTTP 502')), '云厂商请求失败')
+  assert.equal(
+    actionErrorMessage(new TencentApiError('SecretId is invalid', 'AuthFailure.SecretIdNotFound')),
+    '云厂商鉴权失败，请检查设置中的密钥',
+  )
+  assert.doesNotMatch(actionErrorMessage(new Error('got AKIDabcdefghijklmnop')), /AKID/)
 })

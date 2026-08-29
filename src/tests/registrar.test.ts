@@ -18,10 +18,11 @@ import {
   mapOwnedDomain,
   maxPeriodYears,
   normalizeKeyword,
+  realNameLabel,
   type CheckDomainResult,
   type DomainListRow,
 } from '../providers/tencent/products/registrar.js'
-import { domainCall } from '../providers/tencent/client.js'
+import { domainCall, TencentApiError } from '../providers/tencent/client.js'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const fixture = (name: string) => JSON.parse(readFileSync(join(dir, 'fixtures', name), 'utf8')) as Record<string, unknown>
@@ -135,7 +136,7 @@ test('g1.3 cart order rejects empty/no-agree/premium and always PayMode=1', asyn
     templateId: 'tmpl-ok',
     autoRenew: true,
     updateLock: true,
-    transferLock: false,
+    transferLock: true,
   }, ctx)
   assert.equal(created?.ok, true)
   const batch = calls.find((row) => row.action === 'CreateDomainBatch')
@@ -146,6 +147,7 @@ test('g1.3 cart order rejects empty/no-agree/premium and always PayMode=1', asyn
     TemplateId?: string
     AutoRenewFlag?: number
     UpdateProhibition?: number
+    TransferProhibition?: number
   }
   assert.equal(body.PayMode, 1)
   assert.equal(body.Period, 1)
@@ -153,6 +155,7 @@ test('g1.3 cart order rejects empty/no-agree/premium and always PayMode=1', asyn
   assert.equal(body.TemplateId, 'tmpl-ok')
   assert.equal(body.AutoRenewFlag, 1)
   assert.equal(body.UpdateProhibition, 1)
+  assert.equal(body.TransferProhibition, 1)
   if (created?.ok) {
     assert.equal(created.data?.payMode, 1)
     assert.equal(created.data?.statusLabel, '进行中')
@@ -162,6 +165,14 @@ test('g1.3 cart order rejects empty/no-agree/premium and always PayMode=1', asyn
   assert.equal(maxPeriodYears(['brand.co']), 5)
   assert.equal(clampPeriod(10, ['brand.co']), 5)
   assert.equal(clampPeriod(1, ['brand.com']), 1)
+
+  const overCom = await module.execute?.('order.preview', { domains: ['example.com'], agree: true, period: 11 }, ctx)
+  assert.equal(overCom?.ok, false)
+  if (!overCom?.ok) assert.equal(overCom.error, '时长最多 10 年')
+
+  const overCo = await module.execute?.('order.preview', { domains: ['brand.co'], agree: true, period: 6 }, ctx)
+  assert.equal(overCo?.ok, false)
+  if (!overCo?.ok) assert.equal(overCo.error, '时长最多 5 年')
 })
 
 test('g1.3 order.preview returns approved templates and agreement link', async () => {
@@ -198,6 +209,7 @@ test('g1.4 my-domain filters by card keyword and serves 基本信息/域名安�
   assert.equal(listed.items[0].title, 'acme.cn')
   assert.equal(listed.items[0].openLabel, '管理')
   assert.equal(listed.items[0].columns?.find((col) => col.label === '自动续费')?.value, '开')
+  assert.equal(listed.items[0].columns?.find((col) => col.label === '状态')?.value, '正常')
 
   const none = await module.list({ ...ctx, query: 'no-such-name' })
   assert.equal(none.items.length, 0)
@@ -213,7 +225,11 @@ test('g1.4 my-domain filters by card keyword and serves 基本信息/域名安�
   const detail = await module.detail?.({ ...ctx, id: 'tencent.my-domain:domain-acme1', title: 'acme.cn' })
   assert.ok(detail?.fields.some((row) => row.label === '禁止更新锁' && row.value === '开'))
   assert.ok(detail?.fields.some((row) => row.label === '禁止转移锁' && row.value === '关'))
+  assert.ok(detail?.fields.some((row) => row.label === '实名' && row.value === '已实名'))
   assert.equal(detail?.card.extras?.updateLock, true)
+  assert.equal(realNameLabel('Approved'), '已实名')
+  assert.equal(realNameLabel('Pending'), '审核中')
+  assert.equal(realNameLabel('UnApproved'), '未实名')
 
   const renew = await module.execute?.('autorenew.set', { domainId: 'domain-acme1', autoRenew: true }, {
     ...ctx,
@@ -226,10 +242,11 @@ test('g1.4 my-domain filters by card keyword and serves 基本信息/域名安�
   const blocked = await module.execute?.('lock.transfer', {
     domain: 'acme.cn',
     enabled: true,
-    updateLock: true,
   }, { ...ctx, id: 'tencent.my-domain:domain-acme1' })
   assert.equal(blocked?.ok, false)
-  if (!blocked?.ok) assert.match(blocked.error, /更新锁已开/)
+  if (!blocked?.ok) assert.equal(blocked.error, '更新锁已开，不能改转移锁')
+  assert.equal(calls.some((row) => row.action === 'DescribeDomainBaseInfo'), true)
+  assert.equal(calls.some((row) => row.action === 'TransferProhibitionBatch'), false)
 
   const lock = await module.execute?.('lock.update', { domain: 'acme.cn', enabled: true }, {
     ...ctx,
@@ -237,6 +254,81 @@ test('g1.4 my-domain filters by card keyword and serves 基本信息/域名安�
   })
   assert.equal(lock?.ok, true)
   assert.equal(calls.some((row) => row.action === 'UpdateProhibitionBatch'), true)
+})
+
+test('g1.4 lock.transfer follows DescribeDomainBaseInfo not payload.updateLock', async () => {
+  const { calls, call } = mockCall((action) => {
+    if (action === 'DescribeDomainBaseInfo') {
+      return {
+        DomainInfo: {
+          DomainName: 'other.com',
+          UpdateProhibition: false,
+          TransferProhibition: false,
+        },
+      }
+    }
+    if (action === 'TransferProhibitionBatch') return { LogId: 55 }
+    return {}
+  })
+  const module = createMyDomainModule(call)
+  const allowed = await module.execute?.('lock.transfer', {
+    domain: 'other.com',
+    enabled: true,
+    updateLock: true,
+  }, { ...ctx, id: 'tencent.my-domain:domain-other2' })
+  assert.equal(allowed?.ok, true)
+  assert.equal(calls.some((row) => row.action === 'DescribeDomainBaseInfo'), true)
+  assert.equal(calls.some((row) => row.action === 'TransferProhibitionBatch'), true)
+})
+
+test('g1.4 keyword filter pages DescribeDomainNameList until TotalCount', async () => {
+  const page0 = {
+    TotalCount: 101,
+    DomainSet: Array.from({ length: 100 }, (_, i) => ({
+      DomainId: `d${i}`,
+      DomainName: `n${i}.com`,
+      BuyStatus: 'ok',
+    })),
+  }
+  const page1 = {
+    TotalCount: 101,
+    DomainSet: [{ DomainId: 'd-needle', DomainName: 'needle.cn', BuyStatus: 'ok' }],
+  }
+  const { calls, call } = mockCall((action, payload) => {
+    if (action === 'DescribeDomainNameList') {
+      const offset = Number((payload as { Offset?: number }).Offset || 0)
+      return offset === 0 ? page0 : page1
+    }
+    return {}
+  })
+  const module = createMyDomainModule(call)
+  const listed = await module.list({ ...ctx, query: 'needle' })
+  assert.equal(listed.total, 1)
+  assert.equal(listed.items[0].title, 'needle.cn')
+  assert.equal(calls.filter((row) => row.action === 'DescribeDomainNameList').length, 2)
+})
+
+test('g1.3 CreateDomainBatch ResourceInsufficient stays 账户余额不足', async () => {
+  const { call } = mockCall((action, payload) => {
+    if (action === 'CheckDomain') {
+      return { ...fixture('check-domain-available.json'), DomainName: (payload as { DomainName?: string }).DomainName }
+    }
+    if (action === 'DescribeTemplateList') return fixture('template-list.json')
+    if (action === 'CreateDomainBatch') throw new TencentApiError('balance not enough AKIDabcdefgh', 'ResourceInsufficient')
+    return {}
+  })
+  const module = createRegistrarModule(call)
+  const paid = await module.execute?.('order.create', {
+    domains: ['example.com'],
+    agree: true,
+    period: 1,
+    templateId: 'tmpl-ok',
+  }, ctx)
+  assert.equal(paid?.ok, false)
+  if (!paid?.ok) {
+    assert.equal(paid.error, '账户余额不足')
+    assert.doesNotMatch(paid.error, /AKID/)
+  }
 })
 
 test('g1.4 batch status labels stay async and never pretend WHOIS is instant', () => {

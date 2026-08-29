@@ -593,10 +593,11 @@ window.__ModuleLoader__.load({
     function MyDomainTable({ items, pendingId, busyId, onOpen, onToggleRenew, emptyHint }) {
       const rows = Array.isArray(items) ? items.filter(Boolean) : [];
       if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "没有资源");
-      const template = "minmax(120px,1.6fr) minmax(88px,0.8fr) 88px 64px";
+      const template = "minmax(120px,1.6fr) minmax(64px,0.7fr) minmax(88px,0.8fr) 88px 64px";
       return h("div", { className: "ci-list" },
         h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
           h("div", { className: "ci-cell" }, "域名"),
+          h("div", { className: "ci-cell" }, "状态"),
           h("div", { className: "ci-cell" }, "到期"),
           h("div", { className: "ci-cell" }, "自动续费"),
           h("div", { className: "ci-cell" }, "操作"),
@@ -613,6 +614,7 @@ window.__ModuleLoader__.load({
               disabled: pendingId === item.id,
               onClick: () => onOpen(item),
             }, item.title)),
+            h("div", { className: "ci-cell" }, cellValue(item, "状态") || item.description || "-"),
             h("div", { className: "ci-cell num" }, cellValue(item, "到期") || item.expiresAt || "-"),
             h("div", { className: "ci-cell" }, h("button", {
               type: "button",
@@ -708,7 +710,7 @@ window.__ModuleLoader__.load({
               type: "checkbox",
               checked: !!draft.updateLock,
               disabled: busy,
-              onChange: () => setDraft({ ...draft, updateLock: !draft.updateLock, transferLock: draft.updateLock ? draft.transferLock : false }),
+              onChange: () => setDraft({ ...draft, updateLock: !draft.updateLock }),
             }),
             "禁止更新锁",
           ),
@@ -716,8 +718,8 @@ window.__ModuleLoader__.load({
             h("input", {
               type: "checkbox",
               checked: !!draft.transferLock,
-              disabled: busy || !!draft.updateLock,
-              onChange: () => { if (!draft.updateLock) setDraft({ ...draft, transferLock: !draft.transferLock }); },
+              disabled: busy,
+              onChange: () => setDraft({ ...draft, transferLock: !draft.transferLock }),
             }),
             "禁止转移锁",
           ),
