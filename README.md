@@ -10,9 +10,9 @@ DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名与
 - 点击域名或「解析」配置解析记录：添加、修改、启停、删除（删除始终确认）
 - 对话里查询 TKE 集群（`kind=cluster` + 运行时 `region`），打开控制台风格集群列表
 - TKE 列表：顶栏选地域，按名称 / 类型 / 状态 / VPC / 标签筛选；列含集群 ID/名称、状态、Kubernetes 版本、节点数、所在网络、创建时间
-- 新建：类型卡（标准 / 弹性 / 边缘 / 注册）。标准集群四步向导（信息 → 网络含 GR 常用上限 → 组件可跳 → 确认+SLA）。边缘走独立网络步（VPC/Pod/Service CIDR）。注册集群走导入配置（DescribeExternalClusterSpec），不调用 CreateCluster。弹性新建入口关闭，引导标准集群 + 超级节点；独立集群不新建
-- 删除向导：第一步可关闭删除保护，有普通/原生/超级节点则拒绝，再选资源保留或销毁并勾选风险
-- 详情侧栏：基本信息（含 Master/Node 升级表单、APIServer 内外网分开关、删除保护）、节点（封锁用 K8s 节点名、新建需机型/镜像/安全组/子网）、节点池名片（含计费；普通/原生/超级分接口）、命名空间配额、组件（InstallAddon）、授权（K8s ClusterRoleBinding）、策略（DescribeOpenPolicyList/ModifyOpenPolicyList）、运维开关（DescribeLogSwitches ClusterIds/SwitchSet）
+- 新建：类型卡（标准 / 弹性 / 边缘 / 注册）。标准集群四步向导（信息 → 网络含 GR 常用上限 → 组件可跳 → 确认+SLA）。边缘走独立网络步（VPC/Pod/Service CIDR）。注册集群先 `CreateCluster ClusterType=EXTERNAL_CLUSTER` 拿到 ClusterId，再 `DescribeExternalClusterSpec({ ClusterId, IsExtranet })` 生成导入 YAML。弹性新建入口关闭，引导标准集群 + 超级节点；独立集群不新建
+- 删除向导：第一步可关闭删除保护，有普通/原生/超级节点则拒绝，再选资源保留或销毁并勾选风险。标准走 `DeleteCluster`，边缘走 `DeleteTKEEdgeCluster`，弹性走 `DeleteEKSCluster`
+- 详情侧栏：基本信息（含 Master/Node 升级表单、APIServer 内外网分开关、删除保护）、节点（封锁用 K8s 节点名；新建需机型/镜像/可用区 Placement.Zone/安全组/子网/登录凭证；添加已有节点需安全组与密钥或密码；节点列表按 TotalCount 翻页并合并超级节点）、节点池名片（含计费；普通 `ModifyNodePoolDesiredCapacityAboutAsg` / 原生 `ModifyNodePool` 2022-05-01 / 超级不按 ASG 期望数缩容）、命名空间配额、组件（InstallAddon）、授权（K8s ClusterRoleBinding）、策略（DescribeOpenPolicyList/ModifyOpenPolicyList）、运维开关（DescribeLogSwitches ClusterIds/SwitchSet）
 - kubeconfig 只在 APIServer 区块的受信 UI 复制或下载，不进对话
 - 设置页按厂商 schema 填写 AKSK，并开关 `tencent.tke`；无必填地域字段
 - 预留阿里云凭证字段，产品模块尚未实现

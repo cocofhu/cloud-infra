@@ -20,6 +20,7 @@ import {
   validateDeletePayload,
   validateNodeCreatePayload,
   validateNodePoolPayload,
+  validateAddExistedPayload,
   type TkeClusterItem,
   type TkeInstanceItem,
   type TkeNodePoolItem,
@@ -58,11 +59,47 @@ function mockCall() {
       }
       return all
     }
-    if (action === 'DescribeEKSClusters') return { Clusters: [], TotalCount: 0 }
-    if (action === 'DescribeTKEEdgeClusters') return { Clusters: [], TotalCount: 0 }
+    if (action === 'DescribeEKSClusters') {
+      const ids = (payload as { ClusterIds?: string[] }).ClusterIds
+      if (ids?.includes('cls-eks0001')) {
+        return {
+          Clusters: [{
+            ClusterId: 'cls-eks0001',
+            ClusterName: 'eks-empty',
+            ClusterType: 'SERVERLESS_CLUSTER',
+            ClusterStatus: 'Running',
+            ClusterNodeNum: 0,
+            DeletionProtection: false,
+          }],
+          TotalCount: 1,
+        }
+      }
+      return { Clusters: [], TotalCount: 0 }
+    }
+    if (action === 'DescribeTKEEdgeClusters') {
+      const ids = (payload as { ClusterIds?: string[] }).ClusterIds
+      if (ids?.includes('cls-edge0001')) {
+        return {
+          Clusters: [{
+            ClusterId: 'cls-edge0001',
+            ClusterName: 'edge-empty',
+            ClusterType: 'EDGE_CLUSTER',
+            ClusterStatus: 'Running',
+            ClusterNodeNum: 0,
+            DeletionProtection: false,
+          }],
+          TotalCount: 1,
+        }
+      }
+      return { Clusters: [], TotalCount: 0 }
+    }
+    if (action === 'CreateCluster') {
+      const type = String((payload as { ClusterType?: string }).ClusterType || '')
+      return { ClusterId: type === 'EXTERNAL_CLUSTER' ? 'cls-ext00001' : 'cls-created01' }
+    }
     if (action === 'DescribeClusterInstances') {
       const clusterId = String((payload as { ClusterId?: string }).ClusterId || '')
-      if (clusterId === 'cls-empty001') return { TotalCount: 0, InstanceSet: [] }
+      if (clusterId === 'cls-empty001' || clusterId === 'cls-edge0001' || clusterId === 'cls-eks0001') return { TotalCount: 0, InstanceSet: [] }
       return fixture('cluster-instances.json')
     }
     if (action === 'DescribeClusterNodePools') return fixture('node-pools.json')
@@ -262,9 +299,16 @@ test('g2.3 create wizard rejects missing fields, SLA, and elastic/independent', 
     clusterVersion: '1.28.3',
   }, ctx())
   assert.equal(registered?.ok, true)
-  assert.equal(calls.some((row) => row.action === 'DescribeExternalClusterSpec'), true)
-  assert.equal(calls.filter((row) => row.action === 'CreateCluster' && (row.payload as { ClusterType?: string }).ClusterType === 'EXTERNAL_CLUSTER').length, 0)
+  const extCreate = calls.find((row) => row.action === 'CreateCluster' && (row.payload as { ClusterType?: string }).ClusterType === 'EXTERNAL_CLUSTER')
+  assert.ok(extCreate)
+  assert.equal((extCreate?.payload as { ClusterBasicSettings?: { ClusterName?: string; ClusterVersion?: string } }).ClusterBasicSettings?.ClusterName, 'ext')
+  assert.equal((extCreate?.payload as { ClusterBasicSettings?: { ClusterVersion?: string } }).ClusterBasicSettings?.ClusterVersion, '1.28.3')
+  const specCall = calls.find((row) => row.action === 'DescribeExternalClusterSpec')
+  assert.equal((specCall?.payload as { ClusterId?: string }).ClusterId, 'cls-ext00001')
+  assert.equal((specCall?.payload as { ClusterName?: string }).ClusterName, undefined)
+  assert.equal((specCall?.payload as { IsExtranet?: boolean }).IsExtranet, false)
   assert.ok(registered && 'data' in registered && registered.data?.spec)
+  assert.equal(registered && 'data' in registered ? registered.data?.clusterId : '', 'cls-ext00001')
 })
 
 test('g2.4 delete wizard closes protection, rejects nodes, requires risk ack', async () => {
@@ -282,6 +326,18 @@ test('g2.4 delete wizard closes protection, rejects nodes, requires risk ack', a
   }))
   assert.equal(empty?.ok, true)
   assert.equal(calls.some((row) => row.action === 'DeleteCluster'), true)
+  const edgeDel = await module.execute?.('cluster.delete', { riskAck: true, instanceDeleteMode: 'retain' }, ctx({
+    id: 'tencent.tke:ap-guangzhou:cls-edge0001',
+  }))
+  assert.equal(edgeDel?.ok, true)
+  const edgeAction = calls.find((row) => row.action === 'DeleteTKEEdgeCluster')
+  assert.equal((edgeAction?.payload as { ClusterId?: string }).ClusterId, 'cls-edge0001')
+  assert.equal(calls.filter((row) => row.action === 'DeleteCluster' && (row.payload as { ClusterId?: string }).ClusterId === 'cls-edge0001').length, 0)
+  const eksDel = await module.execute?.('cluster.delete', { riskAck: true }, ctx({
+    id: 'tencent.tke:ap-guangzhou:cls-eks0001',
+  }))
+  assert.equal(eksDel?.ok, true)
+  assert.equal(calls.some((row) => row.action === 'DeleteEKSCluster'), true)
   const off = await module.execute?.('cluster.protection', { enable: false }, ctx({ id: 'tencent.tke:ap-guangzhou:cls-abc12345' }))
   assert.equal(off?.ok, true)
   assert.equal(calls.some((row) => row.action === 'DisableClusterDeletionProtection'), true)
@@ -316,8 +372,25 @@ test('g2.6 node cordon/drain/add existing and three node pool types', async () =
   assert.match(String((cordon?.payload as { Path?: string }).Path || ''), /10\.0\.0\.8/)
   assert.doesNotMatch(String((cordon?.payload as { Path?: string }).Path || ''), /ins-node1/)
   assert.equal((await module.execute?.('node.drain', { instanceId: 'ins-node1' }, ctx({ id })))?.ok, true)
-  assert.equal((await module.execute?.('node.addExisted', { instanceIds: ['ins-old'] }, ctx({ id })))?.ok, true)
-  assert.match(validateNodeCreatePayload({ runInstancePara: {} }) || '', /机型|镜像|安全组|子网/)
+  assert.match(validateAddExistedPayload({ instanceIds: ['ins-old'] }) || '', /安全组|登录/)
+  const noLogin = await module.execute?.('node.addExisted', { instanceIds: ['ins-old'] }, ctx({ id }))
+  assert.equal(noLogin?.ok, false)
+  assert.equal((await module.execute?.('node.addExisted', {
+    instanceIds: ['ins-old'],
+    securityGroupIds: ['sg-1'],
+    loginKeyIds: ['skey-1'],
+  }, ctx({ id })))?.ok, true)
+  const addExisted = calls.find((row) => row.action === 'AddExistedInstances')?.payload as { LoginSettings?: { KeyIds?: string[] }; SecurityGroupIds?: string[] }
+  assert.deepEqual(addExisted.SecurityGroupIds, ['sg-1'])
+  assert.deepEqual(addExisted.LoginSettings?.KeyIds, ['skey-1'])
+  assert.match(validateNodeCreatePayload({ runInstancePara: {} }) || '', /机型|镜像|安全组|子网|可用区/)
+  assert.match(validateNodeCreatePayload({
+    instanceType: 'S5.MEDIUM2',
+    imageId: 'img-demo',
+    vpcId: 'vpc-1',
+    subnetId: 'subnet-1',
+    securityGroupIds: 'sg-1',
+  }) || '', /可用区/)
   const emptyNode = await module.execute?.('node.create', { runInstancePara: {} }, ctx({ id }))
   assert.equal(emptyNode?.ok, false)
   const createdNode = await module.execute?.('node.create', {
@@ -326,11 +399,17 @@ test('g2.6 node cordon/drain/add existing and three node pool types', async () =
     vpcId: 'vpc-1',
     subnetId: 'subnet-1',
     securityGroupIds: 'sg-1',
+    zone: 'ap-guangzhou-3',
+    loginKeyIds: 'skey-1',
+    instanceChargeType: 'POSTPAID_BY_HOUR',
   }, ctx({ id }))
   assert.equal(createdNode?.ok, true)
   const runPara = calls.find((row) => row.action === 'CreateClusterInstances')?.payload as { RunInstancePara?: string }
   assert.equal(typeof runPara.RunInstancePara, 'string')
   assert.match(String(runPara.RunInstancePara), /S5\.MEDIUM2/)
+  const runBody = JSON.parse(String(runPara.RunInstancePara)) as { Placement?: { Zone?: string }; LoginSettings?: { KeyIds?: string[] } }
+  assert.equal(runBody.Placement?.Zone, 'ap-guangzhou-3')
+  assert.deepEqual(runBody.LoginSettings?.KeyIds, ['skey-1'])
   assert.equal((await module.execute?.('nodepool.create', { name: 'p1' }, ctx({ id })))?.ok, false)
   assert.match(validateNodePoolPayload({ poolType: 'Regular', name: 'p1' }) || '', /VPC|子网|机型|镜像|安全组/)
   const regular = await module.execute?.('nodepool.create', {
@@ -366,6 +445,21 @@ test('g2.6 node cordon/drain/add existing and three node pool types', async () =
   const asg = calls.find((row) => row.action === 'CreateClusterNodePool')?.payload as { AutoScalingGroupPara?: string; LaunchConfigurePara?: string }
   assert.equal(typeof asg.AutoScalingGroupPara, 'string')
   assert.equal(typeof asg.LaunchConfigurePara, 'string')
+  assert.equal((await module.execute?.('nodepool.scale', { nodePoolId: 'np-regular1', desired: 3, poolType: 'Regular' }, ctx({ id })))?.ok, true)
+  const asgScale = calls.find((row) => row.action === 'ModifyNodePoolDesiredCapacityAboutAsg')
+  assert.equal((asgScale?.payload as { NodePoolId?: string; DesiredCapacity?: number }).NodePoolId, 'np-regular1')
+  assert.equal((asgScale?.payload as { DesiredCapacity?: number }).DesiredCapacity, 3)
+  assert.equal((await module.execute?.('nodepool.scale', { nodePoolId: 'np-native1', desired: 2, poolType: 'Native' }, ctx({ id })))?.ok, true)
+  const nativeScale = calls.find((row) => row.action === 'ModifyNodePool')
+  assert.equal(nativeScale?.version, '2022-05-01')
+  assert.equal((nativeScale?.payload as { NodePoolId?: string }).NodePoolId, 'np-native1')
+  const superScale = await module.execute?.('nodepool.scale', { nodePoolId: 'np-super1', desired: 2, poolType: 'Super' }, ctx({ id }))
+  assert.equal(superScale?.ok, false)
+  assert.match(String(superScale && 'error' in superScale ? superScale.error : ''), /超级节点池/)
+  assert.equal(calls.filter((row) => row.action === 'ModifyNodePoolDesiredCapacityAboutAsg' && (row.payload as { NodePoolId?: string }).NodePoolId === 'np-super1').length, 0)
+  const nativeById = await module.execute?.('nodepool.scale', { nodePoolId: 'np-native1', desired: 1 }, ctx({ id }))
+  assert.equal(nativeById?.ok, true)
+  assert.equal(calls.filter((row) => row.action === 'ModifyNodePool').length, 2)
 })
 
 test('g2.7 namespace quota, addon, rbac, policy confirm, audit switch', async () => {
@@ -446,8 +540,13 @@ test('g4.2 client ClusterConsole is independent of DetailView records table', ()
   assert.match(client, /kind === "cluster"/)
   assert.match(client, /单节点 Pod 上限/)
   assert.match(client, /生成导入配置/)
+  assert.match(client, /先创建注册集群拿到 ClusterId/)
+  assert.match(client, /可用区/)
+  assert.match(client, /登录密钥/)
+  assert.match(client, /超级节点池不按 ASG/)
   assert.match(client, /重装滚动/)
   assert.match(client, /计费/)
+  assert.doesNotMatch(client, /而不是走 CreateCluster/)
   const start = client.indexOf('function CreateWizard')
   const end = client.indexOf('function SearchToolView')
   const consoleSrc = client.slice(start, end)

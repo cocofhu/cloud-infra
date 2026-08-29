@@ -16,6 +16,27 @@
         "AutoscalingAdded": { "Total": 2, "Ready": 2 },
         "ManuallyAdded": { "Total": 0, "Ready": 0 }
       }
+    },
+    {
+      "NodePoolId": "np-native1",
+      "Name": "native-pool",
+      "LifeState": "normal",
+      "NodePoolType": "Native",
+      "DesiredNodesNum": 1,
+      "MinNodesNum": 0,
+      "MaxNodesNum": 5,
+      "InstanceTypes": ["SA2.MEDIUM2"],
+      "InstanceChargeType": "POSTPAID_BY_HOUR",
+      "DeletionProtection": false
+    },
+    {
+      "NodePoolId": "np-super1",
+      "Name": "super-pool",
+      "LifeState": "normal",
+      "NodePoolType": "Super",
+      "DesiredNodesNum": 0,
+      "InstanceChargeType": "POSTPAID_BY_HOUR",
+      "DeletionProtection": false
     }
   ]
 }

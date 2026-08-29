@@ -364,7 +364,7 @@ export function nodeLabelPairs(item: TkeInstanceItem): string[] {
 
 export function validateNodeCreatePayload(payload: Record<string, unknown>): string | null {
   const para = parseRunInstancePara(payload)
-  if (!para) return '缺少机型/镜像/安全组/子网'
+  if (!para) return '缺少机型/镜像/安全组/子网/可用区'
   if (!String(para.InstanceType || payload.instanceType || '').trim()) return '缺少机型'
   if (!String(para.ImageId || payload.imageId || '').trim()) return '缺少镜像'
   const vpc = para.VirtualPrivateCloud as Record<string, unknown> | undefined
@@ -374,6 +374,19 @@ export function validateNodeCreatePayload(payload: Record<string, unknown>): str
   if (!vpcId) return '缺少 VPC'
   const sgs = asStringArray(para.SecurityGroupIds || payload.securityGroupIds)
   if (!sgs.length) return '缺少安全组'
+  const placement = para.Placement && typeof para.Placement === 'object' ? para.Placement as Record<string, unknown> : {}
+  const zone = String(placement.Zone || para.Zone || payload.zone || payload.Zone || '').trim()
+  if (!zone) return '缺少可用区'
+  if (!nodeLoginSettings(para, payload)) return '缺少登录密钥或密码'
+  return null
+}
+
+export function validateAddExistedPayload(payload: Record<string, unknown>): string | null {
+  const ids = asStringArray(payload.instanceIds || payload.instanceId || payload.InstanceIds)
+  if (!ids.length) return '缺少已有节点'
+  const sgs = asStringArray(payload.securityGroupIds || payload.SecurityGroupIds)
+  if (!sgs.length) return '缺少安全组'
+  if (!nodeLoginSettings({}, payload)) return '缺少登录密钥或密码'
   return null
 }
 
@@ -388,13 +401,18 @@ export function parseRunInstancePara(payload: Record<string, unknown>): Record<s
       return null
     }
   }
-  if (payload.instanceType || payload.imageId || payload.subnetId) {
+  if (payload.instanceType || payload.imageId || payload.subnetId || payload.zone) {
+    const login = nodeLoginSettings({}, payload)
+    const zone = String(payload.zone || payload.Zone || '').trim()
     return {
       InstanceType: payload.instanceType,
       ImageId: payload.imageId,
       VirtualPrivateCloud: { VpcId: payload.vpcId, SubnetId: payload.subnetId },
       SecurityGroupIds: asStringArray(payload.securityGroupIds),
       InstanceCount: Number(payload.instanceCount || 1) || 1,
+      Placement: zone ? { Zone: zone } : undefined,
+      InstanceChargeType: payload.instanceChargeType || payload.InstanceChargeType || 'POSTPAID_BY_HOUR',
+      LoginSettings: login || undefined,
     }
   }
   return null
@@ -638,9 +656,16 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
           return { ok: true }
         }
         if (actionId === 'node.addExisted') {
-          const ids = asStringArray(payload.instanceIds || payload.instanceId)
-          if (!ids.length) return { ok: false, error: '缺少已有节点' }
-          await call('AddExistedInstances', { ClusterId: clusterId, InstanceIds: ids }, creds(ctx), opts(ctx, region))
+          const invalid = validateAddExistedPayload(payload)
+          if (invalid) return { ok: false, error: invalid }
+          const ids = asStringArray(payload.instanceIds || payload.instanceId || payload.InstanceIds)
+          const login = nodeLoginSettings({}, payload)
+          await call('AddExistedInstances', {
+            ClusterId: clusterId,
+            InstanceIds: ids,
+            LoginSettings: login,
+            SecurityGroupIds: asStringArray(payload.securityGroupIds || payload.SecurityGroupIds),
+          }, creds(ctx), opts(ctx, region))
           return { ok: true }
         }
         if (actionId === 'node.create') {
@@ -651,16 +676,22 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
           const imageId = String(para.ImageId || payload.imageId || '').trim()
           const vpc = (para.VirtualPrivateCloud && typeof para.VirtualPrivateCloud === 'object'
             ? para.VirtualPrivateCloud as Record<string, unknown>
-            : {}) 
+            : {})
           const vpcId = String(vpc.VpcId || payload.vpcId || '').trim()
           const subnetId = String(vpc.SubnetId || payload.subnetId || '').trim()
           const securityGroupIds = asStringArray(para.SecurityGroupIds || payload.securityGroupIds)
+          const placement = para.Placement && typeof para.Placement === 'object' ? para.Placement as Record<string, unknown> : {}
+          const zone = String(placement.Zone || para.Zone || payload.zone || payload.Zone || '').trim()
+          const login = nodeLoginSettings(para, payload)
           const body = {
             InstanceType: instanceType,
             ImageId: imageId,
+            Placement: { Zone: zone },
             VirtualPrivateCloud: { VpcId: vpcId, SubnetId: subnetId },
             SecurityGroupIds: securityGroupIds,
             InstanceCount: Number(para.InstanceCount || payload.instanceCount || 1) || 1,
+            InstanceChargeType: String(para.InstanceChargeType || payload.instanceChargeType || payload.InstanceChargeType || 'POSTPAID_BY_HOUR'),
+            LoginSettings: login,
           }
           await call('CreateClusterInstances', {
             ClusterId: clusterId,
@@ -669,18 +700,7 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
           return { ok: true }
         }
         if (actionId === 'nodepool.create') return createNodePool(call, ctx, region, clusterId, payload)
-        if (actionId === 'nodepool.scale') {
-          const nodePoolId = String(payload.nodePoolId || '').trim()
-          const desired = Number(payload.desired || payload.DesiredNodesNum)
-          if (!nodePoolId) return { ok: false, error: '缺少节点池' }
-          if (!Number.isFinite(desired) || desired < 0) return { ok: false, error: '缺少期望节点数' }
-          await call('ModifyNodePoolDesiredCapacityAboutAsg', {
-            ClusterId: clusterId,
-            NodePoolId: nodePoolId,
-            DesiredCapacity: desired,
-          }, creds(ctx), opts(ctx, region))
-          return { ok: true }
-        }
+        if (actionId === 'nodepool.scale') return scaleNodePool(call, ctx, region, clusterId, payload)
         if (actionId === 'nodepool.autoscale' || actionId === 'nodepool.protection') {
           const nodePoolId = String(payload.nodePoolId || '').trim()
           if (!nodePoolId) return { ok: false, error: '缺少节点池' }
@@ -837,18 +857,27 @@ async function createCluster(
   const name = String(payload.clusterName || payload.ClusterName || '').trim()
   const version = String(payload.clusterVersion || payload.ClusterVersion || '').trim()
   if (type === 'EXTERNAL_CLUSTER') {
+    const created = await call<{ ClusterId?: string }>('CreateCluster', {
+      ClusterType: 'EXTERNAL_CLUSTER',
+      ClusterBasicSettings: {
+        ClusterName: name,
+        ClusterVersion: version,
+        ClusterDescription: String(payload.description || payload.ClusterDescription || '').trim() || undefined,
+      },
+    }, creds(ctx), opts(ctx, region))
+    const clusterId = String(created.ClusterId || payload.clusterId || payload.ClusterId || '').trim()
+    if (!clusterId) return { ok: false, error: '创建注册集群未返回 ClusterId' }
     const spec = await call<{ Spec?: string; Yaml?: string; Command?: string; Config?: string }>(
       'DescribeExternalClusterSpec',
       {
-        ClusterName: name,
-        K8SVersion: version || undefined,
-        ClusterDescription: String(payload.description || payload.ClusterDescription || '').trim() || undefined,
+        ClusterId: clusterId,
+        IsExtranet: payload.isExtranet === true || payload.IsExtranet === true,
       },
       creds(ctx),
       opts(ctx, region),
     )
     const yaml = String(spec.Spec || spec.Yaml || spec.Config || spec.Command || '').trim()
-    return { ok: true, data: { spec: yaml, clusterName: name, filename: `${name || 'cluster'}.yaml` } }
+    return { ok: true, data: { spec: yaml, clusterId, clusterName: name, filename: `${name || 'cluster'}.yaml` } }
   }
   if (type === 'EDGE_CLUSTER') {
     await call('CreateTKEEdgeCluster', {
@@ -903,6 +932,15 @@ async function deleteCluster(
   if (invalid) return { ok: false, error: invalid }
   const mode = String(payload.instanceDeleteMode || payload.InstanceDeleteMode || 'retain')
   const keepDisk = payload.retainCbs !== false && payload.destroyCbs !== true
+  const clusterType = normalizeClusterType(String(cluster?.ClusterType || payload.clusterType || payload.ClusterType || ''))
+  if (clusterType === 'EDGE_CLUSTER') {
+    await call('DeleteTKEEdgeCluster', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
+    return { ok: true }
+  }
+  if (clusterType === 'SERVERLESS_CLUSTER') {
+    await call('DeleteEKSCluster', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
+    return { ok: true }
+  }
   await call('DeleteCluster', {
     ClusterId: clusterId,
     InstanceDeleteMode: mode,
@@ -1034,6 +1072,52 @@ async function createNodePool(
   return { ok: true }
 }
 
+async function scaleNodePool(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+  payload: Record<string, unknown>,
+): Promise<ActionResult> {
+  const nodePoolId = String(payload.nodePoolId || payload.NodePoolId || '').trim()
+  const desired = Number(payload.desired || payload.DesiredNodesNum)
+  if (!nodePoolId) return { ok: false, error: '缺少节点池' }
+  if (!Number.isFinite(desired) || desired < 0) return { ok: false, error: '缺少期望节点数' }
+  let type = normalizePoolType(String(payload.poolType || payload.type || payload.NodePoolType || ''))
+  if (type !== 'Regular' && type !== 'Native' && type !== 'Super' && type !== 'External') {
+    const pools = await loadNodePools(call, ctx, region, clusterId)
+    const hit = pools.find((item) => item.NodePoolId === nodePoolId)
+    type = normalizePoolType(String(hit?.NodePoolType || 'Regular'))
+  }
+  if (type === 'Super') {
+    return { ok: false, error: '超级节点池不按 ASG 期望节点数调整，请修改子网或安全组' }
+  }
+  if (type === 'External') {
+    return { ok: false, error: '注册节点池不按 ASG 期望节点数调整' }
+  }
+  if (type === 'Native') {
+    const min = Number(payload.min ?? payload.MinNodesNum ?? desired)
+    const max = Number(payload.max ?? payload.MaxNodesNum ?? Math.max(desired, 1))
+    await call('ModifyNodePool', {
+      ClusterId: clusterId,
+      NodePoolId: nodePoolId,
+      Native: {
+        Scaling: {
+          MinReplicas: Number.isFinite(min) ? min : desired,
+          MaxReplicas: Number.isFinite(max) && max >= (Number.isFinite(min) ? min : desired) ? max : Math.max(desired, 1),
+        },
+      },
+    }, creds(ctx), opts(ctx, region, { version: '2022-05-01' }))
+    return { ok: true }
+  }
+  await call('ModifyNodePoolDesiredCapacityAboutAsg', {
+    ClusterId: clusterId,
+    NodePoolId: nodePoolId,
+    DesiredCapacity: desired,
+  }, creds(ctx), opts(ctx, region))
+  return { ok: true }
+}
+
 async function loadCluster(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<TkeClusterItem> {
   const managed = await call<{ Clusters?: TkeClusterItem[] }>('DescribeClusters', { ClusterIds: [clusterId] }, creds(ctx), opts(ctx, region)).catch(() => ({ Clusters: [] as TkeClusterItem[] }))
   if (managed.Clusters?.[0]) return managed.Clusters[0]
@@ -1045,12 +1129,47 @@ async function loadCluster(call: typeof tkeCall, ctx: ModuleContext, region: str
 }
 
 async function loadNodes(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<TkeInstanceItem[]> {
+  const out: TkeInstanceItem[] = []
   try {
-    const data = await call<{ InstanceSet?: TkeInstanceItem[] }>('DescribeClusterInstances', { ClusterId: clusterId, Limit: 100 }, creds(ctx), opts(ctx, region))
-    return (data.InstanceSet || []).filter((item) => matchNodeFilters(item, ctx.filters || {}))
+    const pageSize = 100
+    let offset = 0
+    for (let page = 0; page < 20; page += 1) {
+      const data = await call<{ InstanceSet?: TkeInstanceItem[]; TotalCount?: number }>(
+        'DescribeClusterInstances',
+        { ClusterId: clusterId, Offset: offset, Limit: pageSize },
+        creds(ctx),
+        opts(ctx, region),
+      )
+      const rows = data.InstanceSet || []
+      out.push(...rows)
+      const total = Number(data.TotalCount ?? out.length)
+      if (rows.length < pageSize || out.length >= total) break
+      offset += rows.length
+    }
   } catch {
-    return []
+    // 边缘/注册等集群可能没有普通节点接口
   }
+  try {
+    const virt = await call<{ Nodes?: Array<{ Name?: string; NodeName?: string; VirtualNodeId?: string; NodePoolId?: string; Phase?: string }> }>(
+      'DescribeClusterVirtualNode',
+      { ClusterId: clusterId, Limit: 100 },
+      creds(ctx),
+      opts(ctx, region),
+    )
+    for (const node of virt.Nodes || []) {
+      const id = String(node.VirtualNodeId || node.Name || node.NodeName || '').trim()
+      if (!id) continue
+      out.push({
+        InstanceId: id,
+        NodeName: String(node.NodeName || node.Name || id),
+        InstanceState: node.Phase,
+        NodePoolId: node.NodePoolId,
+      })
+    }
+  } catch {
+    // 无超级节点时接口可能不可用
+  }
+  return out.filter((item) => matchNodeFilters(item, ctx.filters || {}))
 }
 
 async function loadNodePools(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<TkeNodePoolItem[]> {
@@ -1236,6 +1355,17 @@ function asStringArray(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean)
   const text = String(value || '').trim()
   return text ? [text] : []
+}
+
+function nodeLoginSettings(para: Record<string, unknown>, payload: Record<string, unknown>): Record<string, unknown> | null {
+  const fromPara = para.LoginSettings && typeof para.LoginSettings === 'object' && !Array.isArray(para.LoginSettings)
+    ? para.LoginSettings as Record<string, unknown>
+    : {}
+  const keyIds = asStringArray(fromPara.KeyIds || payload.loginKeyIds || payload.keyIds || payload.KeyIds)
+  const password = String(fromPara.Password || payload.password || payload.Password || '').trim()
+  if (keyIds.length) return { KeyIds: keyIds }
+  if (password) return { Password: password }
+  return null
 }
 
 function parseJson(raw?: string): { items?: unknown[] } | null {
