@@ -518,8 +518,10 @@ test('event detail flattens Problem/Suggestions JSON (g2.2 g4.1)', async () => {
   }))
   const cause = detail?.tables?.find((table) => table.id === 'cause')
   const advice = detail?.tables?.find((table) => table.id === 'advice')
-  assert.equal(cause?.rows[0]?.内容, '会话快照')
-  assert.equal(advice?.rows[0]?.内容, 'SQL优化')
+  const causeRow = cause?.rows[0] as Record<string, string> | undefined
+  const adviceRow = advice?.rows[0] as Record<string, string> | undefined
+  assert.equal(causeRow?.内容, '会话快照')
+  assert.equal(adviceRow?.内容, 'SQL优化')
   assert.equal(readableDiagText('[{"DataType":"title","Data":{"Name":"会话快照"}}]'), '会话快照')
 })
 

@@ -1,0 +1,25 @@
+{
+  "Data": {
+    "TagCount": 3,
+    "TagInfo": [
+      {
+        "TagName": "1.2.0",
+        "Digest": "sha256:aaa111",
+        "Size": 10485760,
+        "UpdateTime": "2024-06-01"
+      },
+      {
+        "TagName": "1.1.0",
+        "Digest": "sha256:bbb222",
+        "Size": 9437184,
+        "UpdateTime": "2024-05-01"
+      },
+      {
+        "TagName": "latest",
+        "Digest": "sha256:ccc333",
+        "Size": 10485760,
+        "UpdateTime": "2024-06-02"
+      }
+    ]
+  }
+}

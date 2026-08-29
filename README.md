@@ -1,8 +1,8 @@
 # cloud-infra
 
-DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、证书、对象存储、TKE 集群、云服务器、云数据库与 DBbrain 诊断，以对齐各产品控制台的列表展示；在设置页配置各云 AccessKey。
+DeepSeek Harness 腾讯云资源插件。在对话中查询腾讯云上的域名、证书、对象存储、TKE 集群、云服务器、云数据库、容器镜像与 DBbrain 诊断，以对齐各产品控制台的列表展示；在设置页配置腾讯云 SecretId / SecretKey。
 
-已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录，[腾讯云 SSL「我的证书」](https://cloud.tencent.com/document/product/400/55741)（列表、完整详情、申请/上传/部署/下载/更多），对话卡片内的 [腾讯云域名注册](https://cloud.tencent.com/document/product/242/9595)（查询、立即加购、购物车、提交订单、核对信息、账户余额支付、我的域名），[腾讯云 COS](https://cloud.tencent.com/document/product/436/8291) 存储桶列表与文件列表，[腾讯云 TKE](https://cloud.tencent.com/document/product/457/31824) 控制台「集群」配置树，[CVM](https://cloud.tencent.com.cn/document/product/213/16533) 与 [轻量应用服务器](https://cloud.tencent.com/document/product/1207/44574)，以及 [腾讯云 DBbrain](https://cloud.tencent.com/document/product/1130/39054) 实例管理 / 诊断优化、[腾讯云 CLS](https://cloud.tencent.com/document/product/614/56447) 日志主题查看与检索分析、[腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦；Host / Query 不按厂商名分支。地域只在对话参数或资源 UI 会话中传递，不写回设置。
+已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录，[腾讯云 SSL「我的证书」](https://cloud.tencent.com/document/product/400/55741)（列表、完整详情、申请/上传/部署/下载/更多），对话卡片内的 [腾讯云域名注册](https://cloud.tencent.com/document/product/242/9595)（查询、立即加购、购物车、提交订单、核对信息、账户余额支付、我的域名），[腾讯云 COS](https://cloud.tencent.com/document/product/436/8291) 存储桶列表与文件列表，[腾讯云 TKE](https://cloud.tencent.com/document/product/457/31824) 控制台「集群」配置树，[CVM](https://cloud.tencent.com.cn/document/product/213/16533) 与 [轻量应用服务器](https://cloud.tencent.com/document/product/1207/44574)，以及 [腾讯云 TCR](https://cloud.tencent.com/document/product/1141/39271) 容器镜像（个人版 + 企业版）、[腾讯云 DBbrain](https://cloud.tencent.com/document/product/1130/39054) 实例管理 / 诊断优化、[腾讯云 CLS](https://cloud.tencent.com/document/product/614/56447) 日志主题查看与检索分析、[腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦；Host / Query 不按厂商名分支。地域只在对话参数或资源 UI 会话中传递，不写回设置。
 
 ## 功能
 
@@ -28,8 +28,11 @@ DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、
 - 对话一句话可直接检索指定主题的原始日志（CQL 语句模式；空语句查该时间窗全部日志）
 - 卡片顶部可按官方地域分组切换（大陆/港澳台/海外/金融/特殊）。**只改当前对话卡片，不写设置页与覆盖文件**
 - 对话里查询 CDB：列表为「登录 / 管理」，管理页为官方 11 个页签；SQL 走 DMC 登录，库账号只在进程内存
-- 设置页按厂商 schema 填写 AKSK，并开关 `tencent.tke`；无必填地域字段。密钥只保存在本机。不新增地域、库账号或电源控件；新产品只出现在既有产品模块勾选。证书操作不改设置
-- 预留阿里云凭证字段，产品模块尚未实现
+- 对话里查询镜像 / TCR / 镜像仓库时弹出**容器镜像卡片**（与域名共用 `cloud_infra_query` 通道）：顶栏先选地域（默认广州；列表走 TCR `DescribeRegions`，与控制台相同，失败时回退官方接入地域），再以卡片墙展示该地域实例；个人版实例只出现在广州
+- 卡内常驻搜索框（出卡时不预填对话原句，关键字只过滤当前视图的实例/命名空间/仓库/版本），可下钻命名空间、镜像仓库与版本管理；可复制 `docker pull` 文本（不执行 docker）
+- 缺凭证或企业版列表失败时在卡片内显示错误（`.ci-err`），不用「该地域没有实例」顶替；仓库/版本超过 100 条时提示仅显示前 100 条
+- 删除镜像版本始终二次确认，并提示官方同 Digest 警告
+- 设置页按厂商 schema 填写 AKSK，并开关 `tencent.tke`；无必填地域字段。密钥只保存在本机。不新增地域、库账号或电源控件；新产品只出现在既有产品模块勾选。证书操作不改设置。**不在设置页增加地域**等字段
 
 ## 环境要求
 
@@ -60,6 +63,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 - 对象存储：COS 读权限；上传 / 删除 / 建桶还需写权限
 - CLS：CAM 需包含日志服务读权限（如 `DescribeTopics`、`DescribeLogsets`、`SearchLog`）。已有 AKSK 可直接复用，不必重填
 - DBbrain：数据库智能管家读权限；Kill / 生成报告还需写权限
+- TCR / 容器镜像：个人版 `*Personal` 与企业版 `DescribeInstances` / `DescribeRepositories` / `DescribeImages` / `DeleteImage` 等；企业版请求会带当前所选 Region
 
 然后可以直接对 Agent 说：
 
@@ -95,9 +99,13 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 > 帮我看一下慢 SQL
 
+> 查一下我的镜像
+
+> 列出 TCR 仓库
+
 > 还有吗
 
-插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cert`、`cos`、`cluster`、`cdb`、`lighthouse`、`cvm`、`registrar`、`my-domain`、`cls`、`dbbrain`、`auto`。DBbrain：`kind=dbbrain`，点击实例名 / 告警 /「诊断优化」进入异常诊断；有健康报告页的产品线可点健康分进入健康报告，Redis / MongoDB 没有该页则不跳转。Kill 会话仅 MySQL / TDSQL-C 支持按会话 ID 两阶段 `Prepare(Threads)` → `Commit(SqlExecId)`。MariaDB / TDSQL / 自建 MySQL 不展示行上 Kill。MongoDB 在卡片内「创建中断任务」（`Duration` 必填，`Time`/`Host`/`Type` 可选），不按 sessionId 杀，可能同时中断多条会话。生成健康报告不发送邮件（`SendMailFlag=0`）。列表接口公共 Region 固定广州；点进某实例后按该实例 Region 请求。查 CLS 时传 `kind=cls`；检索日志时再传 `topicId` 或主题名、`queryString`（CQL）、`range`（`15m` / `1h` / `4h` / `1d` / `today` / `yesterday`，默认 `1h`）。**查证书必须传 `kind=cert`**。用户说「查 COS」时必须调用 `kind=cos` **且可以不带 region**，对话卡默认选中广州（`ap-guangzhou`）并列出该地域存储桶，顶部 `#ci-cos-region` 仍可输入补全改选。清空后回到「请输入并选择地域」。禁止把中文名或自由文本当 region，也禁止用 Ask question 代替卡内补全。未配置腾讯云密钥时卡片置顶提示去 **设置 → 插件 → 云资源**，不会把鉴权失败画成「该地域下没有存储桶」。查 TKE 用 `kind=cluster` 并传入运行时 `region`（如 `ap-guangzhou`）。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。查询、切地域、写操作都不会改 `cloud-infra.json`。
+插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cert`、`cos`、`cluster`、`cdb`、`lighthouse`、`cvm`、`registrar`、`my-domain`、`cls`、`dbbrain`、`image`、`auto`。DBbrain：`kind=dbbrain`，点击实例名 / 告警 /「诊断优化」进入异常诊断；有健康报告页的产品线可点健康分进入健康报告，Redis / MongoDB 没有该页则不跳转。Kill 会话仅 MySQL / TDSQL-C 支持按会话 ID 两阶段 `Prepare(Threads)` → `Commit(SqlExecId)`。MariaDB / TDSQL / 自建 MySQL 不展示行上 Kill。MongoDB 在卡片内「创建中断任务」（`Duration` 必填，`Time`/`Host`/`Type` 可选），不按 sessionId 杀，可能同时中断多条会话。生成健康报告不发送邮件（`SendMailFlag=0`）。列表接口公共 Region 固定广州；点进某实例后按该实例 Region 请求。镜像查询使用 `kind=image`，结果以对话卡片出现：请先选地域，再点实例卡片进入仓库与版本管理。查 CLS 时传 `kind=cls`；检索日志时再传 `topicId` 或主题名、`queryString`（CQL）、`range`（`15m` / `1h` / `4h` / `1d` / `today` / `yesterday`，默认 `1h`）。**查证书必须传 `kind=cert`**。用户说「查 COS」时必须调用 `kind=cos` **且可以不带 region**，对话卡默认选中广州（`ap-guangzhou`）并列出该地域存储桶，顶部 `#ci-cos-region` 仍可输入补全改选。清空后回到「请输入并选择地域」。禁止把中文名或自由文本当 region，也禁止用 Ask question 代替卡内补全。未配置腾讯云密钥时卡片置顶提示去 **设置 → 插件 → 云资源**，不会把鉴权失败画成「该地域下没有存储桶」。查 TKE 用 `kind=cluster` 并传入运行时 `region`（如 `ap-guangzhou`）。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。查询、切地域、写操作都不会改 `cloud-infra.json`。
 
 COS 对话卡对齐控制台两页：顶部地域补全默认广州，仍可用中文名 / GZ / `ap-guangzhou` 改选（含硅谷、法兰克福、金融区等官方枚举）→ 存储桶列表（名称 / 地域 / 创建时间 / 访问权限只读，桶名搜索 300ms 防抖）→ 点名称进入文件列表（当前层短名 + 面包屑下钻）。一层对象过多时用「上一页 / 下一页」按 `nextMarker` 翻页，搜索仅过滤当前页。访问权限、CORS、生命周期等桶设置不在对话卡内改。地域选择与上传/删除等操作只留在对话卡内存，不写插件设置。重命名走官方 `x-cos-copy-source`（`<桶>.cos.<地域>.myqcloud.com/<编码后的 Key>`）；删文件夹使用批量删除，失败会提示已删/剩余数量。
 

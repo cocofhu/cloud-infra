@@ -142,11 +142,42 @@ export interface DetailCard {
   flags?: Record<string, string | number | boolean | undefined>
 }
 
+export interface ResourceScope {
+  region?: string
+  instanceId?: string
+  namespace?: string
+  repository?: string
+  view?: string
+}
+
+export interface ResourceTableColumn {
+  key: string
+  label: string
+}
+
+export interface ResourceTableRow {
+  id: string
+  cells: Record<string, string>
+  badges?: string[]
+}
+
+export interface ResourceTable {
+  id: string
+  title?: string
+  columns: ResourceTableColumn[]
+  rows: ResourceTableRow[]
+  total?: number
+  hasMore?: boolean
+}
+
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
   groups?: FieldGroup[]
   records?: DnsRecord[]
+  /** TCR uses ResourceTable (cells); DBbrain uses DetailTable (column→value rows). */
+  tables?: Array<ResourceTable | DetailTable>
+  scope?: ResourceScope
   logs?: LogHit[]
   entries?: DirEntry[]
   prefix?: string
@@ -166,7 +197,6 @@ export interface ResourceDetail {
   activeSubTab?: string
   ranges?: DetailTab[]
   activeRange?: string
-  tables?: DetailTable[]
   hints?: string[]
   form?: {
     id: string
@@ -195,7 +225,8 @@ export interface ListResult {
   warnings?: string[]
   errors?: ModuleError[]
   region?: string
-  regions?: Array<string | ClsRegionOption>
+  instanceId?: string
+  regions?: Array<string | ClsRegionOption | RegionOption>
   view?: string
 }
 
@@ -215,7 +246,7 @@ export interface QueryResult {
   needsRegion?: boolean
   view?: string
   region?: string
-  regions?: Array<string | ClsRegionOption>
+  regions?: Array<string | ClsRegionOption | RegionOption>
   topicId?: string
   topicName?: string
   queryString?: string
@@ -225,6 +256,7 @@ export interface QueryResult {
   logs?: LogHit[]
   context?: string
   fields?: string[]
+  instanceId?: string
 }
 
 export interface ModuleContext {
@@ -250,9 +282,12 @@ export interface ModuleContext {
   range?: string
   context?: string
   view?: string
+  instanceId?: string
+  namespace?: string
+  repository?: string
 }
 
-export type ActionResult = { ok: true; data?: Record<string, unknown> } | { ok: false; error: string }
+export type ActionResult = { ok: true; command?: string; data?: Record<string, unknown> } | { ok: false; error: string }
 
 export interface SearchResult {
   card?: ResourceCard
