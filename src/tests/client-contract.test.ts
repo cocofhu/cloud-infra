@@ -195,4 +195,6 @@ test('cdb review fixes: WAN DMC, destroy protect toggle, project form, destructi
   assert.match(client, /未开外网时需插件主机可达内网/)
   assert.match(client, /skip && !always/)
   assert.doesNotMatch(client, /if \(skip && action !== "dmc\.row\.write"\)/)
+  assert.match(client, /onClick: \(\) => onReload\(tab\) \}, "重新检查"\)/)
+  assert.match(client, /tabData\.slowLogError/)
 })

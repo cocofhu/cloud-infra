@@ -554,11 +554,11 @@ function logRows(items: unknown[]): Array<{ time: string; sql: string; user: str
   })
 }
 
-function lastDayRange(): { StartTime: string; EndTime: string } {
-  const end = new Date()
-  const start = new Date(end.getTime() - 24 * 3600 * 1000)
-  const fmt = (d: Date) => d.toISOString().replace('T', ' ').slice(0, 19)
-  return { StartTime: fmt(start), EndTime: fmt(end) }
+/** Official DescribeSlowLogData / DescribeErrorLogData take Unix seconds, not date strings. */
+export function lastDayRange(now = Date.now()): { StartTime: number; EndTime: number } {
+  const end = Math.floor(now / 1000)
+  const start = Math.floor((now - 864e5) / 1000)
+  return { StartTime: start, EndTime: end }
 }
 
 export function createCdbModule(
@@ -684,7 +684,7 @@ export function createCdbModule(
           const enable = parseProtectEnable(payload.enable)
           await call('ModifyInstanceDestroyProtect', {
             InstanceIds: [instanceId],
-            ProtectStatus: enable ? 'on' : 'off',
+            DestroyProtect: enable ? 'on' : 'off',
           }, creds(ctx), opts(ctx, region))
           return { ok: true, data: { protect: enable } }
         }
@@ -788,11 +788,21 @@ export function createCdbModule(
           return { ok: true }
         }
         if (actionId === 'check.connect') {
-          const host = String(payload.host || payload.vip || '')
-          const port = Number(payload.port || 3306)
-          if (!host) return { ok: false, error: '缺少连接地址' }
-          const result = await tcpProbe(host, port, Math.min(ctx.timeoutMs, 8000))
-          return { ok: true, data: result }
+          const vip = String(payload.host || payload.vip || '')
+          const vport = Number(payload.port || 3306)
+          const wanHost = String(payload.wanDomain || payload.wanHost || '')
+          const wanPort = Number(payload.wanPort || 3306)
+          if (!vip && !wanHost) return { ok: false, error: '缺少连接地址' }
+          const timeout = Math.min(ctx.timeoutMs, 8000)
+          const innerPort = Number.isFinite(vport) && vport > 0 ? vport : 3306
+          const outerPort = Number.isFinite(wanPort) && wanPort > 0 ? wanPort : 3306
+          const inner = vip
+            ? await tcpProbe(vip, innerPort, timeout)
+            : { ok: false, latencyMs: 0, error: '无内网地址' }
+          const outer = wanHost
+            ? await tcpProbe(wanHost, outerPort, timeout)
+            : { ok: false, latencyMs: 0, error: '未开外网：管理页仍可用，DMC 登录提示网络原因' }
+          return { ok: true, data: { inner, outer } }
         }
         if (actionId === 'dmc.login') {
           const user = String(payload.user || '').trim()
@@ -1021,21 +1031,31 @@ async function loadTab(
   }
   if (tab === '日志中心') {
     const range = lastDayRange()
-    const slow = await call<{ Items?: unknown[]; TotalCount?: number }>(
-      'DescribeSlowLogData',
-      { InstanceId: instanceId, Offset: 0, Limit: 20, ...range },
-      c,
-      o,
-    ).catch(() => ({ Items: [], TotalCount: 0 }))
-    const errors = await call<{ Items?: unknown[]; TotalCount?: number }>(
-      'DescribeErrorLogData',
-      { InstanceId: instanceId, Offset: 0, Limit: 20, ...range },
-      c,
-      o,
-    ).catch(() => ({ Items: [], TotalCount: 0 }))
+    const loadLogs = async (action: 'DescribeSlowLogData' | 'DescribeErrorLogData') => {
+      try {
+        const data = await call<{ Items?: unknown[]; TotalCount?: number }>(
+          action,
+          { InstanceId: instanceId, Offset: 0, Limit: 20, ...range },
+          c,
+          o,
+        )
+        return { rows: logRows(data.Items || []), error: '' }
+      } catch (err) {
+        return { rows: [] as ReturnType<typeof logRows>, error: publicErrorMessage(err) }
+      }
+    }
+    const slow = await loadLogs('DescribeSlowLogData')
+    const errors = await loadLogs('DescribeErrorLogData')
+    const hints = [
+      slow.error ? `慢日志：${slow.error}` : '',
+      errors.error ? `错误日志：${errors.error}` : '',
+    ].filter(Boolean)
     return {
-      slowLogs: logRows(slow.Items || []),
-      errorLogs: logRows(errors.Items || []),
+      slowLogs: slow.rows,
+      errorLogs: errors.rows,
+      slowLogError: slow.error || undefined,
+      errorLogError: errors.error || undefined,
+      tabError: hints.length ? hints.join('；') : undefined,
       note: '慢查询在日志中心，不是顶栏页签。',
     }
   }

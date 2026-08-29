@@ -16,6 +16,7 @@ import {
   isConnectError,
   isDestructiveSql,
   isWriteSql,
+  lastDayRange,
   mapCdbItem,
   metricValue,
   parseCdbRef,
@@ -350,9 +351,10 @@ test('destroy protect calls ModifyInstanceDestroyProtect on/off g1.3', async () 
   assert.equal(off?.ok, true)
   const protect = calls.filter((row) => row.action === 'ModifyInstanceDestroyProtect')
   assert.equal(protect.length, 2)
-  assert.deepEqual(protect[0]?.payload, { InstanceIds: ['cdb-70zdmgg1'], ProtectStatus: 'on' })
-  assert.deepEqual(protect[1]?.payload, { InstanceIds: ['cdb-70zdmgg1'], ProtectStatus: 'off' })
+  assert.deepEqual(protect[0]?.payload, { InstanceIds: ['cdb-70zdmgg1'], DestroyProtect: 'on' })
+  assert.deepEqual(protect[1]?.payload, { InstanceIds: ['cdb-70zdmgg1'], DestroyProtect: 'off' })
   assert.equal(calls.some((row) => row.action === 'ModifyInstanceTag'), false)
+  assert.doesNotMatch(src('src/providers/tencent/products/cdb.ts'), /ProtectStatus/)
 })
 
 test('param.modify sends InstanceIds array g2.3', async () => {
@@ -432,7 +434,9 @@ test('data security empty objects are not treated as opened g2.5', async () => {
 })
 
 test('logs tab maps SqlText and Timestamp g2.4', async () => {
-  const call = async (action: string) => {
+  const payloads: Array<{ action: string; payload: Record<string, unknown> }> = []
+  const call = async (action: string, payload: Record<string, unknown> = {}) => {
+    payloads.push({ action, payload })
     if (action === 'DescribeDBInstances') return { Items: (fixture('cdb-list.json').Items as unknown[]).slice(0, 1) }
     if (action === 'DescribeSlowLogData') return { Items: [{ SqlText: 'SELECT 1', Timestamp: '2024-01-01 00:00:00', UserHost: 'app' }] }
     if (action === 'DescribeErrorLogData') return { Items: [{ Content: 'err', Timestamp: '2024-01-01 00:01:00' }] }
@@ -449,6 +453,47 @@ test('logs tab maps SqlText and Timestamp g2.4', async () => {
   assert.equal(data.slowLogs?.[0]?.sql, 'SELECT 1')
   assert.equal(data.slowLogs?.[0]?.time, '2024-01-01 00:00:00')
   assert.equal(data.errorLogs?.[0]?.sql, 'err')
+  const slow = payloads.find((row) => row.action === 'DescribeSlowLogData')
+  const errLog = payloads.find((row) => row.action === 'DescribeErrorLogData')
+  assert.equal(typeof slow?.payload.StartTime, 'number')
+  assert.equal(typeof slow?.payload.EndTime, 'number')
+  assert.ok(Number.isInteger(slow?.payload.StartTime))
+  assert.ok(Number.isInteger(slow?.payload.EndTime))
+  assert.equal(typeof errLog?.payload.StartTime, 'number')
+  assert.equal(typeof errLog?.payload.EndTime, 'number')
+  const range = lastDayRange()
+  assert.equal(typeof range.StartTime, 'number')
+  assert.equal(typeof range.EndTime, 'number')
+  assert.equal(range.EndTime - range.StartTime, 86400)
+})
+
+test('logs tab surfaces DescribeSlowLogData failure instead of fake empty g2.4', async () => {
+  const call = async (action: string) => {
+    if (action === 'DescribeDBInstances') return { Items: (fixture('cdb-list.json').Items as unknown[]).slice(0, 1) }
+    if (action === 'DescribeSlowLogData') throw new TencentApiError('StartTime invalid', 'InvalidParameter')
+    if (action === 'DescribeErrorLogData') return { Items: [{ Content: 'err', Timestamp: '2024-01-01 00:01:00' }] }
+    return {}
+  }
+  const module = createCdbModule(call as never)
+  const logs = await module.detail?.({
+    ...ctx(),
+    id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1',
+    region: 'ap-guangzhou',
+    tab: '日志中心',
+  })
+  const data = logs?.extra?.tabData as {
+    slowLogs?: unknown[]
+    errorLogs?: Array<{ sql?: string }>
+    slowLogError?: string
+    tabError?: string
+  }
+  assert.equal((data.slowLogs || []).length, 0)
+  assert.ok(data.slowLogError)
+  assert.match(String(data.tabError || ''), /慢日志/)
+  assert.equal(data.errorLogs?.[0]?.sql, 'err')
+  const client = src('src/client.js')
+  assert.match(client, /tabData\.slowLogError/)
+  assert.match(client, /tabData\.errorLogError/)
 })
 
 test('dmc.login prefers WAN and keeps password out of the result g3.1', async () => {
@@ -522,5 +567,21 @@ test('dmc.login connection failure is not a generic cloud error g3.1', async () 
   assert.equal(isConnectError({ code: 'ETIMEDOUT', message: 'timeout' }), true)
   assert.match(dmcConnectHint({ wanOpen: false, viaWan: false }), /未开外网/)
   assert.equal(publicErrorMessage(new Error('未开外网：管理页仍可用，DMC 登录需插件主机可达实例内网，或先在管理页开启外网后再登录')), '未开外网：管理页仍可用，DMC 登录需插件主机可达实例内网，或先在管理页开启外网后再登录')
+})
+
+test('check.connect probes WAN as well as VIP g2.5', async () => {
+  const module = createCdbModule((async () => ({})) as never)
+  const result = await module.execute?.('check.connect', {
+    region: 'ap-guangzhou',
+    instanceId: 'cdb-70zdmgg1',
+    host: '127.0.0.1',
+    port: 1,
+    wanDomain: '127.0.0.1',
+    wanPort: 2,
+  }, ctx({ id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1', timeoutMs: 400 }))
+  assert.equal(result?.ok, true)
+  const data = result?.data as { inner?: { ok?: boolean }; outer?: { ok?: boolean } }
+  assert.ok(data.inner)
+  assert.ok(data.outer)
 })
 

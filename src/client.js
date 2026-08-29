@@ -1058,6 +1058,7 @@ window.__ModuleLoader__.load({
         if (tab === "日志中心") {
           const slow = tabData.slowLogs || [];
           const errors = tabData.errorLogs || [];
+          const logError = extra.tabError || tabData.tabError;
           const logTable = (rows, empty) => rows.length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
             h("thead", null, h("tr", null, h("th", null, "时间"), h("th", null, "SQL / 内容"), h("th", null, "用户"))),
             h("tbody", null, rows.slice(0, 50).map((row, idx) => h("tr", { key: idx },
@@ -1067,11 +1068,12 @@ window.__ModuleLoader__.load({
             ))),
           )) : h("div", { className: "ci-empty" }, empty);
           return h("div", { className: "ci-pane" },
+            logError ? h("p", { className: "ci-hint" }, logError) : null,
             h("p", { className: "ci-hint" }, "慢查询在日志中心，不是顶栏页签。"),
             h("div", { className: "ci-sec-t" }, "慢日志"),
-            logTable(slow, "没有慢日志"),
+            logTable(slow, tabData.slowLogError || "没有慢日志"),
             h("div", { className: "ci-sec-t" }, "错误日志"),
-            logTable(errors, "没有错误日志"),
+            logTable(errors, tabData.errorLogError || "没有错误日志"),
           );
         }
         if (tab === "只读实例") {
@@ -1109,10 +1111,7 @@ window.__ModuleLoader__.load({
               h("div", { className: "ci-k" }, "外网"),
               h("div", null, outer.ok ? `连通 ${outer.latencyMs}ms` : (outer.error || "失败")),
             ),
-            h("button", { type: "button", className: "ci-mini", onClick: () => request({ id: "check.connect", label: "连接检查", confirm: "default" }, {
-              host: cdbMeta(item).vip,
-              port: cdbMeta(item).port,
-            }, "发起连接检查？") }, "重新检查"),
+            h("button", { type: "button", className: "ci-mini", onClick: () => onReload(tab) }, "重新检查"),
           );
         }
         return h("div", { className: "ci-empty" }, extra.tabError || "没有内容");
