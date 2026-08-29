@@ -17,6 +17,7 @@ export interface QueryInput {
   query?: string
   offset?: number
   limit?: number
+  region?: string
 }
 
 export async function queryResources(
@@ -28,6 +29,7 @@ export async function queryResources(
   const kind = String(input.kind || 'domain').trim() || 'domain'
   const provider = String(input.provider || '').trim()
   const query = String(input.query || '').trim()
+  const region = String(input.region || '').trim()
   const offset = Math.max(0, Math.floor(Number(input.offset) || 0))
   const explicit = Number(input.limit)
   const limit = Number.isFinite(explicit) && explicit > 0
@@ -55,6 +57,7 @@ export async function queryResources(
 
   const lists: ResourceCard[][] = []
   const errors: ModuleError[] = []
+  const regions: string[] = []
   let total = 0
   let hasMore = false
 
@@ -81,11 +84,15 @@ export async function queryResources(
         limit,
         timeoutMs: config.timeoutMs,
         signal,
+        region: region || undefined,
       })
       lists.push(result.items || [])
       if (result.total != null) total += result.total
       else total += result.items?.length || 0
       if (result.hasMore) hasMore = true
+      for (const name of result.regions || []) {
+        if (name && !regions.includes(name)) regions.push(name)
+      }
       for (const item of result.errors || []) {
         errors.push({
           moduleId: item.moduleId || module.id,
@@ -99,7 +106,7 @@ export async function queryResources(
 
   const items = lists.flat()
   if (!total) total = items.length
-  return { query, kind, items, errors, total, offset, hasMore }
+  return { query, kind, items, errors, total, offset, hasMore, regions: regions.length ? regions : undefined }
 }
 
 function selectModules(kind: string, provider: string, config: PluginConfig, source: Registry): ResourceModule[] {

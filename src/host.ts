@@ -170,6 +170,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         provider: String(body.provider || ''),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
+        region: body.region ? String(body.region) : undefined,
       }, cfg)
       return sendJson(res, 200, { ok: true, ...result })
     }

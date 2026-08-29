@@ -84,6 +84,30 @@ export function matchInstanceQuery(haystacks: Array<string | undefined>, query: 
   return haystacks.some((value) => String(value || '').toLowerCase().includes(q))
 }
 
+export function matchRegion(card: { region?: string; regionName?: string }, region?: string): boolean {
+  const want = String(region || '').trim()
+  if (!want) return true
+  return card.region === want || card.regionName === want
+}
+
+export function paginateItems<T>(items: T[], offset: number, limit: number): {
+  items: T[]
+  total: number
+  offset: number
+  hasMore: boolean
+} {
+  const total = items.length
+  const start = Math.max(0, Math.floor(Number(offset) || 0))
+  const size = Math.max(1, Math.floor(Number(limit) || 1))
+  const page = items.slice(start, start + size)
+  return {
+    items: page,
+    total,
+    offset: start,
+    hasMore: start + page.length < total,
+  }
+}
+
 export function chargeTypeLabel(type?: string): string {
   const value = String(type || '').toUpperCase()
   if (value === 'PREPAID') return '包年包月'

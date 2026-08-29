@@ -274,6 +274,67 @@ test('start/stop/reboot call product APIs and reject illegal state', async () =>
   assert.equal(stopped?.ok, false)
 })
 
+test('cvm and lighthouse list paginates with offset/limit and hasMore', async () => {
+  const instances = Array.from({ length: 5 }, (_, i) => ({
+    ...cvmRunning,
+    InstanceId: `ins-${i}`,
+    InstanceName: `host-${i}`,
+    PrivateIpAddresses: [`10.0.0.${i}`],
+    PublicIpAddresses: [`1.1.1.${i}`],
+  }))
+  const call = mockCall((action, payload) => {
+    if (action === 'DescribeRegions') {
+      return { RegionSet: [{ Region: 'ap-shanghai', RegionName: '华东地区(上海)', RegionState: 'AVAILABLE' }] }
+    }
+    if (action === 'DescribeZones') return { ZoneSet: [] }
+    if (action === 'DescribeInstances') {
+      const offset = Number((payload as { Offset?: number }).Offset || 0)
+      const limit = Number((payload as { Limit?: number }).Limit || 100)
+      return { InstanceSet: instances.slice(offset, offset + limit), TotalCount: instances.length }
+    }
+    throw new Error(action)
+  })
+  const first = await createCvmModule(call).list({ ...ctx, offset: 0, limit: 2 })
+  assert.equal(first.items.length, 2)
+  assert.equal(first.total, 5)
+  assert.equal(first.offset, 0)
+  assert.equal(first.hasMore, true)
+  assert.equal(first.items[0].instanceId, 'ins-0')
+  const second = await createCvmModule(call).list({ ...ctx, offset: 2, limit: 2 })
+  assert.equal(second.items.map((item) => item.instanceId).join(','), 'ins-2,ins-3')
+  assert.equal(second.hasMore, true)
+  const last = await createCvmModule(call).list({ ...ctx, offset: 4, limit: 2 })
+  assert.equal(last.items.length, 1)
+  assert.equal(last.hasMore, false)
+  const shanghai = await createCvmModule(call).list({ ...ctx, region: '华东地区（上海）', limit: 12 })
+  assert.equal(shanghai.total, 5)
+  const missRegion = await createCvmModule(call).list({ ...ctx, region: '华北地区（北京）', limit: 12 })
+  assert.equal(missRegion.items.length, 0)
+  assert.equal(missRegion.total, 0)
+
+  const lights = Array.from({ length: 3 }, (_, i) => ({
+    ...lhRunning,
+    InstanceId: `lhins-${i}`,
+    InstanceName: `lh-${i}`,
+  }))
+  const lhCall = mockCall((action, payload) => {
+    if (action === 'DescribeRegions') {
+      return { RegionSet: [{ Region: 'ap-guangzhou', RegionName: '华南地区(广州)', RegionState: 'AVAILABLE' }] }
+    }
+    if (action === 'DescribeZones') return { ZoneSet: [] }
+    if (action === 'DescribeInstances') {
+      const offset = Number((payload as { Offset?: number }).Offset || 0)
+      const limit = Number((payload as { Limit?: number }).Limit || 100)
+      return { InstanceSet: lights.slice(offset, offset + limit), TotalCount: lights.length }
+    }
+    throw new Error(action)
+  })
+  const lhPage = await createLighthouseModule(lhCall).list({ ...ctx, offset: 0, limit: 2 })
+  assert.equal(lhPage.items.length, 2)
+  assert.equal(lhPage.total, 3)
+  assert.equal(lhPage.hasMore, true)
+})
+
 test('queryResources merges per-region list errors and keeps other items', async () => {
   const source = createRegistry()
   source.registerProvider({
@@ -303,6 +364,43 @@ test('queryResources merges per-region list errors and keeps other items', async
   assert.equal(result.errors.length, 1)
   assert.match(renderQuery(result), /实例 ID/)
   assert.doesNotMatch(renderQuery(result), /点击「解析」/)
+})
+
+test('queryResources slices cvm results and keeps total for the pager', async () => {
+  const source = createRegistry()
+  source.registerProvider({
+    id: 'tencent',
+    title: '腾讯云',
+    fields: [{ key: 'secretId', label: 'SecretId' }, { key: 'secretKey', label: 'SecretKey' }],
+  })
+  const many = [cvmRunning, cvmStopped, {
+    ...cvmRunning,
+    InstanceId: 'ins-extra',
+    InstanceName: 'extra',
+    PrivateIpAddresses: ['10.0.0.9'],
+    PublicIpAddresses: ['8.8.8.8'],
+  }]
+  source.registerModule(createCvmModule(mockCall((action) => {
+    if (action === 'DescribeRegions') {
+      return { RegionSet: [{ Region: 'ap-shanghai', RegionName: '华东地区(上海)', RegionState: 'AVAILABLE' }] }
+    }
+    if (action === 'DescribeZones') return { ZoneSet: [] }
+    return { InstanceSet: many, TotalCount: many.length }
+  })))
+  const page = await queryResources({ kind: 'cvm', offset: 0, limit: 2 }, withDefaults({
+    providers: { tencent: { secretId: 'id', secretKey: 'key' } },
+    modules: { 'tencent.cvm': true },
+  }), undefined, source)
+  assert.equal(page.items.length, 2)
+  assert.equal(page.total, 3)
+  assert.equal(page.hasMore, true)
+  assert.match(renderQuery(page), /第 1–2 条/)
+  const next = await queryResources({ kind: 'cvm', offset: 2, limit: 2 }, withDefaults({
+    providers: { tencent: { secretId: 'id', secretKey: 'key' } },
+    modules: { 'tencent.cvm': true },
+  }), undefined, source)
+  assert.equal(next.items.length, 1)
+  assert.equal(next.hasMore, false)
 })
 
 test('renderQuery still asks users to open DNS records for domain results', () => {

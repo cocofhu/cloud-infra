@@ -786,25 +786,40 @@ window.__ModuleLoader__.load({
       ];
     }
 
-    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint }) {
-      const [region, setRegion] = useState("");
-      const [q, setQ] = useState("");
-      const regions = Array.from(new Set((items || []).map((row) => row.regionName || row.region).filter(Boolean)));
-      const rows = (items || []).filter((row) => {
-        if (region && (row.regionName || row.region) !== region) return false;
-        return matchLocalInstance(row, q);
-      });
+    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery }) {
+      const [localRegion, setLocalRegion] = useState("");
+      const [localQ, setLocalQ] = useState("");
+      const regionValue = onRegion ? (region || "") : localRegion;
+      const qValue = onQuery ? (q || "") : localQ;
+      const regionNames = Array.from(new Set([
+        ...(Array.isArray(regions) ? regions : []),
+        ...(items || []).map((row) => row.regionName || row.region).filter(Boolean),
+      ]));
+      const rows = onRegion || onQuery
+        ? (items || [])
+        : (items || []).filter((row) => {
+          if (regionValue && (row.regionName || row.region) !== regionValue) return false;
+          return matchLocalInstance(row, qValue);
+        });
+      const setRegion = (next) => {
+        if (onRegion) onRegion(next);
+        else setLocalRegion(next);
+      };
+      const setQ = (next) => {
+        if (onQuery) onQuery(next);
+        else setLocalQ(next);
+      };
       return [
         h("div", { key: "bar", className: "ci-bar" },
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, "实例"),
             h("select", {
               className: "ci-select",
-              value: region,
+              value: regionValue,
               onChange: (e) => setRegion(e.target.value),
             },
               h("option", { value: "" }, "全部地域"),
-              regions.map((name) => h("option", { key: name, value: name }, name)),
+              regionNames.map((name) => h("option", { key: name, value: name }, name)),
             ),
           ),
           h("div", { className: "ci-search-wrap" },
@@ -813,10 +828,10 @@ window.__ModuleLoader__.load({
               className: "ci-search",
               type: "search",
               placeholder: "搜索 ID / 名称 / IP",
-              value: q,
+              value: qValue,
               onChange: (e) => setQ(e.target.value),
             }),
-            q ? h("button", {
+            qValue ? h("button", {
               type: "button",
               className: "ci-search-x",
               onClick: () => setQ(""),
@@ -848,7 +863,7 @@ window.__ModuleLoader__.load({
             h("td", null, cellValue(item, "实例计费模式") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : h("div", { key: "empty", className: "ci-empty" }, emptyHint || (q ? `没有匹配「${q}」的实例` : "没有匹配的实例")),
+        )) : h("div", { key: "empty", className: "ci-empty" }, emptyHint || (qValue ? `没有匹配「${qValue}」的实例` : "没有匹配的实例")),
         h("div", { key: "note", className: "ci-foot-note" }, "官方还可自定义监控、IPv6、网络计费、标签、项目 — 本期进详情，不挤进对话表。"),
       ];
     }
@@ -1042,6 +1057,8 @@ window.__ModuleLoader__.load({
       const [listErr, setListErr] = useState("");
       const [draftQ, setDraftQ] = useState(initialQuery);
       const [activeQ, setActiveQ] = useState(initialQuery);
+      const [listRegion, setListRegion] = useState("");
+      const [regionOptions, setRegionOptions] = useState(Array.isArray(payload?.regions) ? payload.regions : []);
       const seq = useRef(0);
       const debounce = useRef(0);
       const refreshSkip = () => {
@@ -1065,11 +1082,13 @@ window.__ModuleLoader__.load({
         setHasMore(!!payload?.hasMore);
         setDraftQ(initialQuery);
         setActiveQ(initialQuery);
+        setRegionOptions(Array.isArray(payload?.regions) ? payload.regions : []);
         setListErr("");
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
-      const fetchList = async (nextOffset, q) => {
+      const fetchList = async (nextOffset, q, region) => {
         const n = ++seq.current;
+        const useRegion = region !== undefined ? region : listRegion;
         setListBusy(true);
         setListErr("");
         try {
@@ -1079,6 +1098,7 @@ window.__ModuleLoader__.load({
             provider,
             offset: nextOffset,
             limit: pageSize,
+            region: useRegion || undefined,
           });
           if (n !== seq.current) return;
           setRows(result.items || []);
@@ -1086,6 +1106,7 @@ window.__ModuleLoader__.load({
           setHasMore(!!result.hasMore);
           setOffset(Number(result.offset) || nextOffset);
           setActiveQ(q);
+          if (Array.isArray(result.regions)) setRegionOptions(result.regions);
         } catch (e) {
           if (n !== seq.current) return;
           setListErr(publicErrorMessage(e));
@@ -1211,6 +1232,14 @@ window.__ModuleLoader__.load({
             onOpen: openItem,
             onAction: onInstanceAction,
             emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
+            region: listRegion,
+            regions: regionOptions,
+            onRegion: (next) => {
+              setListRegion(next);
+              fetchList(0, String(activeQ || "").trim(), next);
+            },
+            q: draftQ,
+            onQuery: onDraft,
           }) : null,
           showLh ? h(LhConsole, {
             key: "lh",
@@ -1221,6 +1250,14 @@ window.__ModuleLoader__.load({
             emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有资源",
           }) : null,
         ],
+        h(Pager, {
+          key: "pager",
+          total: counted,
+          page,
+          pages: pageCount,
+          busy: listBusy,
+          onPage: goPage,
+        }),
         h(ConfirmDialog, {
           key: "power",
           open: !!powerConfirm,

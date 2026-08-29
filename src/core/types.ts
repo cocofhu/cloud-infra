@@ -77,6 +77,7 @@ export interface ListResult {
   offset?: number
   hasMore?: boolean
   errors?: ModuleError[]
+  regions?: string[]
 }
 
 export interface ModuleError {
@@ -92,6 +93,7 @@ export interface QueryResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  regions?: string[]
 }
 
 export interface ModuleContext {
@@ -103,6 +105,7 @@ export interface ModuleContext {
   signal?: AbortSignal
   id?: string
   title?: string
+  region?: string
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string }

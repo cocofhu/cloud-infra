@@ -17,7 +17,9 @@ import {
   listZones,
   mapInstanceState,
   matchInstanceQuery,
+  matchRegion,
   optsOf,
+  paginateItems,
   parseInstanceRef,
   powerAllowed,
   type CloudRegion,
@@ -166,9 +168,13 @@ export function createCvmModule(call: TencentProductCall = cvmCall): ResourceMod
       const regions = await listRegions(call, credsOf(ctx), optsOf(ctx))
       const { items, errors } = await listAcrossRegions(regions, async (region) => {
         const mapped = await loadCvmRegion(call, ctx, module.id, region)
-        return mapped.filter((card) => matchCvmQuery(card, ctx.query))
+        return mapped.filter((card) => matchCvmQuery(card, ctx.query) && matchRegion(card, ctx.region))
       }, module.id)
-      return { items, total: items.length, offset: 0, hasMore: false, errors }
+      return {
+        ...paginateItems(items, ctx.offset, ctx.limit),
+        errors,
+        regions: regions.map((row) => row.regionName || row.region),
+      }
     },
     async detail(ctx) {
       const raw = await loadOne(call, ctx, module.id)
