@@ -927,7 +927,16 @@ async function deleteCluster(
   payload: Record<string, unknown>,
 ): Promise<ActionResult> {
   const cluster = await loadCluster(call, ctx, region, clusterId).catch(() => undefined)
-  const nodes = await loadNodes(call, ctx, region, clusterId)
+  if (!cluster) {
+    // fail-closed:无法确认集群状态(含节点数)时拒绝删除,宁可误拒不可误删
+    return { ok: false, error: '无法确认集群信息,已阻止删除。请稍后重试。' }
+  }
+  let nodes: TkeInstanceItem[]
+  try {
+    nodes = await loadNodesStrict(call, ctx, region, clusterId)
+  } catch (err) {
+    return { ok: false, error: `无法确认节点数量,已阻止删除：${publicErrorMessage(err)}` }
+  }
   const invalid = validateDeletePayload(payload, cluster, nodes)
   if (invalid) return { ok: false, error: invalid }
   const mode = String(payload.instanceDeleteMode || payload.InstanceDeleteMode || 'retain')
@@ -1119,12 +1128,26 @@ async function scaleNodePool(
 }
 
 async function loadCluster(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<TkeClusterItem> {
-  const managed = await call<{ Clusters?: TkeClusterItem[] }>('DescribeClusters', { ClusterIds: [clusterId] }, creds(ctx), opts(ctx, region)).catch(() => ({ Clusters: [] as TkeClusterItem[] }))
+  // 三类集群接口依次尝试;全部失败时,若任一路是真实错误(鉴权/限流/超时等)则上抛,
+  // 仅当确实「找不到」时才报资源不存在,避免把真实故障误报为「资源不存在」
+  let firstError: unknown
+  const managed = await call<{ Clusters?: TkeClusterItem[] }>('DescribeClusters', { ClusterIds: [clusterId] }, creds(ctx), opts(ctx, region)).catch((err: unknown) => {
+    if (firstError === undefined) firstError = err
+    return { Clusters: [] as TkeClusterItem[] }
+  })
   if (managed.Clusters?.[0]) return managed.Clusters[0]
-  const eks = await call<{ Clusters?: TkeClusterItem[] }>('DescribeEKSClusters', { ClusterIds: [clusterId] }, creds(ctx), opts(ctx, region)).catch(() => ({ Clusters: [] as TkeClusterItem[] }))
+  const eks = await call<{ Clusters?: TkeClusterItem[] }>('DescribeEKSClusters', { ClusterIds: [clusterId] }, creds(ctx), opts(ctx, region)).catch((err: unknown) => {
+    if (firstError === undefined) firstError = err
+    return { Clusters: [] as TkeClusterItem[] }
+  })
   if (eks.Clusters?.[0]) return { ...eks.Clusters[0], ClusterType: eks.Clusters[0].ClusterType || 'SERVERLESS_CLUSTER' }
-  const edge = await call<{ Clusters?: TkeClusterItem[] }>('DescribeTKEEdgeClusters', { ClusterIds: [clusterId] }, creds(ctx), opts(ctx, region)).catch(() => ({ Clusters: [] as TkeClusterItem[] }))
+  const edge = await call<{ Clusters?: TkeClusterItem[] }>('DescribeTKEEdgeClusters', { ClusterIds: [clusterId] }, creds(ctx), opts(ctx, region)).catch((err: unknown) => {
+    if (firstError === undefined) firstError = err
+    return { Clusters: [] as TkeClusterItem[] }
+  })
   if (edge.Clusters?.[0]) return { ...edge.Clusters[0], ClusterType: edge.Clusters[0].ClusterType || 'EDGE_CLUSTER' }
+  // 三路均为「不存在/无数据」类失败才视为真的不存在;否则上抛真实错误
+  if (firstError !== undefined && !isEmptyTypeError(firstError)) throw firstError
   throw new Error('资源不存在')
 }
 
@@ -1170,6 +1193,27 @@ async function loadNodes(call: typeof tkeCall, ctx: ModuleContext, region: strin
     // 无超级节点时接口可能不可用
   }
   return out.filter((item) => matchNodeFilters(item, ctx.filters || {}))
+}
+
+/** 删除保护专用:节点数量必须真实可查。普通节点接口失败即抛错(不再静默吞成空数组)。 */
+async function loadNodesStrict(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<TkeInstanceItem[]> {
+  const out: TkeInstanceItem[] = []
+  const pageSize = 100
+  let offset = 0
+  for (let page = 0; page < 20; page += 1) {
+    const data = await call<{ InstanceSet?: TkeInstanceItem[]; TotalCount?: number }>(
+      'DescribeClusterInstances',
+      { ClusterId: clusterId, Offset: offset, Limit: pageSize },
+      creds(ctx),
+      opts(ctx, region),
+    )
+    const rows = data.InstanceSet || []
+    out.push(...rows)
+    const total = Number(data.TotalCount ?? out.length)
+    if (rows.length < pageSize || out.length >= total) break
+    offset += rows.length
+  }
+  return out
 }
 
 async function loadNodePools(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<TkeNodePoolItem[]> {

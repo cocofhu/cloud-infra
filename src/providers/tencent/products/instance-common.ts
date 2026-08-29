@@ -2,6 +2,170 @@ import { publicErrorMessage } from '../../../core/safe-error.js'
 import type { ModuleError, ResourceAction, ResourceStatus } from '../../../core/types.js'
 import type { TencentCallContext, TencentCreds, TencentProductCall } from '../client.js'
 
+export type MonitorApi = TencentProductCall
+
+export type MonitorRange = '1h' | '6h' | '24h'
+
+export interface MetricSeries {
+  /** 指标定义 key(如 'cpu'),与 MetricDef.key 对齐,前端以此作 seriesMap 键 */
+  key?: string
+  metric: string
+  timestamps: number[]
+  values: Array<number | null>
+}
+
+/** 时间档 → 默认采样周期（秒）：1h/60s、6h/300s、24h/900s */
+export const MONITOR_RANGE_PERIOD: Record<MonitorRange, number> = {
+  '1h': 60,
+  '6h': 300,
+  '24h': 900,
+}
+
+export function normalizeMonitorRange(range?: string): MonitorRange {
+  return range === '6h' || range === '24h' ? range : '1h'
+}
+
+/**
+ * 推导 GetMonitorData 的时间窗与采样周期。
+ * EndTime 对齐到 5 分钟整数倍（云监控 60s 数据有分钟级延迟，对齐后点数平稳）。
+ */
+export function monitorWindow(range?: string, nowMs = Date.now()): { startTime: string; endTime: string; period: number } {
+  const r = normalizeMonitorRange(range)
+  const period = MONITOR_RANGE_PERIOD[r]
+  const hours = r === '24h' ? 24 : r === '6h' ? 6 : 1
+  const align = 300
+  const endSec = Math.floor(nowMs / 1000 / align) * align
+  const startSec = endSec - hours * 3600
+  const iso = (sec: number) => new Date(sec * 1000).toISOString().replace(/\.\d+Z$/, 'Z').replace('T', ' ').replace('Z', '')
+  return { startTime: iso(startSec), endTime: iso(endSec), period }
+}
+
+interface GetMonitorDataPoint {
+  Dimensions?: Array<{ Name?: string; Value?: string }>
+  Timestamps?: number[]
+  Values?: Array<number | null>
+}
+
+interface GetMonitorDataResponse {
+  MetricName?: string
+  DataPoints?: GetMonitorDataPoint[]
+  Points?: GetMonitorDataPoint[]
+}
+
+/**
+ * 拉取单实例单指标的时间序列。
+ * 空数据 / 指标不存在时返回空数组而不抛错；网络与权限错误仍会抛给调用方。
+ */
+export async function fetchMetricSeries(
+  monitor: MonitorApi,
+  input: {
+    namespace: string
+    metric: string
+    instanceId: string
+    region: string
+    range?: string
+    period?: number
+    dimensionName?: string
+    creds: TencentCreds
+    opts: TencentCallContext
+    nowMs?: number
+  },
+): Promise<MetricSeries> {
+  const win = monitorWindow(input.range, input.nowMs)
+  const data = await monitor<GetMonitorDataResponse>('GetMonitorData', {
+    Namespace: input.namespace,
+    MetricName: input.metric,
+    Period: input.period || win.period,
+    StartTime: win.startTime,
+    EndTime: win.endTime,
+    Instances: [{ Dimensions: [{ Name: input.dimensionName || 'InstanceId', Value: input.instanceId }] }],
+  }, input.creds, { ...input.opts, region: input.region })
+  const point = (data.DataPoints || data.Points || [])[0]
+  const timestamps = Array.isArray(point?.Timestamps) ? point.Timestamps.map((t) => Number(t)).filter(Number.isFinite) : []
+  const rawValues = Array.isArray(point?.Values) ? point.Values : []
+  const values = timestamps.map((_, i) => {
+    const v = rawValues[i]
+    const n = Number(v)
+    return v == null || !Number.isFinite(n) ? null : n
+  })
+  return { metric: input.metric, timestamps, values }
+}
+
+export interface HostMetricDef {
+  key: string
+  metricName: string
+  label: string
+  unit: string
+  color: string
+}
+
+/** CVM(QCE/CVM)主机级指标集 */
+export const HOST_METRICS: HostMetricDef[] = [
+  { key: 'cpu', metricName: 'CpuUsage', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
+  { key: 'memory', metricName: 'MemUsage', label: '内存使用率', unit: '%', color: '#8a5cf6' },
+  { key: 'disk', metricName: 'CvmDiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c' },
+  { key: 'lanIn', metricName: 'LanIntraffic', label: '内网入带宽', unit: 'Mbps', color: '#2fbf71' },
+  { key: 'lanOut', metricName: 'LanOuttraffic', label: '内网出带宽', unit: 'Mbps', color: '#1f9d8f' },
+  { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e' },
+  { key: 'diskWrite', metricName: 'DiskWriteIops', label: '磁盘写 IOPS', unit: '次/s', color: '#d48806' },
+  { key: 'pkgIn', metricName: 'LanInpkg', label: '内网入包量', unit: '个/s', color: '#6b7cff' },
+  { key: 'pkgOut', metricName: 'LanOutpkg', label: '内网出包量', unit: '个/s', color: '#9a6bff' },
+]
+
+/**
+ * 轻量应用服务器(QCE/LIGHTHOUSE)指标集。
+ * 命名空间与 CVM 不同,多项指标英文名也不同:
+ *  - CPU 使用率:CPUUsage(CVM 为 CpuUsage)
+ *  - 内存使用率:MemoryUsage(CVM 为 MemUsage;需实例安装监控组件,未装时返回空序列)
+ *  - 磁盘使用率:DiskUsage(CVM 为 CvmDiskUsage;Lighthouse 侧带 disk 维度,单 InstanceId 查询时云监控返回首块磁盘序列)
+ * 带宽 / IOPS / 包量指标名与 CVM 相同,已按官方 QCE/LIGHTHOUSE 指标文档核对。
+ */
+export const LIGHTHOUSE_METRICS: HostMetricDef[] = [
+  { key: 'cpu', metricName: 'CPUUsage', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
+  { key: 'memory', metricName: 'MemoryUsage', label: '内存使用率', unit: '%', color: '#8a5cf6' },
+  { key: 'disk', metricName: 'DiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c' },
+  { key: 'lanIn', metricName: 'LanIntraffic', label: '内网入带宽', unit: 'Mbps', color: '#2fbf71' },
+  { key: 'lanOut', metricName: 'LanOuttraffic', label: '内网出带宽', unit: 'Mbps', color: '#1f9d8f' },
+  { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e' },
+  { key: 'diskWrite', metricName: 'DiskWriteIops', label: '磁盘写 IOPS', unit: '次/s', color: '#d48806' },
+  { key: 'pkgIn', metricName: 'LanInpkg', label: '内网入包量', unit: '个/s', color: '#6b7cff' },
+  { key: 'pkgOut', metricName: 'LanOutpkg', label: '内网出包量', unit: '个/s', color: '#9a6bff' },
+]
+
+/**
+ * 并发拉取一组指标；单指标失败只记空序列，不拖垮其他图。
+ */
+export async function fetchMonitorSeries(
+  monitor: MonitorApi,
+  input: {
+    namespace: string
+    metrics: HostMetricDef[]
+    instanceId: string
+    region: string
+    range?: string
+    creds: TencentCreds
+    opts: TencentCallContext
+    nowMs?: number
+  },
+): Promise<{ range: MonitorRange; series: MetricSeries[]; errors: string[] }> {
+  const range = normalizeMonitorRange(input.range)
+  const results = await Promise.all(input.metrics.map(async (metric) => {
+    try {
+      const row = await fetchMetricSeries(monitor, { ...input, metric: metric.metricName, range })
+      // 同步回填 MetricDef.key,前端 seriesMap 统一以 key 为键(避免 metricName 与 key 错位)
+      return { ...row, key: metric.key }
+    } catch (err) {
+      return { key: metric.key, metric: metric.metricName, timestamps: [] as number[], values: [] as Array<number | null>, error: publicErrorMessage(err) }
+    }
+  }))
+  return {
+    range,
+    series: results.map((row) => ({ key: row.key, metric: row.metric, timestamps: row.timestamps, values: row.values })),
+    errors: results.map((row) => ('error' in row ? String(row.error) : '')).filter(Boolean),
+  }
+}
+
+
 export const INSTANCE_ACTIONS: ResourceAction[] = [
   { id: 'instance.start', label: '开机', confirm: 'default' },
   { id: 'instance.stop', label: '关机', confirm: 'default' },
@@ -208,21 +372,30 @@ export async function listZones(
   }
 }
 
+/** 达到 cap 截断时置位,供调用方生成 warning;调用方每次调用前应复位为 false。 */
+export const listAllPagesTruncated = { current: false }
+
 export async function listAllPages<T>(
   fetchPage: (offset: number, limit: number) => Promise<{ items: T[]; total?: number }>,
   pageSize = 100,
   cap = 500,
 ): Promise<T[]> {
+  listAllPagesTruncated.current = false
   const all: T[] = []
   let offset = 0
+  let reportedTotal: number | undefined
   while (all.length < cap) {
     const { items, total } = await fetchPage(offset, pageSize)
+    if (total != null) reportedTotal = total
     all.push(...items)
     if (!items.length) break
     if (total != null && all.length >= total) break
     if (items.length < pageSize) break
     offset += items.length
   }
+  // 上游总数大于已拉取条数,说明触顶截断,标记给上层提示「仅显示前 N 条」
+  if (reportedTotal != null && reportedTotal > all.length) listAllPagesTruncated.current = true
+  if (all.length > cap) listAllPagesTruncated.current = true
   return all.slice(0, cap)
 }
 

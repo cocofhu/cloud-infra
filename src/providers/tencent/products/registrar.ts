@@ -174,10 +174,27 @@ export function mapCheckDomain(item: CheckDomainResult, moduleId = REGISTRAR_MOD
 
 export function buyStatusLabel(status?: string): string {
   const value = String(status || '')
-  if (value === 'AboutToExpire') return '即将到期'
-  if (value === 'Expired') return '已过期'
-  if (value === 'Binded' || value === 'ok' || value === 'Ok' || value === 'NORMAL') return '正常'
+  const key = value.toLowerCase()
+  if (key === 'abouttoexpire') return '即将到期'
+  if (key === 'expired') return '已过期'
+  if (key === 'binded' || key === 'ok' || key === 'normal') return '正常'
+  if (key === 'notpay' || key === 'unpaid') return '未支付'
+  if (key === 'refund') return '已退款'
+  if (key === 'renewing') return '续费中'
+  if (key === 'redemption') return '赎回期'
+  if (key === 'pendingdelete') return '删除中'
+  if (key === 'transferring') return '转移中'
   return value || '-'
+}
+
+/** 卡片 status 内部枚举与「状态」列 buyStatusLabel 同口径:异常/流程中状态不得显示为绿色 enable。 */
+export function buyStatusToResourceStatus(status?: string): 'enable' | 'pause' | 'error' | 'unknown' {
+  const key = String(status || '').toLowerCase()
+  if (key === 'expired') return 'error'
+  if (key === 'abouttoexpire' || key === 'redemption' || key === 'pendingdelete') return 'pause'
+  if (key === 'binded' || key === 'ok' || key === 'normal') return 'enable'
+  if (!key) return 'unknown'
+  return 'unknown'
 }
 
 export function realNameLabel(status?: string): string {
@@ -221,7 +238,7 @@ export function mapOwnedDomain(item: DomainListRow, moduleId = MY_DOMAIN_MODULE_
     kind: MY_DOMAIN_KIND,
     title,
     description: [buyStatusLabel(item.BuyStatus), autoRenew ? '自动续费开' : '自动续费关'].filter(Boolean).join(' · '),
-    status: item.BuyStatus === 'Expired' ? 'error' : item.BuyStatus === 'AboutToExpire' ? 'pause' : 'enable',
+    status: buyStatusToResourceStatus(item.BuyStatus),
     badges: [autoRenew ? '自动续费' : ''].filter(Boolean) as string[],
     columns: [
       { label: '状态', value: buyStatusLabel(item.BuyStatus) },
@@ -592,10 +609,12 @@ async function findOwnedRow(
 
 async function listOwnedPages(call: typeof domainCall, ctx: ModuleContext): Promise<{ rows: DomainListRow[]; total: number }> {
   const pageSize = 100
+  // 防御上限:最多 50 页 / 5000 条,避免上游 TotalCount 异常或翻页口径错位导致死循环
+  const maxPages = 50
   const rows: DomainListRow[] = []
   let offset = 0
   let total = Number.POSITIVE_INFINITY
-  while (offset < total) {
+  for (let page = 0; page < maxPages && offset < total; page += 1) {
     const data = await call<{ DomainSet?: DomainListRow[]; TotalCount?: number }>('DescribeDomainNameList', {
       Offset: offset,
       Limit: pageSize,

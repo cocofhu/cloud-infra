@@ -307,27 +307,34 @@ export function renderQuery(result: QueryResult): string {
     return '没有找到相关资源。'
   }
   const lines = result.items.map((item, index) => {
-    const status = item.status ? ` ${item.status}` : ''
+    // 状态以卡片「状态」列展示文案为唯一口径；item.status 是内部枚举（enable/pause 等），
+    // 禁止暴露给模型，避免被翻译成与卡片不一致的另一套文案（如「启用/暂停」对「即将到期/正常」）。
+    const statusColumn = item.columns?.find((col) => col.label === '状态')?.value
+    const status = statusColumn ? ` ${statusColumn}` : ''
     const badges = item.badges?.length ? ` · ${item.badges.join(' / ')}` : ''
     return `${index + 1}. ${item.title}${status}${badges}\n   id: ${item.id}`
   })
+  const total = result.total ?? result.items.length
   const start = result.offset || 0
   const shown = start + result.items.length
+  const caliber = `卡片里的「共 ${total} 条」是匹配到的总数，必须使用总数 ${total}（禁止用下面列表的行数 ${result.items.length} 当作总数），本次仅显示第 ${start + 1}–${shown} 条。`
   const more = result.hasMore
-    ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}${result.region ? `，region=${result.region}` : result.kind === 'cos' && result.items[0] ? `，region 保持已选地域` : ''}，offset=${shown}。`
-    : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
+    ? `${caliber}列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}${result.region ? `，region=${result.region}` : result.kind === 'cos' && result.items[0] ? `，region 保持已选地域` : ''}，offset=${shown}。`
+    : `一共 ${total} 条（总数 ${total}，禁止用列表行数当总数），已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
   if (result.kind === 'registrar') {
     return `可注册查询已显示为对话卡片。请用户在卡片顶部搜索框改关键字再查；可买的点「立即加购」，再走购物车、提交订单、核对信息、账户余额支付。不要引导去设置页或独立页。不要打印密钥。\n\n${lines.join('\n')}${err}`
   }
   if (result.kind === 'my-domain') {
-    return `我的域名已显示为对话卡片。请用户在卡片顶部搜索框筛选，点「管理」查看基本信息与域名安全。不要引导去设置页或独立页。不要打印密钥。\n\n${lines.join('\n')}${err}`
+    return `我的域名已显示为对话卡片（共 ${total} 个域名，必须使用总数 ${total}，禁止用下面列表行数当总数；状态以卡片「状态」列文案为准，禁止换用其它说法）。${more} 请用户在卡片顶部搜索框筛选，点「管理」查看基本信息与域名安全。不要引导去设置页或独立页。不要打印密钥。\n\n${lines.join('\n')}${err}`
   }
   const cluster = result.kind === 'cluster' || result.items.some((item) => item.kind === 'cluster')
   const cdb = result.kind === 'cdb' || result.items.some((item) => item.kind === 'cdb')
   const instance = result.kind === 'cvm' || result.kind === 'lighthouse'
     || result.items.some((item) => item.kind === 'cvm' || item.kind === 'lighthouse')
-  const hint = result.kind === 'cos'
+  const hint = result.kind === 'dbbrain'
+    ? '用一两句话概括即可，请用户在对话卡片里点击「诊断优化」或实例名称，不要离开对话。不要打印密钥。'
+    : result.kind === 'cos'
     ? '用一两句话概括即可，请用户点击存储桶名称进入文件列表。不要打印密钥或签名 URL。'
     : result.kind === 'cert'
       ? '用一两句话概括即可，请用户点击证书 ID 或绑定域名查看完整详情。不要打印密钥或证书正文。'
@@ -346,7 +353,7 @@ export function renderQuery(result: QueryResult): string {
   const missNote = result.notFoundQuery
     ? `注意：未找到与您输入的「${result.notFoundQuery}」完全匹配的资源（可能是名称打错、资源不存在或不在当前地域）；对话卡片已在列表上方给出提示并展示当前地域的全量列表，请用户从列表中选择或换个关键字重试。`
     : ''
-  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}${directNote ? ` ${directNote}` : ''}${missNote ? ` ${missNote}` : ''}\n\n${lines.join('\n')}${err}`
+  return `找到 ${total} 条，已显示为可翻页列表。${more} ${hint}${directNote ? ` ${directNote}` : ''}${missNote ? ` ${missNote}` : ''}\n\n${lines.join('\n')}${err}`
 }
 
 function sanitizeFilters(raw: Record<string, string> | undefined): Record<string, string> | undefined {
@@ -385,5 +392,5 @@ function renderClsQuery(result: QueryResult): string {
   const more = result.hasMore
     ? `这是第 ${start + 1}–${shown} 条。用户若在对话里问还有吗，立刻再调用 cloud_infra_query，kind=cls，query 仍为「${result.query || ''}」，region=${result.region || ''}，offset=${shown}。`
     : `一共 ${result.total ?? result.items.length} 个日志主题。`
-  return `${region}找到 ${result.total ?? result.items.length} 个日志主题，已显示为对话卡片。点卡片内「检索分析」或再说检索语句。${more} 用一两句话概括即可。不要打印密钥。\n\n${lines.join('\n')}${err ? `\n${err}` : ''}`
+  return `${region}找到 ${result.total ?? result.items.length} 个日志主题，已显示为对话卡片（必须使用总数 ${result.total ?? result.items.length}，禁止用下面列表行数当总数）。点卡片内「检索分析」或再说检索语句。${more} 用一两句话概括即可。不要打印密钥。\n\n${lines.join('\n')}${err ? `\n${err}` : ''}`
 }

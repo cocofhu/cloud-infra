@@ -1,21 +1,25 @@
 import { publicErrorMessage } from '../../../core/safe-error.js'
 import { registerModule } from '../../../core/registry.js'
 import type { FieldGroup, ModuleContext, ResourceCard, ResourceDetail, ResourceModule } from '../../../core/types.js'
-import { cvmCall, type TencentProductCall } from '../client.js'
+import { cvmCall, monitorCall, type TencentProductCall } from '../client.js'
 import {
+  HOST_METRICS,
   INSTANCE_ACTIONS,
   POWER_ACTIONS,
   chargeTypeLabel,
   consoleTime,
   credsOf,
+  fetchMonitorSeries,
   firstIp,
   formatSpec,
   instanceCardId,
   listAllPages,
+  listAllPagesTruncated,
   listAcrossRegions,
   listRegions,
   listZones,
   mapInstanceState,
+  normalizeMonitorRange,
   instanceSearchText,
   matchInstanceQuery,
   matchRegion,
@@ -152,7 +156,7 @@ export function matchCvmQuery(card: ResourceCard, query: string): boolean {
   return matchInstanceQuery(instanceSearchText(card), query)
 }
 
-export function createCvmModule(call: TencentProductCall = cvmCall): ResourceModule {
+export function createCvmModule(call: TencentProductCall = cvmCall, monitor: TencentProductCall = monitorCall): ResourceModule {
   const module: ResourceModule = {
     id: 'tencent.cvm',
     provider: 'tencent',
@@ -169,6 +173,10 @@ export function createCvmModule(call: TencentProductCall = cvmCall): ResourceMod
           ? mapped.filter((card) => matchCvmQuery(card, ctx.query) && matchRegion(card, ctx.region))
           : mapped.filter((card) => matchRegion(card, ctx.region))
       }, module.id)
+      // 单地域超过拉取上限被截断时,明确提示而不是让用户以为「只有这些」
+      if (listAllPagesTruncated.current) {
+        errors.push({ moduleId: module.id, message: '实例数量超过单地域拉取上限(500),仅显示前 500 条;请按地域或关键字缩小范围。' })
+      }
       return {
         ...paginateItems(items, ctx.offset, ctx.limit),
         errors,
@@ -179,11 +187,40 @@ export function createCvmModule(call: TencentProductCall = cvmCall): ResourceMod
       const raw = await loadOne(call, ctx, module.id)
       const card = raw.card
       const groups = cvmDetailGroups(raw.item, card)
-      return {
+      const detail = {
         card,
         fields: groups.flatMap((group) => group.fields),
         groups,
       } satisfies ResourceDetail
+      const ref = parseInstanceRef(String(ctx.id || ''))
+      if (String(ctx.tab || '') === '实例监控' && ref.region && ref.instanceId) {
+        const range = normalizeMonitorRange(ctx.range)
+        const monitorData = await fetchMonitorSeries(monitor, {
+          namespace: 'QCE/CVM',
+          metrics: HOST_METRICS,
+          instanceId: ref.instanceId,
+          region: ref.region,
+          range,
+          creds: credsOf(ctx),
+          opts: optsOf(ctx),
+        })
+        return {
+          ...detail,
+          extra: {
+            tab: '实例监控',
+            tabs: ['实例详情', '实例监控'],
+            tabData: {
+              range: monitorData.range,
+              metrics: HOST_METRICS,
+              series: monitorData.series,
+              note: monitorData.errors.length === HOST_METRICS.length
+                ? '无法拉取监控数据，请检查 CAM 云监控权限'
+                : monitorData.errors.length ? `部分指标拉取失败（${monitorData.errors.length} 项）` : '',
+            },
+          },
+        }
+      }
+      return { ...detail, extra: { tab: '实例详情', tabs: ['实例详情', '实例监控'] } }
     },
     async execute(actionId, payload, ctx) {
       return runPower(call, actionId, payload, ctx)
@@ -257,7 +294,8 @@ async function runPower(
       InstanceIds: [instanceId],
     }, credsOf(ctx), optsOf(ctx, region))
     const item = data.InstanceSet?.[0]
-    const stateLabel = mapInstanceState(item?.InstanceState).stateLabel
+    if (!item) return { ok: false as const, error: '未找到实例' }
+    const stateLabel = mapInstanceState(item.InstanceState).stateLabel
     if (!powerAllowed(stateLabel, actionId)) {
       const label = INSTANCE_ACTIONS.find((row) => row.id === actionId)?.label || actionId
       return { ok: false as const, error: `当前状态「${stateLabel}」不能${label}` }

@@ -1,7 +1,7 @@
 {
   "name": "@cocofhu/cloud-infra",
   "version": "0.1.0",
-  "description": "DeepSeek Harness 插件：对话卡片内查询多云资源，支持腾讯云 DNSPod、CLS 日志主题检索、COS 控制台文件列表、TKE 集群、CVM/轻量与 CDB MySQL",
+  "description": "DeepSeek Harness 插件：对话卡片内查询腾讯云资源，支持 DNSPod、DBbrain 诊断、TCR 容器镜像、CLS 日志主题检索、COS 控制台文件列表、TKE 集群、CVM/轻量与 CDB MySQL",
   "homepage": "https://github.com/cocofhu/cloud-infra#readme",
   "bugs": {
     "url": "https://github.com/cocofhu/cloud-infra/issues"
@@ -31,13 +31,18 @@
     "deepseek-harness",
     "tencent-cloud",
     "dnspod",
+    "dbbrain",
+    "database",
     "cls",
     "cos",
     "dns",
     "tke",
     "cluster",
     "cdb",
-    "mysql"
+    "mysql",
+    "image",
+    "tcr",
+    "registry"
   ],
   "license": "MIT",
   "publishConfig": {
@@ -48,7 +53,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "rm -rf lib && tsc -p tsconfig.json && mkdir -p lib/tests/fixtures && cp src/client.js lib/client.js && cp src/tests/fixtures/* lib/tests/fixtures/",
+    "build": "rm -rf lib && tsc -p tsconfig.json && mkdir -p lib/tests/fixtures && cp src/tests/fixtures/* lib/tests/fixtures/ && node scripts/bundle-client.mjs",
     "prepare": "npm run build",
     "test": "npm run build && node --test lib/tests/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -66,6 +71,7 @@
     }
   },
   "dependencies": {
+    "echarts": "^6.1.0",
     "mysql2": "^3.24.2"
   },
   "peerDependencies": {
@@ -79,6 +85,8 @@
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
     "@deepseek-ai/schemastery": "^3.18.1",
     "@types/node": "^26.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^7.0.2"
   }
 }

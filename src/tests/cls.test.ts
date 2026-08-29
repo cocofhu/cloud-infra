@@ -434,3 +434,28 @@ test('tencent.cls is registered and settings can toggle it (g2.4)', () => {
   assert.match(client, /key:\s*"cloud-infra"/)
   assert.match(client, /draft\.modules\[module\.id\] !== false/)
 })
+
+test('cls listTopics total 口径:本地 BizType 过滤后总数不得高于实际上屏条数', async () => {
+  const calls: Array<{ action: string; payload: unknown; region: string }> = []
+  // 上游 TotalCount=100(含被过滤的 BizType=1),本地过滤后只剩 1 条 → total 必须回落到可翻页口径
+  const call = async (action: string, payload: unknown, _creds: unknown, opts: { region: string }) => {
+    calls.push({ action, payload, region: opts.region })
+    if (action === 'DescribeTopics') {
+      return { Topics: [{ TopicId: 't-1', TopicName: 'app-log', LogsetId: 'ls-1', BizType: 0 }], TotalCount: 100 }
+    }
+    if (action === 'DescribeLogsets') return { Logsets: [] }
+    return {}
+  }
+  const module = createClsModule(call as never)
+  const listed = await module.list({
+    creds: { secretId: 'id', secretKey: 'key' },
+    query: '',
+    offset: 0,
+    limit: 12,
+    timeoutMs: 5000,
+    region: 'ap-guangzhou',
+  })
+  assert.equal(listed.items.length, 1)
+  assert.ok((listed.total ?? 0) <= 1, `total 应 <= 本页条数,实际 ${listed.total}`)
+  assert.equal(listed.hasMore, false)
+})

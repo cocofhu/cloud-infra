@@ -7,6 +7,7 @@ import { publicErrorMessage } from '../core/safe-error.js'
 import { TencentApiError } from '../providers/tencent/client.js'
 import { clearDmcSessions, getDmcSession } from '../providers/tencent/dmc-session.js'
 import {
+  CDB_MONITOR_METRICS,
   CDB_OFFICIAL_TABS,
   createCdbModule,
   dmcConnectHint,
@@ -191,7 +192,9 @@ test('manage tabs load official console sections g2.3-g2.5', async () => {
   const sec = await load('数据安全')
   assert.ok(sec?.extra?.tabData)
   const mon = await load('实例监控')
-  assert.equal((mon?.extra?.tabData as { cpu?: string }).cpu, '12')
+  const monData = mon?.extra?.tabData as { range?: string; series?: Array<{ metric?: string }> }
+  assert.equal(monData.range, '1h')
+  assert.equal(monData.series?.length, CDB_MONITOR_METRICS.length)
   assert.ok(calls.includes('DescribeDatabases'))
   assert.ok(calls.includes('DescribeSlowLogData'))
   assert.ok(calls.includes('DescribeRoGroups'))
@@ -378,20 +381,65 @@ test('param.modify sends InstanceIds array g2.3', async () => {
   })
 })
 
-test('monitor tab parses official Avg and DataPoints shapes g2.5', async () => {
+test('monitor tab returns chart series and tolerates single metric failure g2.5', async () => {
+  const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
   const call = async (action: string) => {
     if (action === 'DescribeDBInstances') return { Items: (fixture('cdb-list.json').Items as unknown[]).slice(0, 1) }
-    if (action === 'DescribeDeviceMonitorInfo') {
-      return {
-        Cpu: { Min: [1], Max: [20], Avg: [10, 12.5] },
-        Mem: { Min: [1], Max: [50], Avg: [30] },
-        Disk: { Min: [1], Max: [80], Avg: [40] },
-        Connections: { Min: [1], Max: [20], Avg: [8] },
-      }
-    }
     return {}
   }
-  const monitor = async () => ({ DataPoints: [{ Values: [1, 9] }] })
+  const monitor = async (_action: string, payload: Record<string, unknown>) => {
+    calls.push({ action: _action, payload })
+    const metric = String(payload.MetricName || '')
+    if (metric === 'SlowQueries') throw new Error('AuthFailure')
+    if (metric === 'CpuUseRate') return { DataPoints: [{ Timestamps: [1000, 1060], Values: [10, 12.5] }] }
+    return { DataPoints: [{ Timestamps: [1000], Values: [3] }] }
+  }
+  const module = createCdbModule(call as never, {
+    async ping() {},
+    async query() { return { columns: [], rows: [] } },
+  }, monitor as never)
+  const mon = await module.detail?.({
+    ...ctx(),
+    id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1',
+    region: 'ap-guangzhou',
+    tab: '实例监控',
+    range: '6h',
+  })
+  const data = mon?.extra?.tabData as {
+    range?: string
+    metrics?: Array<{ key?: string; metricName?: string }>
+    series?: Array<{ key?: string; metric: string; timestamps: number[]; values: Array<number | null> }>
+    cpu?: string
+    note?: string
+  }
+  assert.equal(data.range, '6h')
+  assert.equal(data.series?.length, CDB_MONITOR_METRICS.length)
+  assert.equal(data.metrics?.length, CDB_MONITOR_METRICS.length)
+  const cpu = data.series?.find((row) => row.metric === 'CpuUseRate')
+  assert.deepEqual(cpu?.timestamps, [1000, 1060])
+  assert.deepEqual(cpu?.values, [10, 12.5])
+  assert.equal(data.cpu, '12.5')
+  const slow = data.series?.find((row) => row.metric === 'SlowQueries')
+  assert.deepEqual(slow, { key: 'slowQueries', metric: 'SlowQueries', timestamps: [], values: [] })
+  // series[].key 必须与 metrics[].key 对齐,前端 seriesMap 以 key 为键
+  for (const row of data.series || []) {
+    assert.ok(row.key && data.metrics?.some((m) => m.key === row.key), `series key ${row.key} 应对应 metrics 中某项`)
+  }
+  assert.match(data.note || '', /部分指标拉取失败/)
+  const firstCall = calls[0]
+  assert.equal(firstCall.payload.Namespace, 'QCE/CDB')
+  assert.equal(firstCall.payload.Period, 300)
+  assert.ok(typeof firstCall.payload.StartTime === 'string' && typeof firstCall.payload.EndTime === 'string')
+  assert.deepEqual(metricValue({ DataPoints: [{ Values: [1, 2, 8] }] }), '8')
+  assert.equal(firstMetric({ Min: [0], Max: [1], Avg: [4] }, { DataPoints: [{ Values: [9] }] }), '4')
+})
+
+test('monitor tab shows CAM hint when every metric fails g2.5', async () => {
+  const call = async (action: string) => {
+    if (action === 'DescribeDBInstances') return { Items: (fixture('cdb-list.json').Items as unknown[]).slice(0, 1) }
+    return {}
+  }
+  const monitor = async () => { throw new Error('AuthFailure') }
   const module = createCdbModule(call as never, {
     async ping() {},
     async query() { return { columns: [], rows: [] } },
@@ -402,13 +450,9 @@ test('monitor tab parses official Avg and DataPoints shapes g2.5', async () => {
     region: 'ap-guangzhou',
     tab: '实例监控',
   })
-  const data = mon?.extra?.tabData as { cpu?: string; memory?: string; disk?: string; connections?: string }
-  assert.equal(data.cpu, '12.5')
-  assert.equal(data.memory, '30')
-  assert.equal(data.disk, '40')
-  assert.equal(data.connections, '8')
-  assert.equal(metricValue({ DataPoints: [{ Values: [1, 2, 8] }] }), '8')
-  assert.equal(firstMetric({ Min: [0], Max: [1], Avg: [4] }, { DataPoints: [{ Values: [9] }] }), '4')
+  const data = mon?.extra?.tabData as { series?: unknown[]; note?: string }
+  assert.equal(data.series?.length, CDB_MONITOR_METRICS.length)
+  assert.match(data.note || '', /无法拉取监控数据/)
 })
 
 test('data security empty objects are not treated as opened g2.5', async () => {

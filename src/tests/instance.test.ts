@@ -7,6 +7,8 @@ import type { ModuleContext } from '../core/types.js'
 import type { TencentProductCall } from '../providers/tencent/client.js'
 import { createCvmModule, mapCvmItem, cvmDetailGroups, matchCvmQuery } from '../providers/tencent/products/cvm.js'
 import {
+  HOST_METRICS,
+  LIGHTHOUSE_METRICS,
   mapInstanceState,
   matchInstanceQuery,
   parseInstanceRef,
@@ -196,6 +198,76 @@ test('cvm and lighthouse detail groups cover official sections and omit DNS reco
   assert.equal(detail.records, undefined)
   assert.equal(JSON.stringify(detail).includes('解析记录'), false)
   assert.equal(detail.groups?.length, 5)
+})
+
+test('cvm detail monitor tab returns monitorSeries with QCE/CVM namespace', async () => {
+  const monitorCalls: Array<{ payload: Record<string, unknown> }> = []
+  const call = mockCall((action) => {
+    if (action === 'DescribeRegions') return { RegionSet: [{ Region: 'ap-shanghai', RegionName: '华东地区(上海)', RegionState: 'AVAILABLE' }] }
+    if (action === 'DescribeZones') return { ZoneSet: [{ Zone: 'ap-shanghai-3', ZoneName: '上海三区' }] }
+    if (action === 'DescribeInstances') return { InstanceSet: [cvmRunning], TotalCount: 1 }
+    throw new Error(action)
+  })
+  const monitor = (async (_action: string, payload: Record<string, unknown>) => {
+    monitorCalls.push({ payload })
+    return { DataPoints: [{ Timestamps: [1000, 1060], Values: [12.5, 13] }] }
+  }) as unknown as TencentProductCall
+  const detail = await createCvmModule(call, monitor).detail?.({
+    ...ctx,
+    id: 'tencent.cvm:ap-shanghai:ins-8k2m1a',
+    tab: '实例监控',
+    range: '6h',
+  })
+  const extra = detail?.extra as { tab?: string; tabs?: string[]; tabData?: { range?: string; series?: Array<{ metric: string; values: Array<number | null> }> } }
+  assert.equal(extra.tab, '实例监控')
+  assert.deepEqual(extra.tabs, ['实例详情', '实例监控'])
+  assert.equal(extra.tabData?.range, '6h')
+  assert.equal(extra.tabData?.series?.length, HOST_METRICS.length)
+  assert.deepEqual(extra.tabData?.series?.[0]?.values, [12.5, 13])
+  assert.equal(monitorCalls.length, HOST_METRICS.length)
+  assert.equal(monitorCalls[0].payload.Namespace, 'QCE/CVM')
+  assert.equal(monitorCalls[0].payload.Period, 300)
+  const defaultDetail = await createCvmModule(call, monitor).detail?.({ ...ctx, id: 'tencent.cvm:ap-shanghai:ins-8k2m1a' })
+  assert.equal((defaultDetail?.extra as { tab?: string }).tab, '实例详情')
+})
+
+test('lighthouse detail monitor tab returns series and isolates errors', async () => {
+  const call = mockCall((action) => {
+    if (action === 'DescribeRegions') return { RegionSet: [{ Region: 'ap-guangzhou', RegionName: '华南地区(广州)', RegionState: 'AVAILABLE' }] }
+    if (action === 'DescribeZones') return { ZoneSet: [{ Zone: 'ap-guangzhou-3', ZoneName: '广州三区' }] }
+    if (action === 'DescribeInstances') return { InstanceSet: [lhRunning], TotalCount: 1 }
+    throw new Error(action)
+  })
+  const monitor = (async (_action: string, payload: { MetricName?: string }) => {
+    if (payload.MetricName === 'LanIntraffic') throw new Error('AuthFailure')
+    return { DataPoints: [{ Timestamps: [1000], Values: [66] }] }
+  }) as unknown as TencentProductCall
+  const detail = await createLighthouseModule(call, monitor).detail?.({
+    ...ctx,
+    id: 'tencent.lighthouse:ap-guangzhou:lhins-4r4p',
+    tab: '实例监控',
+  })
+  const tabData = (detail?.extra as { tabData?: { series?: Array<{ key?: string; metric: string; timestamps: number[] }>; note?: string } }).tabData
+  assert.equal(tabData?.series?.length, LIGHTHOUSE_METRICS.length)
+  const lanIn = tabData?.series?.find((row) => row.metric === 'LanIntraffic')
+  assert.deepEqual(lanIn?.timestamps, [])
+  assert.equal(lanIn?.key, 'lanIn')
+  // QCE/LIGHTHOUSE 命名空间的 CPU 指标名为 CPUUsage(与 CVM 的 CpuUsage 不同)
+  const cpu = tabData?.series?.find((row) => row.metric === 'CPUUsage')
+  assert.deepEqual(cpu?.timestamps, [1000])
+  assert.equal(cpu?.key, 'cpu')
+  // 磁盘使用率应为 DiskUsage 而非 CvmDiskUsage
+  const disk = tabData?.series?.find((row) => row.key === 'disk')
+  assert.equal(disk?.metric, 'DiskUsage')
+  assert.match(tabData?.note || '', /部分指标拉取失败/)
+  const emptyMonitor = (async () => ({})) as unknown as TencentProductCall
+  const empty = await createLighthouseModule(call, emptyMonitor).detail?.({
+    ...ctx,
+    id: 'tencent.lighthouse:ap-guangzhou:lhins-4r4p',
+    tab: '实例监控',
+  })
+  const emptyData = (empty?.extra as { tabData?: { series?: Array<{ timestamps: number[] }> } }).tabData
+  assert.ok(emptyData?.series?.every((row) => row.timestamps.length === 0))
 })
 
 test('pickRegions defaults to Guangzhou and honors an explicit region', () => {

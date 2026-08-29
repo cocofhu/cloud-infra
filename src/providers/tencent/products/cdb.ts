@@ -11,6 +11,7 @@ import type {
 } from '../../../core/types.js'
 import { cdbCall, monitorCall, type TencentServiceOpts } from '../client.js'
 import { deleteDmcSession, getDmcSession, putDmcSession, toPublicDmc } from '../dmc-session.js'
+import { fetchMonitorSeries, normalizeMonitorRange, type HostMetricDef } from './instance-common.js'
 
 export interface CdbInstance {
   InstanceId?: string
@@ -122,6 +123,20 @@ const ACTIONS: ResourceAction[] = [
 
 export type CdbApi = typeof cdbCall
 export type MonitorApi = typeof monitorCall
+
+/** CDB（QCE/CDB）实例监控指标表，前端图表按此渲染 */
+export const CDB_MONITOR_METRICS: HostMetricDef[] = [
+  { key: 'cpu', metricName: 'CpuUseRate', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
+  { key: 'memory', metricName: 'MemoryUseRate', label: '内存使用率', unit: '%', color: '#8a5cf6' },
+  { key: 'disk', metricName: 'VolumeRate', label: '磁盘使用率', unit: '%', color: '#f6a35c' },
+  { key: 'connections', metricName: 'ThreadsConnected', label: '连接数', unit: '个', color: '#2fbf71' },
+  { key: 'qps', metricName: 'QPS', label: 'QPS', unit: '次/s', color: '#1f9d8f' },
+  { key: 'tps', metricName: 'TPS', label: 'TPS', unit: '次/s', color: '#e5646e' },
+  { key: 'slowQueries', metricName: 'SlowQueries', label: '慢查询数', unit: '次', color: '#d48806' },
+  { key: 'cacheHit', metricName: 'CacheHitRate', label: '缓存命中率', unit: '%', color: '#6b7cff' },
+  { key: 'netIn', metricName: 'BytesReceived', label: '网络入流量', unit: 'KB/s', color: '#9a6bff' },
+  { key: 'netOut', metricName: 'BytesSent', label: '网络出流量', unit: 'KB/s', color: '#4aa8d8' },
+]
 
 export interface DmcQueryResult {
   columns: string[]
@@ -908,6 +923,7 @@ async function runLoggedSql(
     let sql = ''
     if (op === 'insert') {
       const keys = Object.keys(values)
+      if (!keys.length) return { ok: false, error: '缺少写入字段' }
       sql = `INSERT INTO ${ident} (${keys.map(qIdent).join(',')}) VALUES (${keys.map((key) => qLiteral(values[key])).join(',')})`
     } else if (op === 'delete') {
       sql = `DELETE FROM ${ident} WHERE ${whereSql(where)}`
@@ -920,6 +936,11 @@ async function runLoggedSql(
   }
   const sql = String(payload.sql || '').trim()
   if (!sql) return { ok: false, error: '缺少 SQL' }
+  // 写语句(UPDATE/INSERT/…)必须显式确认:卡片按钮的 confirm:default 只确认「执行 SQL」动作本身,
+  // 不覆盖 SQL 文本里的写操作;skipConfirm 配置不得跳过此闸门(与 isDestructiveSql 口径一致)
+  if (isWriteSql(sql) && payload.confirmed !== true) {
+    return { ok: false, error: '该 SQL 包含写操作,请确认后携带 confirmed=true 再执行' }
+  }
   const result = await driver.query({
     ...session,
     database: database || undefined,
@@ -961,28 +982,35 @@ async function loadTab(
     }
   }
   if (tab === '实例监控') {
-    const device = await call<Record<string, unknown>>('DescribeDeviceMonitorInfo', { InstanceId: instanceId }, c, o).catch(() => ({} as Record<string, unknown>))
-    const metrics = ['CpuUseRate', 'MemoryUseRate', 'VolumeRate', 'ThreadsConnected']
-    const points: Record<string, unknown> = {}
-    await Promise.all(metrics.map(async (metric) => {
-      try {
-        const data = await monitor('GetMonitorData', {
-          Namespace: 'QCE/CDB',
-          MetricName: metric,
-          Period: 60,
-          Instances: [{ Dimensions: [{ Name: 'InstanceId', Value: instanceId }] }],
-        }, c, o)
-        points[metric] = data
-      } catch {
-        points[metric] = null
+    const range = normalizeMonitorRange(ctx.range)
+    const { series, errors } = await fetchMonitorSeries(monitor, {
+      namespace: 'QCE/CDB',
+      metrics: CDB_MONITOR_METRICS,
+      instanceId,
+      region,
+      range,
+      creds: c,
+      opts: o,
+    })
+    const find = (key: string) => series.find((row) => row.metric === CDB_MONITOR_METRICS.find((m) => m.key === key)?.metricName)
+    const latestOf = (key: string): string => {
+      const values = find(key)?.values || []
+      for (let i = values.length - 1; i >= 0; i--) {
+        if (values[i] != null) return String(values[i])
       }
-    }))
+      return '-'
+    }
     return {
-      cpu: firstMetric(device.Cpu, device.CpuUseRate, points.CpuUseRate),
-      memory: firstMetric(device.Memory, device.Mem, points.MemoryUseRate),
-      disk: firstMetric(device.Disk, device.VolumeRate, points.VolumeRate),
-      connections: firstMetric(device.Connections, device.ThreadsConnected, points.ThreadsConnected),
-      device,
+      range,
+      metrics: CDB_MONITOR_METRICS,
+      series,
+      cpu: latestOf('cpu'),
+      memory: latestOf('memory'),
+      disk: latestOf('disk'),
+      connections: latestOf('connections'),
+      note: errors.length === CDB_MONITOR_METRICS.length
+        ? '无法拉取监控数据，请检查 CAM 云监控权限'
+        : errors.length ? `部分指标拉取失败（${errors.length} 项）` : '',
     }
   }
   if (tab === '账号管理') {
