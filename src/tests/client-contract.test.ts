@@ -156,6 +156,8 @@ test('g1 client uses official DSH tokens without typo or light hex fills', () =>
   assert.match(client, /--dsw-alias-state-error-primary/)
   assert.doesNotMatch(client, /brand-primary-new-colorprimary-new-color/)
   assert.doesNotMatch(client, /#2563eb|#fff\b|#ffffff\b/)
+  assert.match(client, /\.ci-cfg\{[^}]*background:transparent/)
+  assert.match(client, /details\.ci-cfg>summary\.ci-cfg-h\{[^}]*background:transparent/)
 })
 
 test('g2-g3 list chrome and in-card DetailView replace fullscreen drawer', () => {

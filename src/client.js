@@ -86,9 +86,9 @@ window.__ModuleLoader__.load({
 .ci-modal h3{margin:0 0 8px;font-size:16px}
 .ci-modal p{margin:0 0 12px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.55}
 .ci-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
-.ci-cfg-item{list-style:none;margin:0;padding:0;min-width:0}
-.ci-cfg{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:12px;overflow:hidden;box-sizing:border-box;width:100%;min-width:0}
-.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:14px 16px;box-sizing:border-box;min-width:0}
+.ci-cfg-item{list-style:none;margin:0;padding:0;min-width:0;background:transparent;border:0;box-shadow:none}
+.ci-cfg{border:1px solid var(--dsw-alias-border-l2);background:transparent;border-radius:12px;overflow:hidden;box-sizing:border-box;width:100%;min-width:0}
+details.ci-cfg>summary.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:14px 16px;box-sizing:border-box;min-width:0;background:transparent;box-shadow:none;-webkit-appearance:none;appearance:none}
 .ci-cfg-h::-webkit-details-marker,.ci-cfg-h::marker{display:none;content:none}
 .ci-cfg-t{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
 .ci-cfg-n{font-size:15px;font-weight:600;line-height:1.4}
