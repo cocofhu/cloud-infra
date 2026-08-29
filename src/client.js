@@ -78,6 +78,7 @@ window.__ModuleLoader__.load({
 .ci-actions{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 .ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;margin:8px 14px}
 .ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
+.ci-pane-load{min-height:160px;display:flex;align-items:center;justify-content:center;gap:2px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1);font-size:13px}
 .ci-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:ci-spin .7s linear infinite;vertical-align:-1px;margin-right:6px}
 @keyframes ci-spin{to{transform:rotate(360deg)}}
 .ci-modal-mask{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--dsw-alias-bg-mask-3);box-sizing:border-box}
@@ -122,9 +123,14 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
-.ci-tabs{display:flex;gap:0;border-bottom:1px solid var(--dsw-alias-border-l1);padding:0 8px;overflow:auto}
-.ci-tab{padding:10px 14px;white-space:nowrap;cursor:pointer;color:var(--dsw-alias-label-secondary);border:0;border-bottom:2px solid transparent;background:transparent;font:inherit}
+.ci-tabs{display:flex;gap:0;border-bottom:1px solid var(--dsw-alias-border-l1);padding:0 8px}
+.ci-tab{padding:10px 14px;white-space:nowrap;cursor:pointer;color:var(--dsw-alias-label-secondary);border:0;border-bottom:2px solid transparent;background:transparent;font:inherit;display:inline-flex;align-items:center}
 .ci-tab.on{color:var(--dsw-alias-brand-primary);border-bottom-color:var(--dsw-alias-brand-primary);font-weight:600}
+.ci-tab:disabled{cursor:wait;opacity:1}
+.ci-subnav{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-subnav-item{height:26px;padding:0 10px;border:0;border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:12px;display:inline-flex;align-items:center;gap:4px}
+.ci-subnav-item.on{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-weight:600;box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l2)}
+.ci-subnav-item:disabled{cursor:wait}
 .ci-kv{display:grid;grid-template-columns:140px 1fr 140px 1fr;gap:10px 16px;padding:16px 14px}
 .ci-k{color:var(--dsw-alias-label-tertiary)}
 .ci-sub{display:block;color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:400}
@@ -692,6 +698,15 @@ window.__ModuleLoader__.load({
     }
 
     const CDB_OFFICIAL_TABS = ["实例详情","实例监控","账号管理","数据库管理","安全组","备份恢复","日志中心","只读实例","数据库代理","数据安全","连接检查"];
+    const CDB_TAB_GROUPS = [
+      { label: "实例", tabs: ["实例详情", "实例监控", "连接检查"] },
+      { label: "访问", tabs: ["账号管理", "数据库管理"] },
+      { label: "安全", tabs: ["安全组", "数据安全"] },
+      { label: "运维", tabs: ["备份恢复", "日志中心", "只读实例", "数据库代理"] },
+    ];
+    function cdbTabGroup(name) {
+      return CDB_TAB_GROUPS.find((g) => g.tabs.includes(name)) || CDB_TAB_GROUPS[0];
+    }
     const CDB_REGIONS = [
       { id: "ap-guangzhou", name: "广州" },
       { id: "ap-shanghai", name: "上海" },
@@ -774,7 +789,7 @@ window.__ModuleLoader__.load({
           h("td", null, cellValue(item, "计费模式") || "-"),
           h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
             h("button", { type: "button", className: "ci-link", disabled: pendingId === item.id, onClick: () => onLogin(item) }, "登录"),
-            h("button", { type: "button", className: "ci-link", disabled: pendingId === item.id, onClick: () => onManage(item) }, pendingId === item.id ? "加载中" : "管理"),
+            h("button", { type: "button", className: "ci-link", disabled: pendingId === item.id, onClick: () => onManage(item) }, pendingId === item.id ? [h(Spin), "加载中"] : "管理"),
             h("span", { className: "ci-drop" },
               h("button", { type: "button", className: "ci-link", onClick: () => onMore(item) }, "更多"),
               moreId === item.id ? h("div", { className: "ci-drop-menu" }, (moreMenus || []).map((row) => h("button", {
@@ -880,6 +895,7 @@ window.__ModuleLoader__.load({
         setConfirm({ action, payload, text, danger: action.confirm === "always" });
       };
       const region = cdbMeta(item).region || extra.region || "";
+      const group = cdbTabGroup(tab);
       const body = !detail ? null : (() => {
         if (tab === "实例详情") {
           return [
@@ -1122,13 +1138,25 @@ window.__ModuleLoader__.load({
           h("span", { className: "ci-head-t" }, item.title),
           h("span", { className: "ci-sub" }, `${item.description || ""} · ${regionName(region)}`),
         ),
-        h("div", { key: "tabs", className: "ci-tabs" }, CDB_OFFICIAL_TABS.map((name) => h("button", {
-          key: name,
-          type: "button",
-          className: "ci-tab" + (name === tab ? " on" : ""),
-          onClick: () => onTab(name),
-        }, name))),
-        loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        h("div", { key: "nav" },
+          h("div", { className: "ci-tabs" }, CDB_TAB_GROUPS.map((g) => h("button", {
+            key: g.label,
+            type: "button",
+            className: "ci-tab" + (g.label === group.label ? " on" : ""),
+            onClick: () => {
+              if (g.label === group.label) return;
+              onTab(g.tabs[0]);
+            },
+          }, g.label))),
+          h("div", { className: "ci-subnav" }, group.tabs.map((name) => h("button", {
+            key: name,
+            type: "button",
+            className: "ci-subnav-item" + (name === tab ? " on" : ""),
+            disabled: loading && name === tab,
+            onClick: () => { if (name !== tab) onTab(name); },
+          }, loading && name === tab ? h(Spin) : null, name))),
+        ),
+        loading ? h("div", { key: "load", className: "ci-pane-load" }, h(Spin), "加载中…") : null,
         !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
         err ? h("p", { key: "err", className: "ci-err" }, err) : null,
         !loading && detail ? body : null,
@@ -1394,6 +1422,7 @@ window.__ModuleLoader__.load({
       const [listForm, setListForm] = useState(null);
       const [listBusyAct, setListBusyAct] = useState(false);
       const seq = useRef(0);
+      const detailSeq = useRef(0);
       const debounce = useRef(0);
       const refreshSkip = () => {
         api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
@@ -1473,6 +1502,7 @@ window.__ModuleLoader__.load({
         setPendingId(item.id);
         setMoreId("");
         const nextTab = tab || "实例详情";
+        const n = ++detailSeq.current;
         setSession({ item, loading: true, detail: null, mode: "manage", tab: nextTab });
         refreshSkip();
         try {
@@ -1483,11 +1513,13 @@ window.__ModuleLoader__.load({
             region: cdbMeta(item).region,
             tab: item.kind === "cdb" ? nextTab : undefined,
           });
+          if (n !== detailSeq.current) return;
           setSession({ item, loading: false, detail, mode: "manage", tab: nextTab });
         } catch (e) {
+          if (n !== detailSeq.current) return;
           setSession({ item, loading: false, detail: null, error: publicErrorMessage(e), mode: "manage", tab: nextTab });
         } finally {
-          setPendingId("");
+          if (n === detailSeq.current) setPendingId("");
         }
       };
       const openLogin = (item, database) => {
@@ -1497,14 +1529,22 @@ window.__ModuleLoader__.load({
       const reload = async (tab) => {
         if (!session?.item) return;
         const nextTab = tab || session.tab || "实例详情";
-        const detail = await api("detail", {
-          moduleId: session.item.moduleId,
-          id: session.item.id,
-          title: session.item.title,
-          region: cdbMeta(session.item).region,
-          tab: session.item.kind === "cdb" ? nextTab : undefined,
-        });
-        setSession((cur) => cur ? { ...cur, detail, loading: false, tab: nextTab } : cur);
+        const n = ++detailSeq.current;
+        setSession((cur) => cur ? { ...cur, loading: true, tab: nextTab } : cur);
+        try {
+          const detail = await api("detail", {
+            moduleId: session.item.moduleId,
+            id: session.item.id,
+            title: session.item.title,
+            region: cdbMeta(session.item).region,
+            tab: session.item.kind === "cdb" ? nextTab : undefined,
+          });
+          if (n !== detailSeq.current) return;
+          setSession((cur) => cur ? { ...cur, detail, loading: false, error: "", tab: nextTab } : cur);
+        } catch (e) {
+          if (n !== detailSeq.current) return;
+          setSession((cur) => cur ? { ...cur, loading: false, error: publicErrorMessage(e), tab: nextTab } : cur);
+        }
       };
       const selectedItems = rows.filter((item) => selected[item.id]);
       const buyNotice = "购买类操作不在插件内下单，请到腾讯云控制台完成。";
