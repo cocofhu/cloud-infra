@@ -1,6 +1,11 @@
 import { registerProvider } from '../../core/registry.js'
 import './products/domain.js'
 import './products/cos.js'
+import './products/tke.js'
+import './products/registrar.js'
+import './products/cdb.js'
+import './products/lighthouse.js'
+import './products/cvm.js'
 
 registerProvider({
   id: 'tencent',

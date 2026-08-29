@@ -8,6 +8,11 @@ const SAFE_SNIPPETS = [
   '不支持',
   '未配置',
   '未注册',
+  '未登录',
+  '未开外网',
+  '外网地址不可达',
+  '无法连接实例',
+  '网络不可达',
   'unknown method',
   '请先选择地域',
   '存储桶',
@@ -25,6 +30,11 @@ const CODE_HINTS: Record<string, string> = {
   AuthFailure: '云厂商鉴权失败，请检查设置中的密钥',
   UnauthorizedOperation: '当前密钥没有该操作的权限',
   FailedOperation: '云厂商操作失败',
+  'FailedOperation.RegisterDomainFailed': '注册失败，请核对账户余额与域名是否仍可注册',
+  'FailedOperation.InsufficientBalance': '账户余额不足',
+  ResourceInsufficient: '账户余额不足',
+  'UnsupportedOperation.DomainUpdateProhibitionLockStartOn': '更新锁已开，不能改转移锁',
+  'UnsupportedOperation.ModifyDomainInfoOperateUnsupported': '当前域名状态不支持该操作',
   InvalidParameter: '请求参数无效',
   InvalidParameterValue: '请求参数无效',
   MissingParameter: '请求参数无效',
@@ -68,6 +78,13 @@ function looksSafeLocal(message: string): boolean {
   return SAFE_SNIPPETS.some((snippet) => message.includes(snippet))
 }
 
+function looksSafeBusinessCopy(message: string): boolean {
+  if (!message || message.length > 120 || SECRET_RE.test(message)) return false
+  if (PASSTHROUGH.has(message) || looksSafeLocal(message)) return true
+  if (/^HTTP \d+/.test(message) || /\btimeout\b/i.test(message)) return false
+  return /[\u4e00-\u9fff]/.test(message)
+}
+
 /** User-facing error: keep our own hints, drop raw upstream / secret-like text. */
 export function publicErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? '')
@@ -80,4 +97,13 @@ export function publicErrorMessage(err: unknown): string {
   if (/^HTTP \d+/.test(message)) return '云厂商请求失败'
   if (code) return hintForCode(code)
   return '云厂商请求失败'
+}
+
+/** Action 400: keep module-authored Chinese copy; sanitize thrown vendor/secret text only. */
+export function actionErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  const message = raw.replace(/\s+/g, ' ').trim()
+  if (!message) return '云厂商请求失败'
+  if (looksSafeBusinessCopy(message)) return message
+  return publicErrorMessage(err)
 }

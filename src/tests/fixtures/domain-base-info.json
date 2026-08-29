@@ -1,0 +1,24 @@
+{
+  "DomainInfo": {
+    "DomainId": "domain-acme1",
+    "DomainName": "acme.cn",
+    "NameServer": [
+      "f1g1ns1.dnspod.net",
+      "f1g1ns2.dnspod.net"
+    ],
+    "RegistrarType": "epp",
+    "DomainStatus": [
+      "ok",
+      "clientUpdateProhibited"
+    ],
+    "BuyStatus": "ok",
+    "RealNameAuditUnpassReason": "",
+    "DomainNameAuditUnpassReason": "",
+    "RealNameAuditStatus": "Approved",
+    "ExpirationDate": "2027-08-11",
+    "CreationDate": "2024-08-11",
+    "DomainNameAuditStatus": "Approved",
+    "LockTransfer": false,
+    "LockEndTime": ""
+  }
+}

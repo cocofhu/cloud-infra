@@ -120,3 +120,14 @@ export function credentialMap(provider: CloudProvider, bucket: Record<string, st
 }
 
 export const SETTINGS_HINT = '请在 设置 → 插件 → 云资源 填写对应云厂商的 AccessKey'
+
+export function resolveModuleId(moduleId: string, resourceId: string, source: Registry = registry): string {
+  if (moduleId && source.getModule(moduleId)) return moduleId
+  const matches = source.listModules()
+    .map((module) => module.id)
+    .filter((id) => resourceId === id || resourceId.startsWith(`${id}:`))
+    .sort((a, b) => b.length - a.length)
+  if (matches[0]) return matches[0]
+  if (resourceId.includes(':')) return resourceId.slice(0, resourceId.lastIndexOf(':'))
+  return moduleId
+}

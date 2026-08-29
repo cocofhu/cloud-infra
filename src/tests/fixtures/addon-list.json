@@ -1,0 +1,6 @@
+{
+  "Addons": [
+    { "AddonName": "CBS", "AddonVersion": "1.1.3", "Phase": "Succeeded", "LatestVersion": "1.1.4" },
+    { "AddonName": "COS", "AddonVersion": "1.0.2", "Phase": "Succeeded", "LatestVersion": "1.0.2" }
+  ]
+}

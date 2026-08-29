@@ -4,8 +4,8 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import Schema from '@deepseek-ai/schemastery'
 import { assignConfig, publicConfig, readOverlay, sanitizePatch, withDefaults, writeOverlay } from './core/config-store.js'
 import { queryResources, renderQuery } from './core/query.js'
-import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, SETTINGS_HINT, supportedKinds } from './core/registry.js'
-import { publicErrorMessage } from './core/safe-error.js'
+import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, resolveModuleId, SETTINGS_HINT, supportedKinds } from './core/registry.js'
+import { actionErrorMessage, publicErrorMessage } from './core/safe-error.js'
 import { isPost, trustedUiRequest } from './core/trusted-request.js'
 import type { PluginConfig, QueryResult } from './core/types.js'
 import './providers/index.js'
@@ -21,6 +21,8 @@ export const Config: Schema<Config> = Schema.object({
   skipConfirm: Schema.boolean().default(false).description('写操作免确认（删除除外）'),
 }) as unknown as Schema<Config>
 
+export { resolveModuleId }
+
 export function apply(ctx: Context, config: Config): void {
   const cfg = withDefaults(config)
   assignConfig(cfg, readOverlay())
@@ -28,12 +30,12 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates / COS buckets as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/COS/对象存储/存储桶. Pass kind=domain for domains, kind=cos for COS. For COS: if the user did not already name an official region id, still call kind=cos and OMIT region so the console card can default #ci-cos-region to 广州 (ap-guangzhou) and stay selectable. Never use Ask question to pick a COS region. Never guess, invent, or pass Chinese names / free text as region. Only pass region when it is an official id such as ap-guangzhou. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / COS buckets / domain registration / TKE clusters / CDB MySQL / CVM / Lighthouse as a console-style chat tool card. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/COS/对象存储/存储桶/注册/可注册/能不能注册/买域名/我的域名/TKE/集群/容器服务/CDB/云数据库/MySQL/云服务器/轻量/CVM/实例. Pass kind=domain for DNS 解析 (default). Pass kind=cos for COS. For COS: if the user did not already name an official region id, still call kind=cos and OMIT region so the console card can default #ci-cos-region to 广州 (ap-guangzhou) and stay selectable. Never use Ask question to pick a COS region. Never guess, invent, or pass Chinese names / free text as region. Only pass region when it is an official id such as ap-guangzhou. Pass kind=registrar to check if a name can be registered; kind=my-domain for purchased domains. Pass kind=cluster for TKE clusters. Pass kind=cdb for cloud MySQL, kind=cvm for 云服务器, kind=lighthouse for 轻量应用服务器, kind=auto to query every enabled module. After the card appears, the user searches and 立即加购 inside the card — do not send them to settings or a standalone page. For 「查一下我的服务器」use kind=cvm, kind=lighthouse or kind=auto — never kind=domain. For clusters, pass region if the user names one; if omitted, default to ap-guangzhou and do not ask which region. Region is runtime-only and must not be saved to settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com or a bucket name. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cos, or auto.' },
+      query: { type: 'string', description: 'Keyword such as example.com, a bucket name, instance name, cluster name, ins-/lhins-/cdb- ID, or IP. Empty lists all purchased domains, or waits for in-card search on registrar.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cos, registrar, my-domain, cluster, cdb, lighthouse, cvm, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
-      region: { type: 'string', description: 'Optional. For kind=cos, pass only an official COS region id such as ap-guangzhou after the user named one. Omit region when none is named so the UI defaults #ci-cos-region to 广州 (ap-guangzhou) and stays selectable. Never pass Chinese names or free text.' },
+      region: { type: 'string', description: 'Optional. For kind=cos, pass only an official COS region id such as ap-guangzhou after the user named one. Omit region when none is named so the UI defaults #ci-cos-region to 广州 (ap-guangzhou) and stays selectable. Never pass Chinese names or free text. Runtime region for regional products such as TKE, CVM or CDB, e.g. ap-guangzhou. Empty or all queries every region for CVM/CDB. Do not write this to settings.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
     },
@@ -87,13 +89,17 @@ export function apply(ctx: Context, config: Config): void {
       text: () => {
         const modules = implementedModules(cfg)
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
-        const kinds = supportedKinds().join(', ') || 'domain'
+        const kinds = [...new Set([...supportedKinds(), 'auto'])].join(', ') || 'domain, auto'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书 / COS / 对象存储 / 存储桶: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / COS / 对象存储 / 存储桶 / 注册 / 可注册 / 我的域名 / TKE / 集群 / 容器服务 / CDB / 云数据库 / MySQL / 云服务器 / 轻量 / CVM / 实例: call ONLY cloud_infra_query. Never web_search.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Default kind is domain. Use kind=cluster for TKE clusters. Use kind=cdb for 云数据库 MySQL.`,
           'When the user says 查 COS / 对象存储 / 存储桶 without naming a region: still call kind=cos and omit region. CosConsoleView defaults #ci-cos-region to 广州 (ap-guangzhou), lists that region\'s buckets, and stays selectable. Never use Ask question to pick a COS region. Never invent region ids or pass Chinese names / free text. Only pass region= an official id (e.g. ap-guangzhou) if the user already named one.',
+          'kind=registrar for 注册/能不能注册; kind=my-domain for 我的域名; kind=domain for DNS 解析.',
+          'The result is a chat tool card. Users search and 立即加购 inside the card. Do not send them to settings or a standalone page.',
+          'For 服务器/实例/CVM/轻量, use kind=cvm, kind=lighthouse, or kind=auto. Do not query domains when the user asks for 服务器.',
+          'For TKE/集群, use kind=cluster. Default region ap-guangzhou when unspecified; do not ask which region.',
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown (keep region for COS).',
-          'After the table appears, one or two short sentences. Do not print secrets, full record dumps, or signed COS URLs.',
+          'After the table appears, one or two short sentences. CDB list uses 登录 and 管理. Do not print secrets, cluster credentials, full record dumps, or signed COS URLs. Never save region or credentials via this tool.',
         ].join(' ')
       },
     })
@@ -179,7 +185,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         query: String(body.query || ''),
         kind: String(body.kind || 'domain'),
         provider: String(body.provider || ''),
-        region: String(body.region || ''),
+        region: body.region != null ? String(body.region) : '',
+        filters: readFilters(body.filters),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
       }, cfg)
@@ -192,10 +199,11 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         String(body.id || ''),
         String(body.title || ''),
         {
-          region: String(body.region || ''),
+          region: body.region != null ? String(body.region) : '',
           prefix: String(body.prefix || ''),
           marker: String(body.marker || ''),
           bucket: String(body.bucket || ''),
+          tab: body.tab != null ? String(body.tab) : '',
         },
       )
       return sendJson(res, 200, { ok: true, ...detail })
@@ -209,8 +217,9 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         (body.payload && typeof body.payload === 'object' && !Array.isArray(body.payload))
           ? body.payload as Record<string, unknown>
           : {},
+        String(body.region || ''),
       )
-      if (!result.ok) return sendJson(res, 400, { ok: false, error: publicErrorMessage(result.error) })
+      if (!result.ok) return sendJson(res, 400, { ok: false, error: actionErrorMessage(result.error) })
       return sendJson(res, 200, result)
     }
     sendJson(res, 400, { ok: false, error: 'unknown method' })
@@ -224,7 +233,7 @@ async function runDetail(
   moduleId: string,
   id: string,
   title = '',
-  extra: { region?: string; prefix?: string; marker?: string; bucket?: string } = {},
+  extra: { region?: string; prefix?: string; marker?: string; bucket?: string; tab?: string } = {},
 ) {
   const { module, creds } = readyModule(cfg, moduleId, id)
   if (!module.detail) throw new Error(`${module.title} 不支持详情`)
@@ -240,6 +249,7 @@ async function runDetail(
     prefix: extra.prefix || undefined,
     marker: extra.marker || undefined,
     bucket: extra.bucket || undefined,
+    tab: extra.tab || undefined,
   })
 }
 
@@ -249,6 +259,7 @@ async function runAction(
   actionId: string,
   id: string,
   payload: Record<string, unknown>,
+  region = '',
 ) {
   const { module, creds } = readyModule(cfg, moduleId, id)
   if (!module.execute) return { ok: false, error: `${module.title} 不支持写操作` }
@@ -259,24 +270,23 @@ async function runAction(
     limit: cfg.maxResults,
     timeoutMs: cfg.timeoutMs,
     id,
-    region: typeof payload.region === 'string' ? payload.region : undefined,
+    region: region || (typeof payload.region === 'string' ? payload.region : undefined),
     prefix: typeof payload.prefix === 'string' ? payload.prefix : undefined,
     bucket: typeof payload.bucket === 'string' ? payload.bucket : undefined,
+    tab: typeof payload.tab === 'string' ? payload.tab : undefined,
   })
 }
 
-export function resolveModuleId(moduleId: string, id: string): string {
-  const explicit = String(moduleId || '').trim()
-  if (explicit) return explicit
-  const raw = String(id || '').trim()
-  if (!raw) return ''
-  const hits = registry.listModules()
-    .map((item) => item.id)
-    .filter((mid) => raw === mid || raw.startsWith(`${mid}:`))
-    .sort((a, b) => b.length - a.length)
-  if (hits[0]) return hits[0]
-  const colon = raw.indexOf(':')
-  return colon > 0 ? raw.slice(0, colon) : raw
+function readFilters(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const name = String(key || '').trim()
+    const text = String(value ?? '').trim()
+    if (!name || !text) continue
+    out[name] = text
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 function readyModule(cfg: PluginConfig, moduleId: string, id: string) {

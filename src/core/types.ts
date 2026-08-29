@@ -32,6 +32,14 @@ export interface ResourceCard {
   columns?: ResourceColumn[]
   openLabel?: string
   expiresAt?: string
+  extras?: Record<string, string | number | boolean | null | undefined>
+  meta?: Record<string, string>
+  region?: string
+  regionName?: string
+  stateLabel?: string
+  instanceId?: string
+  privateIp?: string
+  publicIp?: string
 }
 
 export interface DnsRecord {
@@ -62,9 +70,36 @@ export interface RegionOption {
   aliases?: string[]
 }
 
+export interface FieldGroup {
+  title: string
+  fields: Array<{ label: string; value: string }>
+}
+
+export interface DetailPage {
+  id: string
+  title: string
+}
+
+export interface DetailBlock {
+  id: string
+  title: string
+  fields: Array<{ label: string; value: string }>
+}
+
+export interface DetailCard {
+  id: string
+  title: string
+  status?: string
+  badges?: string[]
+  columns?: ResourceColumn[]
+  fields?: Array<{ label: string; value: string }>
+  flags?: Record<string, string | number | boolean | undefined>
+}
+
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
+  groups?: FieldGroup[]
   records?: DnsRecord[]
   entries?: DirEntry[]
   prefix?: string
@@ -72,6 +107,11 @@ export interface ResourceDetail {
   bucket?: string
   hasMore?: boolean
   nextMarker?: string
+  extra?: Record<string, unknown>
+  pages?: DetailPage[]
+  blocks?: DetailBlock[]
+  cards?: Record<string, DetailCard[]>
+  flags?: Record<string, string | number | boolean | undefined>
 }
 
 export interface ResourceAction {
@@ -88,6 +128,9 @@ export interface ListResult {
   hasMore?: boolean
   /** True when kind needs a region pick in the card; list must not hit upstream. */
   needsRegion?: boolean
+  warnings?: string[]
+  errors?: ModuleError[]
+  regions?: string[]
 }
 
 export interface ModuleError {
@@ -104,6 +147,8 @@ export interface QueryResult {
   offset?: number
   hasMore?: boolean
   needsRegion?: boolean
+  region?: string
+  regions?: string[]
 }
 
 export interface ModuleContext {
@@ -119,6 +164,8 @@ export interface ModuleContext {
   prefix?: string
   marker?: string
   bucket?: string
+  tab?: string
+  filters?: Record<string, string>
 }
 
 export type ActionResult = { ok: true; data?: Record<string, unknown> } | { ok: false; error: string }

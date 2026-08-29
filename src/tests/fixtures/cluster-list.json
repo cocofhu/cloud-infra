@@ -1,0 +1,40 @@
+{
+  "TotalCount": 2,
+  "Clusters": [
+    {
+      "ClusterId": "cls-abc12345",
+      "ClusterName": "prod-tke",
+      "ClusterVersion": "1.28.3",
+      "ClusterType": "MANAGED_CLUSTER",
+      "ClusterStatus": "Running",
+      "ClusterNodeNum": 2,
+      "CreatedTime": "2024-01-02T08:00:00Z",
+      "DeletionProtection": true,
+      "ContainerRuntime": "containerd",
+      "ClusterNetworkSettings": {
+        "VpcId": "vpc-demo001",
+        "ClusterCIDR": "172.16.0.0/16",
+        "ServiceCIDR": "10.200.0.0/22",
+        "MaxNodePodNum": 64,
+        "KubeProxyMode": "iptables"
+      },
+      "TagSpecification": [{ "Tags": [{ "Key": "env", "Value": "prod" }] }]
+    },
+    {
+      "ClusterId": "cls-empty001",
+      "ClusterName": "empty-tke",
+      "ClusterVersion": "1.28.3",
+      "ClusterType": "MANAGED_CLUSTER",
+      "ClusterStatus": "Running",
+      "ClusterNodeNum": 0,
+      "CreatedTime": "2024-03-01T08:00:00Z",
+      "DeletionProtection": false,
+      "ContainerRuntime": "containerd",
+      "ClusterNetworkSettings": {
+        "VpcId": "vpc-demo001",
+        "ClusterCIDR": "172.17.0.0/16",
+        "ServiceCIDR": "10.201.0.0/22"
+      }
+    }
+  ]
+}

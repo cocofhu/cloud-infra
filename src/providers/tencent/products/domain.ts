@@ -124,7 +124,7 @@ export function createDomainModule(call: typeof dnspodCall = dnspodCall): Resour
     id: 'tencent.domain',
     provider: 'tencent',
     kind: 'domain',
-    title: '腾讯云域名',
+    title: '腾讯云域名解析',
     implemented: true,
     actions: ACTIONS,
     async list(ctx) {
