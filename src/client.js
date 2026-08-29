@@ -23,15 +23,16 @@ window.__ModuleLoader__.load({
 .ci-row{display:grid;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);min-width:0;box-sizing:border-box}
 .ci-row.head{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:500;padding:8px 14px}
 .ci-row:last-child{border-bottom:0}
-.ci-row:not(.head):hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-row:not(.head):hover,.ci-row:not(.head).open{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-row:not(.head).open{position:relative;z-index:4}
 .ci-cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary)}
-.ci-cell.ci-ops-cell{overflow:visible}
+.ci-cell.ci-ops-cell{overflow:visible;min-width:max-content;background:inherit}
 .ci-row.head .ci-cell{color:var(--dsw-alias-label-tertiary)}
 .ci-cell.num{font-variant-numeric:tabular-nums}
 .ci-name{font-weight:550;color:var(--dsw-alias-label-primary);background:none;border:0;padding:0;cursor:pointer;font:inherit;font-size:13px;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ci-name:hover{color:var(--dsw-alias-brand-primary)}
-.ci-ops{display:flex;align-items:center;gap:10px;white-space:nowrap}
-.ci-link{background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-brand-primary)}
+.ci-ops{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;white-space:nowrap;background:inherit}
+.ci-link{appearance:none;-webkit-appearance:none;background:transparent;border:0;padding:0;margin:0;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-brand-primary)}
 .ci-link:hover{text-decoration:underline}
 .ci-link:disabled{opacity:.45;cursor:wait;text-decoration:none}
 .ci-link.danger{color:var(--dsw-alias-state-error-primary)}
@@ -131,9 +132,10 @@ window.__ModuleLoader__.load({
 .ci-dl{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;padding:0 14px 14px;font-size:13px}
 .ci-dl span{color:var(--dsw-alias-label-tertiary)}
 .ci-dl b{font-weight:600;color:var(--dsw-alias-label-primary);word-break:break-all}
-.ci-more{position:relative;display:inline-flex}
-.ci-more-menu{position:fixed;z-index:50;min-width:128px;padding:6px 0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);box-shadow:var(--dsw-alias-shadow)}
-.ci-more-item{display:block;width:100%;text-align:left;background:none;border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-primary)}
+.ci-more{position:relative;display:inline-flex;background:inherit}
+.ci-more-menu{position:fixed;z-index:60;min-width:128px;padding:6px 0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background-color:Canvas;box-shadow:0 8px 24px rgba(0,0,0,.16);overflow:hidden;isolation:isolate}
+.ci-more-menu::before{content:"";position:absolute;inset:0;background:var(--dsw-alias-button-elevated-fill,var(--dsw-alias-bg-layer-1));pointer-events:none;border-radius:inherit}
+.ci-more-item{display:block;width:100%;text-align:left;background:transparent;border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-primary);position:relative;z-index:1}
 .ci-more-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-more-item.danger{color:var(--dsw-alias-state-error-primary)}
 .ci-field textarea{min-height:88px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:8px 10px;font:inherit;resize:vertical}
@@ -684,7 +686,7 @@ window.__ModuleLoader__.load({
     function CertTable({ items, pendingId, moreId, setMoreId, onOpen, emptyHint, onDeploy, onDownload, onMore }) {
       const rows = Array.isArray(items) ? items.filter(Boolean) : [];
       if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "没有证书");
-      const template = "minmax(110px,1fr) minmax(120px,1.2fr) minmax(72px,0.7fr) minmax(90px,0.9fr) minmax(88px,0.8fr) minmax(120px,0.9fr) minmax(160px,auto)";
+      const template = "minmax(110px,1fr) minmax(120px,1.2fr) minmax(72px,0.7fr) minmax(90px,0.9fr) minmax(88px,0.8fr) minmax(120px,0.9fr) max-content";
       const head = ["证书 ID", "绑定域名", "备注", "类型/品牌", "状态", "有效期", "操作"];
       return h("div", { className: "ci-list" },
         h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
@@ -692,7 +694,7 @@ window.__ModuleLoader__.load({
         ),
         rows.map((item) => {
           const meta = certMeta(item);
-          return h("div", { key: item.id, className: "ci-row", style: { gridTemplateColumns: template } },
+          return h("div", { key: item.id, className: "ci-row" + (moreId === item.id ? " open" : ""), style: { gridTemplateColumns: template } },
             h("div", { className: "ci-cell" }, h("button", {
               type: "button",
               className: "ci-name",
