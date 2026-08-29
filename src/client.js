@@ -347,7 +347,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-cls .ci-mini.primary{background:var(--cls-blue);color:var(--dsw-alias-label-primary-foreground);border-radius:3px;height:32px;padding:0 16px;font-size:14px;border:0}
 .ci-cls .ci-mini.primary:hover:not(:disabled){background:var(--cls-blue-h)}
 .ci-cls .ci-back{border-radius:3px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1);height:32px}
-.ci-cls .ci-region,.ci-cls-filter .ci-combo,.ci-cls .ci-search{border-radius:3px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1)}
+.ci-cls .ci-region,.ci-cls-filter .ci-combo,.ci-cls .ci-search{border-radius:8px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1)}
 .ci-cls .ci-cql{border-radius:3px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1);min-height:64px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
 .ci-cls-mode{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
 .ci-cls-tag{height:22px;padding:0 8px;border:1px solid var(--cls-line);border-radius:3px;font-size:12px;line-height:20px;color:#111;background:var(--dsw-alias-bg-layer-1)}
@@ -712,7 +712,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
 
     // 统一地域组合框:聚焦展开完整列表、输入按名称/ID 即时过滤、↑↓ 高亮、Enter 选中、
     // Esc 关闭、失焦延时收起、支持分组标题与『全部地域』首项,供全部 5 处地域选择点复用。
-    function RegionCombo({ items, groups, value, display, onDisplay, placeholder, allowAll, disabled, style, inputId, onChange }) {
+    function RegionCombo({ items, groups, value, display, onDisplay, placeholder, allowAll, disabled, style, inputId, chosenText, onChange }) {
       const [open, setOpen] = useState(false);
       const [highlight, setHighlight] = useState(0);
       const visibleGroups = useMemo(() => {
@@ -724,7 +724,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         let comboNeedle = String(display || "");
         if (value && value.id !== REGION_ALL_ID) {
           const chosen = source.flatMap((group) => group.items).find((item) => item.id === value.id);
-          if (chosen && comboNeedle === `${chosen.label}（${chosen.id}）`) comboNeedle = "";
+          if (chosen && (comboNeedle === `${chosen.label}（${chosen.id}）` || comboNeedle === chosen.label)) comboNeedle = "";
         }
         const hitGroups = source.map((group) => ({
           title: group.title,
@@ -735,26 +735,32 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       }, [items, groups, display, value, allowAll]);
       const flat = useMemo(() => visibleGroups.flatMap((group) => group.items), [visibleGroups]);
       const placeholderText = placeholder || (allowAll ? "全部地域" : "输入地域名称或 ID 补全");
+      // 选中项回显格式:默认 label（id)(COS 视觉),ById 薄封装传 label-only,保证失焦/Esc 与 pick 后一致
+      const formatChosen = (item) => {
+        if (!item) return "";
+        if (typeof chosenText === "function") return chosenText(item);
+        return item.id === REGION_ALL_ID ? item.label : `${item.label}（${item.id}）`;
+      };
       const pick = (item) => {
         if (!item) return;
         const next = item.id === REGION_ALL_ID ? { id: item.id, label: item.label } : item;
-        onDisplay(item.id === REGION_ALL_ID ? item.label : `${item.label}（${item.id}）`);
+        onDisplay(formatChosen(item));
         setOpen(false);
         onChange && onChange(next);
       };
       const close = () => {
         setOpen(false);
-        onDisplay(value ? value.label : String(display || ""));
+        onDisplay(value ? formatChosen(value) : String(display || ""));
       };
       return h("div", { className: "ci-combo", style },
         h("input", {
-          id: inputId || "ci-cos-region",
           type: "text",
           placeholder: placeholderText,
           autoComplete: "off",
           disabled,
           "aria-label": "地域",
           value: display,
+          id: inputId || undefined,
           key: inputId ? `${inputId}:root` : undefined,
           onChange: (e) => { onDisplay(e.target.value); setHighlight(0); if (!open) setOpen(true); },
           onFocus: (e) => {
@@ -780,7 +786,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             } else if (e.key === "Escape") {
               e.preventDefault();
               setOpen(false);
-              onDisplay(value ? value.label : "");
+              onDisplay(value ? formatChosen(value) : "");
             }
           },
         }),
@@ -800,27 +806,35 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       );
     }
 
-    // 旧地域 select 的薄封装:仅靠 id 解析选项,保留 text 状态,供服务器/TCR/CLS/CDB 等 Caller 复用。
+    // 旧地域 select 的薄封装:仅靠 id 解析选项;内部自持文本状态,输入仅更新文本与过滤、不清空选中,
+    // 仅在选中新项/清空时经 onChange 回调,供服务器/TCR/CLS/CDB 等 Caller 复用。
     function RegionComboById({ options, groups, value, text, onText, placeholder, allowAll, disabled, style, onChange }) {
       const list = Array.isArray(groups) && groups.length
         ? groups.flatMap((group) => (Array.isArray(group.items) ? group.items : []).filter(Boolean))
         : (Array.isArray(options) ? options : []).filter(Boolean);
       const hit = list.find((item) => item.id === value) || null;
-      const shown = text !== undefined ? text : (hit ? hit.label : String(value || ""));
+      const isAll = allowAll && value === REGION_ALL_ID;
+      const allItem = isAll ? { id: REGION_ALL_ID, label: "全部地域" } : null;
+      // null 表示跟随外部 value;输入时接管,选中/外部 value 变化时复位
+      const [inner, setInner] = useState(null);
+      const derived = hit ? hit.label : (allItem ? allItem.label : (value ? String(value) : ""));
+      const shown = text !== undefined ? text : (inner !== null ? inner : derived);
       const setShown = (next) => {
         if (onText) onText(next);
-        else if (hit || !next) onChange && onChange("");
+        else setInner(next);
       };
+      useEffect(() => { setInner(null); }, [value]);
       return h(RegionCombo, {
         items: list,
         groups,
-        value: hit,
+        value: hit || allItem,
         display: shown,
         onDisplay: setShown,
         placeholder,
         allowAll,
         disabled,
         style,
+        chosenText: (item) => (item && item.label) || "",
         onChange: (item) => { setShown(item.label); onChange && onChange(item.id); },
       });
     }
@@ -832,7 +846,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const current = value || defaultRegionName(names);
       return h(RegionComboById, {
         options: items,
-        value: current,
+        value: current === "all" ? REGION_ALL_ID : current,
         allowAll: true,
         onChange: (next) => onChange && onChange(next === REGION_ALL_ID ? "all" : next),
       });

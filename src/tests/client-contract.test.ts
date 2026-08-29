@@ -853,3 +853,26 @@ test('region pickers unify on RegionCombo with grouping and 全部地域 support
   assert.match(client, /clsRegionGroups/)
   assert.match(client, /全部地域/)
 })
+
+test('RegionComboById typing only filters and never clears selection; all-region maps back to label', () => {
+  const client = read('src/client.js')
+  // 内部自持文本状态:输入仅更新文本(setInner),不再在打字时清空父级 region
+  const byId = client.match(/function RegionComboById[\s\S]*?\n    \}/)![0]
+  assert.match(byId, /useState/)
+  assert.match(byId, /setInner/)
+  assert.match(byId, /useEffect\(\(\) => \{ setInner\(null\); \}, \[value\]\)/)
+  assert.doesNotMatch(byId, /onChange && onChange\(""\)/)
+  assert.doesNotMatch(byId, /onChange\(""\)/)
+  // 选中『全部地域』时 label 正确回显(不显示字面 all)
+  const regionSel = client.match(/function RegionSelect[\s\S]*?\n    \}/)![0]
+  assert.match(regionSel, /current === "all" \? REGION_ALL_ID/)
+  // 失焦/Esc 回显与 pick 一致的格式(chosenText 回显策略)
+  const combo = client.match(/function RegionCombo\([\s\S]*?\n    \}/)![0]
+  assert.match(combo, /formatChosen/)
+  assert.match(combo, /chosenText/)
+  // 未传 inputId 时不输出固定默认 id,避免同屏重复
+  assert.match(combo, /id: inputId \|\| undefined/)
+  // CLS 圆角已归一到统一 8px
+  assert.doesNotMatch(client, /\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:3px/)
+  assert.match(client, /\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:8px/)
+})
