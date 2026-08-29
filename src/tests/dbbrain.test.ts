@@ -123,24 +123,26 @@ test('same-card detail carries instance region, not list Guangzhou (g1.2 g2.1 g4
   assert.equal(detail?.card.openLabel, '诊断优化')
 })
 
-test('missing region refuses diagnosis and never defaults to Guangzhou (g2.1 g4.1)', async () => {
+test('missing region defaults to Guangzhou instead of 全地域 (g2.1 g4.1 g3.2)', async () => {
   const calls: Array<{ region: string }> = []
   const call = async (_action: string, _payload: unknown, _creds: unknown, opts: { region: string }) => {
     calls.push({ region: opts.region })
     return {}
   }
   const module = createDbbrainModule(call as never)
-  await assert.rejects(
-    async () => {
-      await module.detail?.(ctx({ id: 'tencent.dbbrain:mysql::cdb-x', title: 'x', filters: { tab: 'diag' } }))
-    },
-    (err: Error) => err.message === MISSING_REGION,
-  )
-  assert.equal(calls.length, 0)
-  assert.throws(
-    () => requireRegion(ctx({ id: 'tencent.dbbrain:mysql::cdb-x' })),
-    (err: Error) => err.message === MISSING_REGION,
-  )
+  // 空 region 不再抛 MISSING_REGION,而是被 requireRegion 收敛为 ap-guangzhou(共享数据源 DEFAULT_REGION)。
+  // 「全地域」别名也已废弃,不再触发"不过滤"语义。
+  await module.detail?.(ctx({ id: 'tencent.dbbrain:mysql::cdb-x', title: 'x', filters: { tab: 'diag' } }))
+  assert.ok(calls.length > 0, 'detail 应使用 ap-guangzhou 继续调用云 API')
+  assert.ok(calls.every((row) => row.region === 'ap-guangzhou'), `expected all calls ap-guangzhou, got ${JSON.stringify(calls)}`)
+
+  // requireRegion 自身的兜底语义:
+  assert.equal(requireRegion(ctx({ id: 'tencent.dbbrain:mysql::cdb-x' })), 'ap-guangzhou')
+  assert.equal(requireRegion(ctx({ id: 'tencent.dbbrain:mysql::cdb-x', filters: { region: '' } })), 'ap-guangzhou')
+  assert.equal(requireRegion(ctx({ id: 'tencent.dbbrain:mysql::cdb-x', filters: { region: '全地域' } })), 'ap-guangzhou')
+  // 命名别名仍命中:
+  assert.equal(requireRegion(ctx({ id: 'tencent.dbbrain:mysql::cdb-x', filters: { region: 'gz' } })), 'ap-guangzhou')
+  assert.equal(requireRegion(ctx({ id: 'tencent.dbbrain:mysql::cdb-x', filters: { region: '香港' } })), 'ap-hongkong')
 })
 
 test('MySQL tabs, Redis/Mongo console names, Kill always confirms (g2.2 g2.3)', () => {

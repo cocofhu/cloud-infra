@@ -2143,28 +2143,39 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ];
     }
 
+    // 与 src/providers/tencent/regions-shared.ts 共享数据源对齐(不冗余维护 aliases,
+    // 让二者保持一致)。这里包含共享 source 全部 id,UI 即便在运行时拉取失败前,也能展示完整清单。
     const COS_REGION_FALLBACK = [
-      { id: "ap-beijing", label: "北京", aliases: ["bj", "beijing", "pek"] },
-      { id: "ap-beijing-fsi", label: "北京金融", aliases: ["beijing-fsi"] },
-      { id: "ap-nanjing", label: "南京", aliases: ["nj", "nanjing"] },
-      { id: "ap-shanghai", label: "上海", aliases: ["sh", "shanghai"] },
-      { id: "ap-shanghai-fsi", label: "上海金融", aliases: ["shanghai-fsi"] },
-      { id: "ap-guangzhou", label: "广州", aliases: ["gz", "guangzhou", "canton"] },
-      { id: "ap-shenzhen-fsi", label: "深圳金融", aliases: ["sz-fsi", "shenzhen-fsi"] },
-      { id: "ap-chengdu", label: "成都", aliases: ["cd", "chengdu"] },
-      { id: "ap-chongqing", label: "重庆", aliases: ["cq", "chongqing"] },
-      { id: "ap-hongkong", label: "中国香港", aliases: ["hk", "hongkong", "hong kong", "香港"] },
-      { id: "ap-singapore", label: "新加坡", aliases: ["sg", "singapore"] },
-      { id: "ap-mumbai", label: "孟买", aliases: ["in", "mumbai", "india"] },
-      { id: "ap-jakarta", label: "雅加达", aliases: ["id", "jakarta"] },
-      { id: "ap-seoul", label: "首尔", aliases: ["kr", "seoul"] },
-      { id: "ap-bangkok", label: "曼谷", aliases: ["th", "bangkok"] },
-      { id: "ap-tokyo", label: "东京", aliases: ["jp", "tokyo"] },
-      { id: "na-siliconvalley", label: "硅谷", aliases: ["usw", "siliconvalley", "silicon valley"] },
-      { id: "na-ashburn", label: "弗吉尼亚", aliases: ["use", "ashburn", "virginia"] },
-      { id: "na-toronto", label: "多伦多", aliases: ["ca", "toronto"] },
-      { id: "sa-saopaulo", label: "圣保罗", aliases: ["br", "saopaulo", "sao paulo"] },
-      { id: "eu-frankfurt", label: "法兰克福", aliases: ["de", "frankfurt"] },
+      { id: "ap-guangzhou", label: "广州", aliases: ["gz", "guangzhou", "canton", "广州"] },
+      { id: "ap-beijing", label: "北京", aliases: ["bj", "beijing", "pek", "北京"] },
+      { id: "ap-shanghai", label: "上海", aliases: ["sh", "shanghai", "上海"] },
+      { id: "ap-shenzhen", label: "深圳", aliases: ["sz", "shenzhen", "深圳"] },
+      { id: "ap-qingyuan", label: "清远", aliases: ["qy", "qingyuan", "清远"] },
+      { id: "ap-chengdu", label: "成都", aliases: ["cd", "chengdu", "成都"] },
+      { id: "ap-nanjing", label: "南京", aliases: ["nj", "nanjing", "南京"] },
+      { id: "ap-chongqing", label: "重庆", aliases: ["cq", "chongqing", "重庆"] },
+      { id: "ap-hangzhou", label: "杭州", aliases: ["hz", "hangzhou", "杭州"] },
+      { id: "ap-qingdao", label: "青岛", aliases: ["qd", "qingdao", "青岛"] },
+      { id: "ap-tianjin", label: "天津", aliases: ["tj", "tianjin", "天津"] },
+      { id: "ap-zhongwei", label: "中卫", aliases: ["zhongwei", "zw", "中卫"] },
+      { id: "ap-hongkong", label: "中国香港", aliases: ["hk", "hongkong", "hong kong", "香港", "中国香港"] },
+      { id: "ap-taipei", label: "中国台北", aliases: ["taipei", "tw", "tp", "台北", "台湾", "中国台北"] },
+      { id: "ap-singapore", label: "新加坡", aliases: ["sg", "singapore", "新加坡"] },
+      { id: "ap-bangkok", label: "曼谷", aliases: ["th", "bangkok", "曼谷"] },
+      { id: "ap-tokyo", label: "东京", aliases: ["jp", "tokyo", "东京"] },
+      { id: "ap-seoul", label: "首尔", aliases: ["kr", "seoul", "首尔"] },
+      { id: "ap-jakarta", label: "雅加达", aliases: ["id", "jakarta", "雅加达"] },
+      { id: "ap-mumbai", label: "孟买", aliases: ["in", "mumbai", "india", "孟买"] },
+      { id: "sa-saopaulo", label: "圣保罗", aliases: ["br", "saopaulo", "sao paulo", "圣保罗"] },
+      { id: "eu-frankfurt", label: "法兰克福", aliases: ["de", "frankfurt", "法兰克福"] },
+      { id: "na-siliconvalley", label: "硅谷", aliases: ["usw", "siliconvalley", "silicon valley", "美西", "硅谷"] },
+      { id: "na-ashburn", label: "弗吉尼亚", aliases: ["use", "ashburn", "virginia", "美东", "弗吉尼亚"] },
+      { id: "na-toronto", label: "多伦多", aliases: ["ca", "toronto", "多伦多"] },
+      { id: "me-riyadh", label: "利雅得", aliases: ["riyadh", "me-saudi-arabia", "saudi", "沙特", "利雅得"] },
+      { id: "ap-shanghai-fsi", label: "上海金融", aliases: ["sh-fsi", "shanghai-fsi", "上海金融"] },
+      { id: "ap-shenzhen-fsi", label: "深圳金融", aliases: ["sz-fsi", "shenzhen-fsi", "深圳金融"] },
+      { id: "ap-beijing-fsi", label: "北京金融", aliases: ["bj-fsi", "beijing-fsi", "北京金融"] },
+      { id: "ap-shanghai-adc", label: "上海自动驾驶云", aliases: ["sh-adc", "shanghai-adc", "自动驾驶", "上海自动驾驶云"] },
     ];
 
     function normRegion(value) {
@@ -2365,6 +2376,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ));
     }
 
+    function fetchRuntimeRegions(product) {
+      // 运行时按产品从云 API 拉取最新地域清单;失败时保留现有列表并在控制台告警,
+      // 不做本地"再兜底一份硬编码快照"(共享 source 已是基础)。
+      return api("regions", { product }).then((d) => {
+        if (!d || !d.ok || !Array.isArray(d.regions) || !d.regions.length) return null;
+        return d.regions;
+      });
+    }
+
     function CosConsoleView({ payload, args, skipConfirm, onSkipConfirm }) {
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const [regions, setRegions] = useState(COS_REGION_FALLBACK);
@@ -2400,6 +2420,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           if (cos) setRegions(cos.regions);
           if (onSkipConfirm) onSkipConfirm(!!d.skipConfirm);
         }).catch(() => {});
+        // 运行时拉取云 API 最新地域清单(失败即报错,不做本地快照兜底)。
+        fetchRuntimeRegions("cos").then((list) => { if (list) setRegions(list); }).catch((e) => {
+          console.warn("[cloud-infra] regions(cos) 拉取失败", e);
+        });
         return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
       }, []);
       const seedSig = `${payload?.kind || ""}|${args.region || ""}|${(payload?.items || []).map((i) => i.id).join(",")}`;
@@ -5228,13 +5252,19 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ["custom", "自定义"],
     ];
 
+    // 与 src/providers/tencent/regions-shared.ts 共享数据源对齐(差别:client 字段名是 name 而非 label)。
     const FALLBACK_CLS_REGIONS = [
       { id: "ap-guangzhou", name: "广州", group: "大陆" },
       { id: "ap-beijing", name: "北京", group: "大陆" },
       { id: "ap-shanghai", name: "上海", group: "大陆" },
+      { id: "ap-shenzhen", name: "深圳", group: "大陆" },
+      { id: "ap-qingyuan", name: "清远", group: "大陆" },
       { id: "ap-chengdu", name: "成都", group: "大陆" },
       { id: "ap-nanjing", name: "南京", group: "大陆" },
       { id: "ap-chongqing", name: "重庆", group: "大陆" },
+      { id: "ap-hangzhou", name: "杭州", group: "大陆" },
+      { id: "ap-qingdao", name: "青岛", group: "大陆" },
+      { id: "ap-tianjin", name: "天津", group: "大陆" },
       { id: "ap-zhongwei", name: "中卫", group: "大陆" },
       { id: "ap-hongkong", name: "中国香港", group: "港澳台" },
       { id: "ap-taipei", name: "中国台北", group: "港澳台" },
@@ -5243,10 +5273,12 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       { id: "ap-tokyo", name: "东京", group: "海外" },
       { id: "ap-seoul", name: "首尔", group: "海外" },
       { id: "ap-jakarta", name: "雅加达", group: "海外" },
+      { id: "ap-mumbai", name: "孟买", group: "海外" },
       { id: "sa-saopaulo", name: "圣保罗", group: "海外" },
       { id: "eu-frankfurt", name: "法兰克福", group: "海外" },
       { id: "na-siliconvalley", name: "硅谷", group: "海外" },
       { id: "na-ashburn", name: "弗吉尼亚", group: "海外" },
+      { id: "na-toronto", name: "多伦多", group: "海外" },
       { id: "me-riyadh", name: "利雅得", group: "海外" },
       { id: "ap-shenzhen-fsi", name: "深圳金融", group: "金融" },
       { id: "ap-shanghai-fsi", name: "上海金融", group: "金融" },
@@ -5410,6 +5442,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         setListErr((payload?.errors || []).map((e) => e.message).join("；"));
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
+      // 运行时拉取云 API 最新地域清单(失败即报错,不做本地快照兜底)。
+      useEffect(() => {
+        fetchRuntimeRegions("cls").then((list) => {
+          if (!list) return;
+          setRegions(list.map((row) => ({ id: row.id, name: row.label, group: row.group })));
+        }).catch((e) => {
+          console.warn("[cloud-infra] regions(cls) 拉取失败", e);
+        });
+      }, []);
       const fetchList = async (nextOffset, q, nextRegion) => {
         const n = ++seq.current;
         const usedRegion = nextRegion || region;
@@ -6222,8 +6263,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ["dbbrain-mysql", "自建 MySQL"],
     ];
     // Keep in sync with src/providers/tencent/products/dbbrain-catalog.ts
+    // 移除「全地域」占位,默认选中广州。labels 统一收敛到与共享数据源一致(如「中国香港」)。
     const DBBRAIN_REGIONS = [
-      ["", "全地域"],
       ["ap-guangzhou", "广州"],
       ["ap-qingyuan", "清远"],
       ["ap-shenzhen", "深圳"],
@@ -6236,8 +6277,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ["ap-chengdu", "成都"],
       ["ap-chongqing", "重庆"],
       ["ap-zhongwei", "中卫"],
-      ["ap-hongkong", "香港"],
-      ["ap-taipei", "台北"],
+      ["ap-hongkong", "中国香港"],
+      ["ap-taipei", "中国台北"],
       ["ap-shanghai-fsi", "上海金融"],
       ["ap-shenzhen-fsi", "深圳金融"],
       ["ap-beijing-fsi", "北京金融"],
@@ -6664,7 +6705,20 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const isCert = kind === "cert";
       const isDbbrain = kind === "dbbrain";
       const [dbProduct, setDbProduct] = useState((fromTool && fromTool[0] && fromTool[0].product) || "mysql");
-      const [dbRegion, setDbRegion] = useState("");
+      const [dbRegion, setDbRegion] = useState("ap-guangzhou");
+      const [dbRegions, setDbRegions] = useState(DBBRAIN_REGIONS);
+      // 运行时拉取云 API 最新地域清单(失败即报错,不做本地快照兜底)。
+      useEffect(() => {
+        if (kind !== "dbbrain") return;
+        fetchRuntimeRegions("dbbrain").then((list) => {
+          if (!list) return;
+          setDbRegions(list
+            .filter((row) => row.group !== "特殊")
+            .map((row) => [row.id, row.label]));
+        }).catch((e) => {
+          console.warn("[cloud-infra] regions(dbbrain) 拉取失败", e);
+        });
+      }, [kind]);
       const refreshSkip = () => {
         api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
       };
@@ -7309,7 +7363,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                   setDbRegion(next);
                   fetchList(0, String(activeQ || "").trim(), undefined, undefined, { product: dbProduct, region: next });
                 },
-              }, DBBRAIN_REGIONS.map((row) => h("option", { key: row[0] || "all", value: row[0] }, row[1]))),
+              }, dbRegions.map((row) => h("option", { key: row[0] || "all", value: row[0] }, row[1]))),
               h("div", { className: "ci-search-wrap" },
                 h(SearchIcon),
                 h("input", {

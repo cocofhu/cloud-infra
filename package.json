@@ -56,7 +56,8 @@
     "build": "rm -rf lib && tsc -p tsconfig.json && mkdir -p lib/tests/fixtures && cp src/tests/fixtures/* lib/tests/fixtures/ && node scripts/bundle-client.mjs",
     "prepare": "npm run build",
     "test": "npm run build && node --test lib/tests/*.test.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "sync:regions": "node scripts/sync-regions.mjs"
   },
   "dsh": {
     "bundle": {

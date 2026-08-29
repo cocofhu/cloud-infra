@@ -11,6 +11,7 @@ import type {
   ResourceStatus,
 } from '../../../core/types.js'
 import { dbbrainCall } from '../client.js'
+import { DEFAULT_REGION, regionLabel as sharedRegionLabel, resolveRegion } from '../regions-shared.js'
 import { DBBRAIN_PRODUCTS, DBBRAIN_REGIONS } from './dbbrain-catalog.js'
 
 export { DBBRAIN_PRODUCTS, DBBRAIN_REGIONS } from './dbbrain-catalog.js'
@@ -118,7 +119,7 @@ export function parseInstanceRef(id: string): { moduleId: string; product: strin
 export function regionLabel(region?: string): string {
   const id = String(region || '').trim()
   if (!id) return ''
-  return DBBRAIN_REGIONS.find((item) => item.id === id)?.label || id
+  return sharedRegionLabel(id)
 }
 
 export function productLabel(product?: string): string {
@@ -316,8 +317,8 @@ export function timeRange(key: string, custom?: { start?: string; end?: string }
 
 export function requireRegion(ctx: ModuleContext, payload?: Record<string, unknown>): string {
   const parsed = parseInstanceRef(String(ctx.id || ''))
-  const region = parsed.region || String(ctx.filters?.region || payload?.region || '').trim()
-  if (!region) throw new Error(MISSING_REGION)
+  const raw = parsed.region || String(ctx.filters?.region || payload?.region || '').trim()
+  const region = resolveRegion(raw) || DEFAULT_REGION
   return region
 }
 
