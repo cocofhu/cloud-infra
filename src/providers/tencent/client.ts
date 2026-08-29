@@ -96,14 +96,14 @@ export function tkeCall<T>(
   action: string,
   payload: unknown,
   creds: { secretId: string; secretKey: string },
-  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch; region: string },
+  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch; region: string; version?: string },
 ): Promise<T> {
   const region = String(opts.region || '').trim()
   if (!region) throw new TencentApiError('缺少地域')
   return callTencentApi<T>({
     service: 'tke',
     host: 'tke.tencentcloudapi.com',
-    version: '2018-05-25',
+    version: opts.version || '2018-05-25',
     action,
     payload,
     secretId: creds.secretId,

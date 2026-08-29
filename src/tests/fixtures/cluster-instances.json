@@ -6,16 +6,20 @@
       "InstanceRole": "WORKER",
       "InstanceState": "running",
       "LanIP": "10.0.0.8",
+      "NodeName": "10.0.0.8",
       "Unschedulable": false,
-      "NodePoolId": "np-regular1"
+      "NodePoolId": "np-regular1",
+      "Labels": [{ "Name": "role", "Value": "worker" }]
     },
     {
       "InstanceId": "ins-node2",
       "InstanceRole": "WORKER",
       "InstanceState": "running",
       "LanIP": "10.0.0.9",
+      "NodeName": "10.0.0.9",
       "Unschedulable": true,
-      "NodePoolId": "np-regular1"
+      "NodePoolId": "np-regular1",
+      "Labels": [{ "Name": "role", "Value": "db" }]
     }
   ]
 }

@@ -254,8 +254,15 @@ function readFilters(raw: unknown): Record<string, string> | undefined {
   return Object.keys(out).length ? out : undefined
 }
 
+function resolveModuleId(moduleId: string, id: string): string {
+  if (moduleId) return moduleId
+  const first = String(id || '').split(':')[0] || ''
+  if (first.includes('.')) return first
+  return id.includes(':') ? id.slice(0, id.lastIndexOf(':')) : ''
+}
+
 function readyModule(cfg: PluginConfig, moduleId: string, id: string) {
-  const resolvedId = moduleId || (id.includes(':') ? id.slice(0, id.lastIndexOf(':')) : '')
+  const resolvedId = resolveModuleId(moduleId, id)
   const module = registry.getModule(resolvedId)
   if (!module) throw new Error('未知模块')
   const provider = registry.getProvider(module.provider)

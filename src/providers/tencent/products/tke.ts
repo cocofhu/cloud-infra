@@ -98,10 +98,12 @@ export interface TkeInstanceItem {
   InstanceRole?: string
   InstanceState?: string
   LanIP?: string
+  NodeName?: string
   Unschedulable?: boolean | number
   NodePoolId?: string
   InstanceType?: string
   CreatedTime?: string
+  Labels?: Array<{ Name?: string; Value?: string }> | Record<string, string>
 }
 
 export interface TkeNodePoolItem {
@@ -120,6 +122,8 @@ export interface TkeNodePoolItem {
     ManuallyAdded?: { Total?: number; Ready?: number }
   }
   Labels?: Array<{ Name?: string; Value?: string }>
+  InstanceChargeType?: string
+  ChargeType?: string
 }
 
 export interface TkeAddonItem {
@@ -187,6 +191,8 @@ export function mapClusterItem(item: TkeClusterItem, moduleId = 'tencent.tke', r
 
 export function mapNodeCard(item: TkeInstanceItem): DetailCard {
   const unschedulable = item.Unschedulable === true || item.Unschedulable === 1
+  const labels = nodeLabelPairs(item)
+  const nodeName = String(item.NodeName || item.LanIP || item.InstanceId || '')
   return {
     id: String(item.InstanceId || ''),
     title: String(item.InstanceId || ''),
@@ -194,15 +200,19 @@ export function mapNodeCard(item: TkeInstanceItem): DetailCard {
     badges: [item.InstanceRole, unschedulable ? '已封锁' : ''].filter(Boolean) as string[],
     columns: [
       { label: 'IP', value: item.LanIP || '-' },
+      { label: '节点名', value: nodeName || '-' },
       { label: '封锁', value: unschedulable ? '是' : '否' },
       { label: '状态', value: item.InstanceState || '-' },
       { label: '节点池', value: item.NodePoolId || '-' },
+      { label: 'Label', value: labels.join(',') || '-' },
     ],
     flags: {
       unschedulable,
       instanceRole: item.InstanceRole || '',
       lanIp: item.LanIP || '',
+      nodeName,
       nodePoolId: item.NodePoolId || '',
+      labels: labels.join(','),
     },
   }
 }
@@ -213,6 +223,7 @@ export function mapNodePoolCard(item: TkeNodePoolItem): DetailCard {
   const desired = item.DesiredNodesNum ?? total
   const autoscaling = String(item.AutoscalingGroupStatus || '').toUpperCase() === 'ENABLED'
     || String(item.AutoscalingGroupStatus || '').toUpperCase() === 'ENABLE'
+  const charge = chargeTypeLabel(item.InstanceChargeType || item.ChargeType)
   return {
     id: String(item.NodePoolId || ''),
     title: item.Name || String(item.NodePoolId || ''),
@@ -222,6 +233,7 @@ export function mapNodePoolCard(item: TkeNodePoolItem): DetailCard {
       { label: '节点池ID', value: String(item.NodePoolId || '') },
       { label: '可用/总数', value: `${ready}/${desired || total}` },
       { label: '机型', value: (item.InstanceTypes || []).join(',') || '-' },
+      { label: '计费', value: charge },
       { label: '弹性伸缩', value: autoscaling ? '已开启' : '未开启' },
     ],
     flags: {
@@ -233,8 +245,17 @@ export function mapNodePoolCard(item: TkeNodePoolItem): DetailCard {
       deletionProtection: !!item.DeletionProtection,
       min: item.MinNodesNum ?? 0,
       max: item.MaxNodesNum ?? desired,
+      charge,
     },
   }
+}
+
+export function chargeTypeLabel(raw?: string): string {
+  const value = String(raw || '').toUpperCase()
+  if (value === 'PREPAID' || value === 'PREPAID_BY_MONTH' || value === 'UNDER_THE_PERIOD') return '包年包月'
+  if (value === 'SPOTPAID' || value === 'SPOT') return '竞价'
+  if (value === 'POSTPAID_BY_HOUR' || value === 'POSTPAID' || value === 'POSTPAID_BY_MONTH') return '按量计费'
+  return raw || '-'
 }
 
 export function nodePoolTypeLabel(type?: string): string {
@@ -285,6 +306,12 @@ export function validateCreatePayload(payload: Record<string, unknown>): string 
   if (type === 'EXTERNAL_CLUSTER') return null
   const vpc = String(payload.vpcId || payload.VpcId || '').trim()
   if (!vpc) return '缺少 VPC'
+  if (type === 'EDGE_CLUSTER') {
+    const pod = String(payload.clusterCidr || payload.PodCIDR || payload.podCidr || '').trim()
+    const service = String(payload.serviceCidr || payload.ServiceCIDR || '').trim()
+    if (!pod) return '缺少 Pod 网段'
+    if (!service) return '缺少 Service 网段'
+  }
   return null
 }
 
@@ -304,9 +331,12 @@ export function validateDeletePayload(
 
 export function matchNodeFilters(item: TkeInstanceItem, filters: Record<string, string> = {}): boolean {
   const ip = String(filters.ip || '').trim()
-  if (ip && !String(item.LanIP || '').includes(ip)) return false
+  if (ip && !String(item.LanIP || '').includes(ip) && !String(item.NodeName || '').includes(ip)) return false
   const label = String(filters.label || filters.labels || '').trim()
-  if (label && !JSON.stringify(item).toLowerCase().includes(label.toLowerCase())) return false
+  if (label) {
+    const hay = nodeLabelPairs(item).join(',').toLowerCase()
+    if (!hay.includes(label.toLowerCase()) && !hay.replace(/=/g, ':').includes(label.toLowerCase())) return false
+  }
   const state = String(filters.status || filters.instanceState || '').trim()
   if (state && String(item.InstanceState || '').toLowerCase() !== state.toLowerCase()) return false
   const cordon = String(filters.unschedulable || filters.cordon || '').trim().toLowerCase()
@@ -321,6 +351,86 @@ export function matchNodeFilters(item: TkeInstanceItem, filters: Record<string, 
   return true
 }
 
+export function nodeLabelPairs(item: TkeInstanceItem): string[] {
+  const labels = item.Labels
+  if (Array.isArray(labels)) {
+    return labels.map((row) => `${row.Name || ''}=${row.Value || ''}`).filter((row) => row !== '=')
+  }
+  if (labels && typeof labels === 'object') {
+    return Object.entries(labels).map(([key, value]) => `${key}=${value}`)
+  }
+  return []
+}
+
+export function validateNodeCreatePayload(payload: Record<string, unknown>): string | null {
+  const para = parseRunInstancePara(payload)
+  if (!para) return '缺少机型/镜像/安全组/子网'
+  if (!String(para.InstanceType || payload.instanceType || '').trim()) return '缺少机型'
+  if (!String(para.ImageId || payload.imageId || '').trim()) return '缺少镜像'
+  const vpc = para.VirtualPrivateCloud as Record<string, unknown> | undefined
+  const subnet = String(vpc?.SubnetId || payload.subnetId || '').trim()
+  const vpcId = String(vpc?.VpcId || payload.vpcId || '').trim()
+  if (!subnet) return '缺少子网'
+  if (!vpcId) return '缺少 VPC'
+  const sgs = asStringArray(para.SecurityGroupIds || payload.securityGroupIds)
+  if (!sgs.length) return '缺少安全组'
+  return null
+}
+
+export function parseRunInstancePara(payload: Record<string, unknown>): Record<string, unknown> | null {
+  const raw = payload.runInstancePara ?? payload.RunInstancePara
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      return parsed && typeof parsed === 'object' ? parsed : null
+    } catch {
+      return null
+    }
+  }
+  if (payload.instanceType || payload.imageId || payload.subnetId) {
+    return {
+      InstanceType: payload.instanceType,
+      ImageId: payload.imageId,
+      VirtualPrivateCloud: { VpcId: payload.vpcId, SubnetId: payload.subnetId },
+      SecurityGroupIds: asStringArray(payload.securityGroupIds),
+      InstanceCount: Number(payload.instanceCount || 1) || 1,
+    }
+  }
+  return null
+}
+
+export function validateNodePoolPayload(payload: Record<string, unknown>): string | null {
+  const type = normalizePoolType(String(payload.poolType || payload.nodePoolType || payload.NodePoolType || ''))
+  if (!type) return '请先选择普通、原生或超级节点'
+  const name = String(payload.name || payload.Name || '').trim()
+  if (!name) return '缺少节点池名称'
+  if (type === 'Super') {
+    if (!asStringArray(payload.securityGroupIds || payload.SecurityGroupIds).length) return '缺少安全组'
+    return null
+  }
+  if (type === 'Native') {
+    if (!asStringArray(payload.subnetIds || payload.SubnetIds || payload.subnetId).length) return '缺少子网'
+    if (!asStringArray(payload.instanceTypes || payload.InstanceTypes || payload.instanceType).length) return '缺少机型'
+    return null
+  }
+  if (!String(payload.vpcId || payload.VpcId || '').trim()) return '缺少 VPC'
+  if (!asStringArray(payload.subnetIds || payload.SubnetIds || payload.subnetId).length) return '缺少子网'
+  if (!String(payload.instanceType || payload.InstanceType || asStringArray(payload.instanceTypes)[0] || '').trim()) return '缺少机型'
+  if (!String(payload.imageId || payload.ImageId || '').trim()) return '缺少镜像'
+  if (!asStringArray(payload.securityGroupIds || payload.SecurityGroupIds).length) return '缺少安全组'
+  return null
+}
+
+export function normalizePoolType(raw: string): string {
+  const value = raw.trim().toLowerCase()
+  if (value === 'regular' || value === '普通' || value === '普通节点') return 'Regular'
+  if (value === 'native' || value === 'nativenodepool' || value === '原生' || value === '原生节点') return 'Native'
+  if (value === 'super' || value === 'supernode' || value === 'eklet' || value === '超级' || value === '超级节点') return 'Super'
+  if (value === 'external' || value === '注册' || value === '注册节点') return 'External'
+  return raw.trim()
+}
+
 export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule {
   const module: ResourceModule = {
     id: 'tencent.tke',
@@ -331,42 +441,58 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
     actions: ACTIONS,
     async list(ctx) {
       const region = requireRegion(ctx)
-      const filters = buildClusterFilters(ctx)
-      const base = {
-        Offset: ctx.offset,
-        Limit: ctx.limit,
-        ...(filters.length ? { Filters: filters } : {}),
-      }
+      const typeFilter = String(ctx.filters?.clusterType || ctx.filters?.type || '').trim()
+      const want = typeFilter ? normalizeClusterType(typeFilter) : ''
+      const apiFilters = buildClusterFilters(ctx)
       const settled = await Promise.allSettled([
-        call<{ Clusters?: TkeClusterItem[]; TotalCount?: number }>('DescribeClusters', base, creds(ctx), opts(ctx, region)),
-        call<{ Clusters?: TkeClusterItem[]; TotalCount?: number }>('DescribeEKSClusters', base, creds(ctx), opts(ctx, region)),
-        call<{ Clusters?: TkeClusterItem[]; TotalCount?: number }>('DescribeTKEEdgeClusters', base, creds(ctx), opts(ctx, region)),
+        !want || want === 'MANAGED_CLUSTER' || want === 'INDEPENDENT_CLUSTER'
+          ? listAllClusters(call, ctx, region, 'DescribeClusters', apiFilters.length ? { Filters: apiFilters } : {})
+          : Promise.resolve([] as TkeClusterItem[]),
+        !want || want === 'SERVERLESS_CLUSTER'
+          ? listAllClusters(call, ctx, region, 'DescribeEKSClusters')
+          : Promise.resolve([] as TkeClusterItem[]),
+        !want || want === 'EDGE_CLUSTER'
+          ? listAllClusters(call, ctx, region, 'DescribeTKEEdgeClusters')
+          : Promise.resolve([] as TkeClusterItem[]),
+        !want || want === 'EXTERNAL_CLUSTER'
+          ? listAllClusters(call, ctx, region, 'DescribeClusters', { Filters: [{ Name: 'ClusterType', Values: ['EXTERNAL_CLUSTER'] }] })
+          : Promise.resolve([] as TkeClusterItem[]),
       ])
       const buckets = settled.map((row, index) => {
-        if (row.status === 'fulfilled') return row.value
-        if (isEmptyTypeError(row.reason)) return { Clusters: [], TotalCount: 0 }
+        if (row.status === 'fulfilled') return { items: row.value, index }
+        if (isEmptyTypeError(row.reason)) return { items: [] as TkeClusterItem[], index }
         return { error: row.reason, index }
       })
       const fatal = buckets.find((row) => 'error' in row && row.error)
       const anyOk = buckets.some((row) => !('error' in row))
       if (!anyOk && fatal && 'error' in fatal) throw fatal.error
+      const seen = new Set<string>()
       const items: ResourceCard[] = []
-      let total = 0
-      for (const [index, bucket] of buckets.entries()) {
+      for (const bucket of buckets) {
         if ('error' in bucket) continue
-        const raw = (bucket.Clusters || []).map((item) => {
-          const type = index === 1 ? item.ClusterType || 'SERVERLESS_CLUSTER' : index === 2 ? item.ClusterType || 'EDGE_CLUSTER' : item.ClusterType
-          return mapClusterItem({ ...item, ClusterType: type }, module.id, region)
-        })
-        items.push(...raw)
-        total += Number(bucket.TotalCount ?? raw.length)
+        for (const item of bucket.items) {
+          const clusterId = String(item.ClusterId || '')
+          if (!clusterId || seen.has(clusterId)) continue
+          seen.add(clusterId)
+          const type = bucket.index === 1
+            ? item.ClusterType || 'SERVERLESS_CLUSTER'
+            : bucket.index === 2
+              ? item.ClusterType || 'EDGE_CLUSTER'
+              : bucket.index === 3
+                ? item.ClusterType || 'EXTERNAL_CLUSTER'
+                : item.ClusterType
+          items.push(mapClusterItem({ ...item, ClusterType: type }, module.id, region))
+        }
       }
       const filtered = applyClientFilters(items, ctx)
+      const offset = Math.max(0, Number(ctx.offset) || 0)
+      const limit = Math.max(1, Number(ctx.limit) || 12)
+      const sliced = filtered.slice(offset, offset + limit)
       return {
-        items: filtered,
-        total: ctx.query || ctx.filters ? filtered.length : total || filtered.length,
-        offset: ctx.offset,
-        hasMore: ctx.offset + filtered.length < (ctx.query || ctx.filters ? filtered.length : total || filtered.length),
+        items: sliced,
+        total: filtered.length,
+        offset,
+        hasMore: offset + sliced.length < filtered.length,
       }
     },
     async detail(ctx) {
@@ -484,10 +610,13 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
         }
         if (actionId === 'cluster.endpoint') return toggleEndpoint(call, ctx, region, clusterId, payload)
         if (actionId === 'node.cordon' || actionId === 'node.uncordon') {
+          const nodeName = await resolveK8sNodeName(call, ctx, region, clusterId, payload)
+          if (!nodeName) return { ok: false, error: '缺少节点名' }
           await call('ForwardApplicationRequestV3', {
             ClusterName: clusterId,
             Method: 'PATCH',
-            Path: `/api/v1/nodes/${String(payload.nodeName || payload.instanceId || '')}`,
+            Path: `/api/v1/nodes/${encodeURIComponent(nodeName)}`,
+            ContentType: 'application/strategic-merge-patch+json',
             RequestBody: JSON.stringify({ spec: { unschedulable: actionId === 'node.cordon' } }),
           }, creds(ctx), opts(ctx, region))
           return { ok: true }
@@ -515,9 +644,27 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
           return { ok: true }
         }
         if (actionId === 'node.create') {
+          const invalid = validateNodeCreatePayload(payload)
+          if (invalid) return { ok: false, error: invalid }
+          const para = parseRunInstancePara(payload) || {}
+          const instanceType = String(para.InstanceType || payload.instanceType || '').trim()
+          const imageId = String(para.ImageId || payload.imageId || '').trim()
+          const vpc = (para.VirtualPrivateCloud && typeof para.VirtualPrivateCloud === 'object'
+            ? para.VirtualPrivateCloud as Record<string, unknown>
+            : {}) 
+          const vpcId = String(vpc.VpcId || payload.vpcId || '').trim()
+          const subnetId = String(vpc.SubnetId || payload.subnetId || '').trim()
+          const securityGroupIds = asStringArray(para.SecurityGroupIds || payload.securityGroupIds)
+          const body = {
+            InstanceType: instanceType,
+            ImageId: imageId,
+            VirtualPrivateCloud: { VpcId: vpcId, SubnetId: subnetId },
+            SecurityGroupIds: securityGroupIds,
+            InstanceCount: Number(para.InstanceCount || payload.instanceCount || 1) || 1,
+          }
           await call('CreateClusterInstances', {
             ClusterId: clusterId,
-            RunInstancePara: payload.runInstancePara || payload.RunInstancePara || {},
+            RunInstancePara: JSON.stringify(body),
           }, creds(ctx), opts(ctx, region))
           return { ok: true }
         }
@@ -591,7 +738,7 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
         if (actionId === 'addon.install') {
           const name = String(payload.name || payload.addonName || '').trim()
           if (!name) return { ok: false, error: '缺少组件' }
-          await call('CreateAddon', {
+          await call('InstallAddon', {
             ClusterId: clusterId,
             AddonName: name,
             AddonVersion: String(payload.version || payload.addonVersion || '').trim() || undefined,
@@ -618,17 +765,29 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
           const role = String(payload.role || payload.clusterRole || 'tke:admin').trim()
           const user = String(payload.user || payload.subAccountUin || '').trim()
           if (!user) return { ok: false, error: '缺少授权对象' }
-          await call('CreateClusterRoleBinding', {
-            ClusterId: clusterId,
-            RoleName: role,
-            Users: [user],
+          const bindingName = String(payload.name || payload.bindingName || `${role.replace(/[^a-zA-Z0-9]+/g, '-')}-${user}`).trim()
+          await call('ForwardApplicationRequestV3', {
+            ClusterName: clusterId,
+            Method: 'POST',
+            Path: '/apis/rbac.authorization.k8s.io/v1/clusterrolebindings',
+            RequestBody: JSON.stringify({
+              apiVersion: 'rbac.authorization.k8s.io/v1',
+              kind: 'ClusterRoleBinding',
+              metadata: { name: bindingName },
+              roleRef: { apiGroup: 'rbac.authorization.k8s.io', kind: 'ClusterRole', name: role },
+              subjects: [{ kind: 'User', name: user }],
+            }),
           }, creds(ctx), opts(ctx, region))
           return { ok: true }
         }
         if (actionId === 'rbac.unbind') {
           const name = String(payload.name || payload.bindingName || '').trim()
           if (!name) return { ok: false, error: '缺少绑定' }
-          await call('DeleteClusterRoleBinding', { ClusterId: clusterId, Name: name }, creds(ctx), opts(ctx, region))
+          await call('ForwardApplicationRequestV3', {
+            ClusterName: clusterId,
+            Method: 'DELETE',
+            Path: `/apis/rbac.authorization.k8s.io/v1/clusterrolebindings/${encodeURIComponent(name)}`,
+          }, creds(ctx), opts(ctx, region))
           return { ok: true }
         }
         if (actionId === 'policy.toggle') {
@@ -636,7 +795,17 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
           if (!name) return { ok: false, error: '缺少策略' }
           const enable = payload.enable === true
           if (!enable && payload.confirmed !== true) return { ok: false, error: '关闭策略需要二次确认' }
-          await call(enable ? 'EnablePolicy' : 'DisablePolicy', { ClusterId: clusterId, PolicyName: name }, creds(ctx), opts(ctx, region))
+          const kind = String(payload.kind || payload.Kind || '').trim()
+          await call('ModifyOpenPolicyList', {
+            ClusterId: clusterId,
+            Category: String(payload.category || payload.Category || '').trim() || undefined,
+            OpenPolicyInfoList: [{
+              Name: name,
+              Kind: kind || undefined,
+              EnforcementAction: enable ? 'deny' : 'dryrun',
+              EnabledStatus: enable ? 'open' : 'close',
+            }],
+          }, creds(ctx), opts(ctx, region))
           return { ok: true }
         }
         if (actionId === 'ops.audit') {
@@ -667,16 +836,36 @@ async function createCluster(
   const type = normalizeClusterType(String(payload.clusterType || payload.ClusterType || 'MANAGED_CLUSTER'))
   const name = String(payload.clusterName || payload.ClusterName || '').trim()
   const version = String(payload.clusterVersion || payload.ClusterVersion || '').trim()
+  if (type === 'EXTERNAL_CLUSTER') {
+    const spec = await call<{ Spec?: string; Yaml?: string; Command?: string; Config?: string }>(
+      'DescribeExternalClusterSpec',
+      {
+        ClusterName: name,
+        K8SVersion: version || undefined,
+        ClusterDescription: String(payload.description || payload.ClusterDescription || '').trim() || undefined,
+      },
+      creds(ctx),
+      opts(ctx, region),
+    )
+    const yaml = String(spec.Spec || spec.Yaml || spec.Config || spec.Command || '').trim()
+    return { ok: true, data: { spec: yaml, clusterName: name, filename: `${name || 'cluster'}.yaml` } }
+  }
   if (type === 'EDGE_CLUSTER') {
     await call('CreateTKEEdgeCluster', {
       ClusterName: name,
       K8SVersion: version,
-      VpcId: String(payload.vpcId || payload.VpcId || '').trim() || undefined,
+      VpcId: String(payload.vpcId || payload.VpcId || '').trim(),
+      PodCIDR: String(payload.clusterCidr || payload.PodCIDR || payload.podCidr || '').trim(),
+      ServiceCIDR: String(payload.serviceCidr || payload.ServiceCIDR || '').trim(),
+      ClusterDesc: String(payload.description || '').trim() || undefined,
+      MaxNodePodNum: Number(payload.maxNodePodNum || payload.MaxNodePodNum || 64) || 64,
     }, creds(ctx), opts(ctx, region))
     return { ok: true }
   }
+  const maxNodePodNum = Number(payload.maxNodePodNum || payload.MaxNodePodNum || 64) || 64
+  const maxClusterServiceNum = Number(payload.maxClusterServiceNum || payload.MaxClusterServiceNum || 256) || 256
   const body: Record<string, unknown> = {
-    ClusterType: type === 'EXTERNAL_CLUSTER' ? 'EXTERNAL_CLUSTER' : 'MANAGED_CLUSTER',
+    ClusterType: 'MANAGED_CLUSTER',
     ClusterBasicSettings: {
       ClusterName: name,
       ClusterVersion: version,
@@ -686,6 +875,8 @@ async function createCluster(
     ClusterCIDRSettings: {
       ClusterCIDR: String(payload.clusterCidr || payload.ClusterCIDR || '').trim() || undefined,
       ServiceCIDR: String(payload.serviceCidr || payload.ServiceCIDR || '').trim() || undefined,
+      MaxNodePodNum: maxNodePodNum,
+      MaxClusterServiceNum: maxClusterServiceNum,
     },
     ClusterAdvancedSettings: {
       ContainerRuntime: String(payload.runtime || payload.ContainerRuntime || 'containerd'),
@@ -693,7 +884,7 @@ async function createCluster(
     },
   }
   if (Array.isArray(payload.addons) && payload.addons.length) {
-    body.ExtensionAddons = (payload.addons as unknown[]).map((name) => ({ AddonName: String(name) }))
+    body.ExtensionAddons = (payload.addons as unknown[]).map((addonName) => ({ AddonName: String(addonName) }))
   }
   await call('CreateCluster', body, creds(ctx), opts(ctx, region))
   return { ok: true }
@@ -763,17 +954,82 @@ async function createNodePool(
   clusterId: string,
   payload: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const type = String(payload.poolType || payload.nodePoolType || payload.NodePoolType || '').trim()
-  if (!type) return { ok: false, error: '请先选择普通、原生或超级节点' }
+  const invalid = validateNodePoolPayload(payload)
+  if (invalid) return { ok: false, error: invalid }
+  const type = normalizePoolType(String(payload.poolType || payload.nodePoolType || payload.NodePoolType || ''))
   const name = String(payload.name || payload.Name || '').trim()
-  if (!name) return { ok: false, error: '缺少节点池名称' }
+  const subnetIds = asStringArray(payload.subnetIds || payload.SubnetIds || payload.subnetId)
+  const securityGroupIds = asStringArray(payload.securityGroupIds || payload.SecurityGroupIds)
+  if (type === 'Super') {
+    await call('CreateClusterVirtualNodePool', {
+      ClusterId: clusterId,
+      Name: name,
+      SecurityGroupIds: securityGroupIds,
+      SubnetIds: subnetIds.length ? subnetIds : undefined,
+      DeletionProtection: payload.deletionProtection === true,
+    }, creds(ctx), opts(ctx, region))
+    return { ok: true }
+  }
+  if (type === 'Native') {
+    const instanceTypes = asStringArray(payload.instanceTypes || payload.InstanceTypes || payload.instanceType)
+    const desired = Number(payload.desired || payload.DesiredNodesNum || 0) || 0
+    await call('CreateNodePool', {
+      ClusterId: clusterId,
+      Name: name,
+      Type: 'Native',
+      DeletionProtection: payload.deletionProtection === true,
+      Native: {
+        SubnetIds: subnetIds,
+        InstanceTypes: instanceTypes,
+        InstanceChargeType: String(payload.instanceChargeType || payload.InstanceChargeType || 'POSTPAID_BY_HOUR'),
+        SystemDisk: {
+          DiskType: String(payload.systemDiskType || 'CLOUD_PREMIUM'),
+          DiskSize: Number(payload.systemDiskSize || 50) || 50,
+        },
+        Scaling: {
+          MinReplicas: Number(payload.min || payload.MinNodesNum || 0) || 0,
+          MaxReplicas: Number(payload.max || payload.MaxNodesNum || Math.max(desired, 1)) || 1,
+          CreateReplicas: desired,
+        },
+      },
+    }, creds(ctx), opts(ctx, region, { version: '2022-05-01' }))
+    return { ok: true }
+  }
+  if (type === 'External') {
+    await call('CreateExternalNodePool', {
+      ClusterId: clusterId,
+      Name: name,
+      ContainerRuntime: String(payload.runtime || payload.ContainerRuntime || 'containerd'),
+      RuntimeVersion: String(payload.runtimeVersion || payload.RuntimeVersion || '1.7.28'),
+      DeletionProtection: payload.deletionProtection === true,
+    }, creds(ctx), opts(ctx, region))
+    return { ok: true }
+  }
+  const instanceType = String(payload.instanceType || payload.InstanceType || asStringArray(payload.instanceTypes)[0] || '').trim()
+  const imageId = String(payload.imageId || payload.ImageId || '').trim()
+  const vpcId = String(payload.vpcId || payload.VpcId || '').trim()
+  const desired = Number(payload.desired || payload.DesiredNodesNum || 0) || 0
+  const min = Number(payload.min || payload.MinNodesNum || 0) || 0
+  const max = Number(payload.max || payload.MaxNodesNum || Math.max(desired, 1)) || 1
   await call('CreateClusterNodePool', {
     ClusterId: clusterId,
     Name: name,
-    NodePoolType: type,
     EnableAutoscale: payload.enableAutoscale === true,
     DeletionProtection: payload.deletionProtection === true,
-    DesiredNodesNum: Number(payload.desired || 0) || 0,
+    AutoScalingGroupPara: JSON.stringify({
+      MinSize: min,
+      MaxSize: max,
+      DesiredCapacity: desired,
+      VpcId: vpcId,
+      SubnetIds: subnetIds,
+    }),
+    LaunchConfigurePara: JSON.stringify({
+      InstanceType: instanceType,
+      ImageId: imageId,
+      SecurityGroupIds: securityGroupIds,
+      InstanceChargeType: String(payload.instanceChargeType || payload.InstanceChargeType || 'POSTPAID_BY_HOUR'),
+    }),
+    InstanceAdvancedSettings: {},
   }, creds(ctx), opts(ctx, region))
   return { ok: true }
 }
@@ -824,10 +1080,13 @@ async function loadAddons(call: typeof tkeCall, ctx: ModuleContext, region: stri
 }
 
 async function loadEndpoint(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<{ intranet: boolean; internet: boolean }> {
+  const isCreated = (status?: string) => String(status || '').toLowerCase() === 'created'
   try {
-    const data = await call<{ Status?: string; ExtraParam?: { IsExtranet?: boolean } }>('DescribeClusterEndpointStatus', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
-    const created = String(data.Status || '').toLowerCase() === 'created'
-    return { intranet: created, internet: created && !!data.ExtraParam?.IsExtranet }
+    const [intranet, internet] = await Promise.all([
+      call<{ Status?: string }>('DescribeClusterEndpointStatus', { ClusterId: clusterId, IsExtranet: false }, creds(ctx), opts(ctx, region)),
+      call<{ Status?: string }>('DescribeClusterEndpointStatus', { ClusterId: clusterId, IsExtranet: true }, creds(ctx), opts(ctx, region)),
+    ])
+    return { intranet: isCreated(intranet.Status), internet: isCreated(internet.Status) }
   } catch {
     return { intranet: false, internet: false }
   }
@@ -854,15 +1113,31 @@ async function loadNamespaces(call: typeof tkeCall, ctx: ModuleContext, region: 
 
 async function loadBindings(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<DetailCard[]> {
   try {
-    const data = await call<{ ClusterRoleBindingSet?: Array<{ Name?: string; RoleName?: string; Users?: string[] }> }>('DescribeClusterRoleBindings', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
-    return (data.ClusterRoleBindingSet || []).map((item) => ({
-      id: String(item.Name || ''),
-      title: String(item.Name || item.RoleName || ''),
-      columns: [
-        { label: '角色', value: item.RoleName || '-' },
-        { label: '对象', value: (item.Users || []).join(',') || '-' },
-      ],
-    }))
+    const data = await call<{ ResponseBody?: string }>('ForwardApplicationRequestV3', {
+      ClusterName: clusterId,
+      Method: 'GET',
+      Path: '/apis/rbac.authorization.k8s.io/v1/clusterrolebindings',
+    }, creds(ctx), opts(ctx, region))
+    const parsed = parseJson(data.ResponseBody)
+    const items = Array.isArray(parsed?.items)
+      ? parsed.items as Array<{
+        metadata?: { name?: string }
+        roleRef?: { name?: string }
+        subjects?: Array<{ kind?: string; name?: string }>
+      }>
+      : []
+    return items.map((item) => {
+      const users = (item.subjects || []).map((row) => row.name).filter(Boolean)
+      return {
+        id: String(item.metadata?.name || ''),
+        title: String(item.metadata?.name || item.roleRef?.name || ''),
+        columns: [
+          { label: '角色', value: item.roleRef?.name || '-' },
+          { label: '对象', value: users.join(',') || '-' },
+        ],
+        flags: { role: item.roleRef?.name || '', users: users.join(',') },
+      }
+    }).filter((item) => item.id)
   } catch {
     return []
   }
@@ -870,14 +1145,35 @@ async function loadBindings(call: typeof tkeCall, ctx: ModuleContext, region: st
 
 async function loadPolicies(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<DetailCard[]> {
   try {
-    const data = await call<{ PolicySet?: Array<{ PolicyName?: string; Enabled?: boolean; Category?: string }> }>('DescribePolicy', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
-    return (data.PolicySet || []).map((item) => ({
-      id: String(item.PolicyName || ''),
-      title: String(item.PolicyName || ''),
-      status: item.Enabled ? 'enable' : 'pause',
-      badges: [item.Category || ''].filter(Boolean),
-      flags: { enabled: !!item.Enabled },
-    }))
+    const data = await call<{
+      OpenPolicyInfoList?: Array<{
+        PolicyName?: string
+        Name?: string
+        Kind?: string
+        EnabledStatus?: string
+        EnforcementAction?: string
+        PolicyCategory?: string
+        Category?: string
+      }>
+    }>('DescribeOpenPolicyList', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
+    return (data.OpenPolicyInfoList || []).map((item) => {
+      const enabled = String(item.EnabledStatus || '').toLowerCase() === 'open'
+        || String(item.EnforcementAction || '').toLowerCase() === 'deny'
+      const name = String(item.Name || item.PolicyName || '')
+      return {
+        id: name,
+        title: String(item.PolicyName || item.Name || ''),
+        status: enabled ? 'enable' : 'pause',
+        badges: [item.PolicyCategory || item.Category || ''].filter(Boolean),
+        flags: {
+          enabled,
+          kind: item.Kind || '',
+          name,
+          category: item.PolicyCategory || item.Category || '',
+          enforcementAction: item.EnforcementAction || '',
+        },
+      }
+    }).filter((item) => item.id)
   } catch {
     return []
   }
@@ -885,22 +1181,28 @@ async function loadPolicies(call: typeof tkeCall, ctx: ModuleContext, region: st
 
 async function loadOps(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<{ audit: boolean; event: boolean }> {
   try {
-    const data = await call<{ AuditEnabled?: boolean; EventEnabled?: boolean; LogSwitches?: Array<{ LogType?: string; Status?: boolean }> }>('DescribeLogSwitches', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
-    const switches = data.LogSwitches || []
-    const audit = data.AuditEnabled === true || switches.some((item) => /audit/i.test(String(item.LogType || '')) && item.Status)
-    const event = data.EventEnabled === true || switches.some((item) => /event/i.test(String(item.LogType || '')) && item.Status)
-    return { audit, event }
+    const data = await call<{
+      SwitchSet?: Array<{ ClusterId?: string; Audit?: { Enable?: boolean }; Event?: { Enable?: boolean } }>
+    }>('DescribeLogSwitches', { ClusterIds: [clusterId] }, creds(ctx), opts(ctx, region))
+    const row = (data.SwitchSet || []).find((item) => !item.ClusterId || item.ClusterId === clusterId) || data.SwitchSet?.[0]
+    return { audit: !!row?.Audit?.Enable, event: !!row?.Event?.Enable }
   } catch {
     return { audit: false, event: false }
   }
 }
 
 function applyClientFilters(items: ResourceCard[], ctx: ModuleContext): ResourceCard[] {
+  const keyword = String(ctx.query || ctx.filters?.keyword || ctx.filters?.name || '').trim().toLowerCase()
   const vpc = String(ctx.filters?.vpcId || ctx.filters?.vpc || '').trim()
   const tag = String(ctx.filters?.tag || '').trim()
   const type = String(ctx.filters?.clusterType || ctx.filters?.type || '').trim()
   const status = String(ctx.filters?.status || '').trim()
   return items.filter((item) => {
+    if (keyword) {
+      const id = columnValue(item, '集群ID').toLowerCase()
+      const title = String(item.title || '').toLowerCase()
+      if (!title.includes(keyword) && !id.includes(keyword) && !String(item.description || '').toLowerCase().includes(keyword)) return false
+    }
     if (vpc && !columnValue(item, '所在网络').includes(vpc)) return false
     if (tag && !columnValue(item, '标签').includes(tag) && !columnValue(item, '标签').includes(tag.replace(':', '='))) return false
     if (type && columnValue(item, '类型') !== clusterTypeLabel(normalizeClusterType(type)) && columnValue(item, '类型') !== type) return false
@@ -926,8 +1228,8 @@ function creds(ctx: ModuleContext): { secretId: string; secretKey: string } {
   return { secretId: ctx.creds.secretId, secretKey: ctx.creds.secretKey }
 }
 
-function opts(ctx: ModuleContext, region: string): { timeoutMs: number; signal?: AbortSignal; region: string } {
-  return { timeoutMs: ctx.timeoutMs, signal: ctx.signal, region }
+function opts(ctx: ModuleContext, region: string, extra: { version?: string } = {}): { timeoutMs: number; signal?: AbortSignal; region: string; version?: string } {
+  return { timeoutMs: ctx.timeoutMs, signal: ctx.signal, region, ...extra }
 }
 
 function asStringArray(value: unknown): string[] {
@@ -948,6 +1250,49 @@ function parseJson(raw?: string): { items?: unknown[] } | null {
 function isEmptyTypeError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err || '')
   return /不支持|not support|ResourceNotFound|不存在|暂无/i.test(message)
+}
+
+async function listAllClusters(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  action: string,
+  extra: Record<string, unknown> = {},
+): Promise<TkeClusterItem[]> {
+  const pageSize = 100
+  const out: TkeClusterItem[] = []
+  let offset = 0
+  for (let page = 0; page < 20; page += 1) {
+    const data = await call<{ Clusters?: TkeClusterItem[]; TotalCount?: number }>(
+      action,
+      { Offset: offset, Limit: pageSize, ...extra },
+      creds(ctx),
+      opts(ctx, region),
+    )
+    const rows = data.Clusters || []
+    out.push(...rows)
+    const total = Number(data.TotalCount ?? out.length)
+    if (rows.length < pageSize || out.length >= total) break
+    offset += rows.length
+  }
+  return out
+}
+
+async function resolveK8sNodeName(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+  payload: Record<string, unknown>,
+): Promise<string> {
+  const explicit = String(payload.nodeName || payload.NodeName || '').trim()
+  if (explicit && !/^ins-/i.test(explicit)) return explicit
+  const instanceId = String(payload.instanceId || payload.InstanceId || explicit || '').trim()
+  const nodes = await loadNodes(call, ctx, region, clusterId)
+  const hit = nodes.find((item) => item.InstanceId === instanceId || item.InstanceId === explicit || item.NodeName === explicit)
+  const resolved = String(hit?.NodeName || hit?.LanIP || '').trim()
+  if (resolved) return resolved
+  return explicit || instanceId
 }
 
 export const tencentTkeModule = createTkeModule()
