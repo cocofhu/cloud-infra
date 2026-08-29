@@ -403,7 +403,7 @@ test('settings card still has no region or db account fields g4.1', () => {
   assert.match(client, /腾讯云 CDB|matchModule/)
 })
 
-test('cvm and lighthouse consoles use two skins and console Chinese status', () => {
+test('cvm and lighthouse consoles share one dual-tab instance card', () => {
   const client = read('src/client.js')
   assert.match(client, /function CvmConsole/)
   assert.match(client, /function LhConsole/)
@@ -424,6 +424,11 @@ test('cvm and lighthouse consoles use two skins and console Chinese status', () 
   assert.match(client, /搜索 ID \/ 名称 \/ IP/)
   assert.doesNotMatch(client, /卡片视图/)
   assert.doesNotMatch(client, /function RegionTabs/)
+  // 常驻双 Tab:KindTabs 不再要求两类数据同卡才显示
+  assert.doesNotMatch(client, /if \(!\(showCvm && showLh\)\) return null/)
+  // 去冗余标题:实例卡内不再出现「实例」「服务器」两个 bar 标题
+  assert.doesNotMatch(client, /className: "ci-bar-title" \}, "实例"\)/)
+  assert.doesNotMatch(client, /className: "ci-bar-title" \}, "服务器"\)/)
   assert.match(client, /运行中/)
   assert.match(client, /已关机/)
   assert.match(client, /"更多"/)
@@ -436,8 +441,6 @@ test('cvm and lighthouse consoles use two skins and console Chinese status', () 
   assert.match(client, /ci-dense/)
   assert.match(client, /min-width:980px/)
   assert.match(client, /\.ci-select\{[^}]*max-width:180px/)
-  assert.match(client, /region: listRegion/)
-  assert.match(client, /onQuery: onDraft/)
   const toolStart = client.indexOf('function SearchToolView')
   const toolEnd = client.indexOf('function matchModule', toolStart)
   const tool = client.slice(toolStart, toolEnd)
@@ -453,13 +456,46 @@ test('cvm and lighthouse consoles use two skins and console Chinese status', () 
   assert.match(tool, /usableInstanceQuery/)
   assert.match(client, /function usableInstanceQuery/)
   assert.match(tool, /华南地区（广州）/)
-  assert.match(tool, /onSubmit: runSearch/)
   assert.match(tool, /setTimeout\(\(\) => runSearch\(value\), 800\)/)
   assert.match(client, /function SearchField/)
   assert.match(client, /function ListPane/)
   assert.match(client, /加载列表/)
   assert.doesNotMatch(client, /ci-list-mask/)
   assert.doesNotMatch(tool, /showDomain = kind === "domain" \|\| \(!showCvm && !showLh\)/)
+  // Tab 行为主行,下行统一「地域下拉 + 搜索框」:一套 RegionSelect + SearchField 由 KindTabs 下层的 ci-bar 渲染
+  assert.match(tool, /h\("div", \{ key: "bar", className: "ci-bar" \}/)
+  assert.match(tool, /h\(RegionSelect, \{[\s\S]*h\(SearchField, \{/)
+  // 切 Tab 按需拉取另一类型,保留搜索词与地域(onChange 内 fetchList 带 next tab)
+  assert.match(tool, /onChange: \(next\) => \{[\s\S]{0,160}?setKindTab\(next\)[\s\S]{0,160}?fetchList\(0, String\(activeQ \|\| ""\)\.trim\(\), undefined, next\)/)
+  // 切 Tab 时不再因 showCvm/showLh 之一缺失而退回单 Tab
+  assert.match(tool, /kindTab === "cvm" \? h\(CvmConsole/)
+  // 轻量空态与云服务器一致(没有匹配…的实例)
+  assert.match(tool, /emptyHint[\s\S]{0,80}?没有匹配「\$\{activeQ \|\| draftQ\}」的实例[\s\S]{0,80}?没有匹配的实例/)
+  // 地域命名统一:客户端按控制台全称归一,短名(如「广州」)映射为「华南地区（广州）」
+  assert.match(client, /function canonicalRegionName/)
+  assert.match(client, /\["广州", "华南地区（广州）"\]/)
+})
+
+test('canonicalRegionName maps short names to console full names and RegionSelect dedupes by canonical', () => {
+  const src = read('src/client.js')
+  const fnStart = src.indexOf('function canonicalRegionName')
+  const fnEnd = src.indexOf('function RegionSelect', fnStart)
+  const tableStart = src.indexOf('const REGION_CITY_TO_DISPLAY')
+  const tableEnd = src.indexOf('];', tableStart) + 2
+  assert.ok(fnStart > tableStart && tableStart > 0 && fnEnd > fnStart)
+  const factory = new Function(`${src.slice(tableStart, tableEnd)}\n${src.slice(fnStart, fnEnd)}\nreturn canonicalRegionName`)
+  const canonical = factory() as (name: string) => string
+  // 短名归一为控制台全称
+  assert.equal(canonical('广州'), '华南地区（广州）')
+  assert.equal(canonical('上海'), '华东地区（上海）')
+  assert.equal(canonical('北京'), '华北地区（北京）')
+  // 已全称按原样,半角括号转全角
+  assert.equal(canonical('华南地区(广州)'), '华南地区（广州）')
+  assert.equal(canonical('华南地区（广州）'), '华南地区（广州）')
+  // 官方 region id 不动
+  assert.equal(canonical('ap-guangzhou'), 'ap-guangzhou')
+  // 未知文本原样返回(不映射避免误判)
+  assert.equal(canonical('其它地域'), '其它地域')
 })
 
 test('instance detail uses official groups and never renders DNS records', () => {
@@ -538,8 +574,26 @@ test('host tool kind lists domain lighthouse cvm auto and default stays domain',
   assert.match(host, /查一下我的服务器/)
   assert.match(host, /never kind=domain/)
   assert.match(host, /args\.kind != null \? String\(args\.kind\) : 'domain'/)
-  assert.match(host, /云服务器 \/ 轻量 \/ CVM \/ 实例/)
+  assert.match(host, /云服务器\/轻量\/CVM\/实例|云服务器 \/ 轻量 \/ CVM \/ 实例|云服务器\|轻量应用服务器/)
   assert.doesNotMatch(host, /if\s*\(.*provider\s*===\s*['"]tencent['"]/)
+})
+
+test('host prompt guides one kind=auto call for server queries and references dual tabs', () => {
+  const host = read('src/host.ts')
+  // 工具 description 内的关键句
+  assert.match(host, /ONE call with kind=auto/)
+  assert.match(host, /do NOT split into two calls/)
+  assert.match(host, /云服务器 \| 轻量应用服务器 tabs/)
+  assert.match(host, /switch between them inside the same card/)
+  // systemPrompt 同步段落,与 description 表述一致
+  const promptStart = host.indexOf("name: 'tool:cloud-infra'")
+  const promptEnd = host.indexOf("ctx.inject(['webServer']", promptStart)
+  assert.ok(promptStart > 0 && promptEnd > promptStart)
+  const prompt = host.slice(promptStart, promptEnd)
+  assert.match(prompt, /ONE call with kind=auto/)
+  assert.match(prompt, /do NOT split into two calls/)
+  assert.match(prompt, /云服务器 \| 轻量应用服务器 tabs/)
+  assert.match(prompt, /switch between them inside the same card/)
 })
 
 test('g3 COS console two pages use region combo and file list, not an expand tree', () => {
