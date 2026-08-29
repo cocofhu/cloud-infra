@@ -1053,20 +1053,27 @@ window.__ModuleLoader__.load({
         setOpen(true);
         setHighlight(0);
       };
-      const loadFiles = async (item, prefix, marker) => {
+      const loadFiles = async (item, prefix, opts) => {
         const n = ++fileSeq.current;
-        const append = !!marker;
+        const marker = opts && opts.marker ? String(opts.marker) : "";
+        const page = Math.max(1, Number(opts && opts.page) || 1);
+        const markers = Array.isArray(opts && opts.markers) && opts.markers.length ? opts.markers : [""];
         setPendingId(item.id);
-        setSession((cur) => ({
-          item,
-          prefix,
-          marker: marker || "",
-          loading: true,
-          detail: cur && cur.item?.id === item.id ? cur.detail : null,
-          entries: append && cur && cur.item?.id === item.id ? (cur.entries || []) : [],
-          hasMore: append && cur ? cur.hasMore : false,
-          nextMarker: marker || "",
-        }));
+        setSession((cur) => {
+          const sameDir = cur && cur.item?.id === item.id && (cur.prefix || "") === (prefix || "");
+          return {
+            item,
+            prefix,
+            marker,
+            page,
+            markers,
+            loading: true,
+            detail: sameDir ? cur.detail : null,
+            entries: sameDir ? (cur.entries || []) : [],
+            hasMore: sameDir ? cur.hasMore : false,
+            nextMarker: sameDir ? (cur.nextMarker || "") : "",
+          };
+        });
         try {
           const detail = await api("detail", {
             moduleId: item.moduleId,
@@ -1075,25 +1082,24 @@ window.__ModuleLoader__.load({
             bucket: item.title,
             region: selected?.id || args.region,
             prefix: prefix || "",
-            marker: marker || "",
+            marker,
           });
           if (n !== fileSeq.current) return;
-          setSession((cur) => {
-            const same = cur && cur.item?.id === item.id && (cur.prefix || "") === (detail.prefix || prefix || "");
-            const prev = append && same ? (cur.entries || []) : [];
-            return {
-              item,
-              prefix: detail.prefix || prefix || "",
-              loading: false,
-              detail,
-              entries: [...prev, ...(detail.entries || [])],
-              hasMore: !!detail.hasMore,
-              nextMarker: detail.nextMarker || "",
-            };
+          setSession({
+            item,
+            prefix: detail.prefix || prefix || "",
+            marker,
+            page,
+            markers,
+            loading: false,
+            detail,
+            entries: detail.entries || [],
+            hasMore: !!detail.hasMore,
+            nextMarker: detail.nextMarker || "",
           });
         } catch (e) {
           if (n !== fileSeq.current) return;
-          setSession({ item, prefix: prefix || "", loading: false, detail: null, error: publicErrorMessage(e), entries: [], hasMore: false, nextMarker: "" });
+          setSession({ item, prefix: prefix || "", page, markers, loading: false, detail: null, error: publicErrorMessage(e), entries: [], hasMore: false, nextMarker: "" });
         } finally {
           if (n === fileSeq.current) setPendingId("");
         }
@@ -1286,7 +1292,7 @@ window.__ModuleLoader__.load({
         }) : null,
         session && session.loading && !(session.entries || []).length ? h("div", { key: "fload", className: "ci-load" }, h(Spin), "加载文件列表…") : null,
         session && session.error && !session.detail ? h("div", { key: "ferr", className: "ci-err" }, session.error) : null,
-        session && draftQ && session.hasMore ? h("p", { key: "search-hint", className: "ci-hint" }, "仅搜索已加载的文件，可先加载更多") : null,
+        session && draftQ && session.hasMore ? h("p", { key: "search-hint", className: "ci-hint" }, "仅搜索当前页的文件，可先翻到其它页") : null,
         showFiles ? h(CosFileTable, {
           key: "files",
           entries: fileEntries,
@@ -1315,16 +1321,35 @@ window.__ModuleLoader__.load({
             );
           },
         }) : null,
-        showFiles && session.hasMore ? h("div", { key: "file-more", className: "ci-footbar", id: "ci-cos-file-pager" },
+        showFiles && (session.hasMore || (session.page || 1) > 1) ? h("div", { key: "file-more", className: "ci-footbar", id: "ci-cos-file-pager" },
           h("div", { className: "ci-page" },
-            h("span", null, `已加载 ${(session.entries || []).length} 条，一层过多可翻页`),
-            session.nextMarker ? h("button", {
-              id: "ci-cos-load-more",
-              type: "button",
-              className: "ci-page-btn",
-              disabled: !!session.loading || busy,
-              onClick: () => loadFiles(session.item, session.prefix || "", session.nextMarker),
-            }, "加载更多") : h("span", { className: "ci-hint" }, "列表已截断，但未返回下一页标记"),
+            h("span", null, `第 ${session.page || 1} 页 · 本页 ${(session.entries || []).length} 条`),
+            h("div", { className: "ci-page-btns" },
+              h("button", {
+                id: "ci-cos-file-prev",
+                type: "button",
+                className: "ci-page-btn",
+                disabled: !!session.loading || busy || (session.page || 1) <= 1,
+                onClick: () => {
+                  const page = Math.max(1, (session.page || 1) - 1);
+                  const markers = (session.markers || [""]).slice(0, page);
+                  loadFiles(session.item, session.prefix || "", { marker: markers[page - 1] || "", page, markers });
+                },
+              }, "上一页"),
+              session.hasMore && !session.nextMarker
+                ? h("span", { className: "ci-hint" }, "列表已截断，但未返回下一页标记")
+                : h("button", {
+                  id: "ci-cos-file-next",
+                  type: "button",
+                  className: "ci-page-btn",
+                  disabled: !!session.loading || busy || !session.hasMore || !session.nextMarker,
+                  onClick: () => {
+                    const page = (session.page || 1) + 1;
+                    const markers = [...(session.markers || [""]).slice(0, session.page || 1), session.nextMarker];
+                    loadFiles(session.item, session.prefix || "", { marker: session.nextMarker, page, markers });
+                  },
+                }, "下一页"),
+            ),
           ),
         ) : null,
         form ? h(RecordForm, {
