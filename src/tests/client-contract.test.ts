@@ -470,9 +470,11 @@ test('instance detail uses official groups and never renders DNS records', () =>
   const end = tke > start ? tke : search
   assert.ok(start > 0 && end > start)
   const body = client.slice(start, end)
-  assert.match(body, /h\(ChevronLeft/)
-  assert.match(body, /aria-label": "返回"/)
+  assert.match(body, /h\(BackButton, \{ onClick: onBack \}\)/)
   assert.doesNotMatch(body, /返回实例列表/)
+  assert.match(client, /function BackButton\(\{ onClick, className, \.\.\.rest \}\)/)
+  assert.match(client, /aria-label": "返回"/)
+  assert.match(client, /h\(ChevronLeft\)/)
   assert.match(body, /detail\?\.groups/)
   assert.match(body, /开机/)
   assert.match(body, /关机/)
