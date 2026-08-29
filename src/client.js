@@ -63,12 +63,14 @@ window.__ModuleLoader__.load({
 .ci-chip b{color:var(--dsw-alias-label-primary);margin-left:4px;font-weight:600}
 .ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
 .ci-sec-t{font-size:13px;font-weight:650}
-.ci-table-wrap{width:100%;overflow:auto}
-.ci-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
-.ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle}
+.ci-table-wrap{width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+.ci-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:13px}
+.ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle;white-space:nowrap;word-break:normal}
 .ci-table th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px}
-.ci-table td{word-break:break-all;color:var(--dsw-alias-label-secondary)}
+.ci-table td{color:var(--dsw-alias-label-secondary)}
 .ci-table td.ci-ops-cell{white-space:nowrap;word-break:normal}
+.ci-table .ci-name{max-width:none;overflow:visible;text-overflow:unset}
+.ci-table .ci-id{overflow:visible;text-overflow:unset}
 .ci-table tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-rec-page{margin:0}
 .ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
@@ -143,7 +145,7 @@ window.__ModuleLoader__.load({
 .ci-kv{display:inline-block;margin:4px 6px 0 0;background:var(--dsw-alias-bg-layer-2);border-radius:6px;padding:1px 6px;font-size:12px}
 .ci-raw{font-family:ui-monospace,Menlo,monospace;font-size:12px;margin-top:4px;word-break:break-all}
 .ci-tiny{font-size:12px;color:var(--dsw-alias-label-tertiary)}
-.ci-table-scroll{overflow:auto;width:100%}
+.ci-table-scroll{overflow-x:auto;overflow-y:hidden;width:100%;max-width:100%;min-width:0;-webkit-overflow-scrolling:touch}
 .ci-foot-note{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;color:var(--dsw-alias-label-tertiary);font-size:12px;border-top:1px solid var(--dsw-alias-border-l1);flex-wrap:wrap}
 @media(max-width:640px){.ci-query,.ci-split{grid-template-columns:1fr}.ci-fields{border-right:0;border-bottom:1px solid var(--dsw-alias-border-l1)}}
 `;
