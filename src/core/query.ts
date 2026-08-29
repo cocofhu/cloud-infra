@@ -65,6 +65,7 @@ export async function queryResources(
   const regions: string[] = []
   let total = 0
   let hasMore = false
+  let needsRegion = false
 
   await Promise.allSettled(candidates.map(async (module) => {
     const providerDef = source.getProvider(module.provider)
@@ -90,13 +91,14 @@ export async function queryResources(
         timeoutMs: config.timeoutMs,
         signal,
         group: group || undefined,
-        region: region || undefined,
+        region: input.region || region || undefined,
         filters,
       })
       lists.push(result.items || [])
       if (result.total != null) total += result.total
       else total += result.items?.length || 0
       if (result.hasMore) hasMore = true
+      if (result.needsRegion) needsRegion = true
       for (const message of result.warnings || []) {
         errors.push({ moduleId: module.id, message })
       }
@@ -126,6 +128,7 @@ export async function queryResources(
     hasMore,
     region: region || undefined,
     regions: regions.length ? regions : undefined,
+    ...(needsRegion ? { needsRegion: true } : {}),
   }
 }
 
@@ -148,6 +151,9 @@ function clamp(n: number, min: number, max: number): number {
 
 export function renderQuery(result: QueryResult): string {
   if (!result.items.length) {
+    if (result.kind === 'cos' && result.needsRegion) {
+      return '对话卡默认选中广州（ap-guangzhou，#ci-cos-region 可输入补全并改选其它官方地域）并自动列出该地域存储桶。不要用 Ask question 代替选地域，不要编造 region id，也不要把中文名或自由文本当作 region。'
+    }
     const err = result.errors.map((item) => item.message).join('；')
     if (err) return err
     if (result.kind === 'registrar') {
@@ -170,7 +176,7 @@ export function renderQuery(result: QueryResult): string {
   const start = result.offset || 0
   const shown = start + result.items.length
   const more = result.hasMore
-    ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}${result.region ? `，region=${result.region}` : ''}，offset=${shown}。`
+    ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}${result.region ? `，region=${result.region}` : result.kind === 'cos' && result.items[0] ? `，region 保持已选地域` : ''}，offset=${shown}。`
     : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
   if (result.kind === 'registrar') {
@@ -183,15 +189,17 @@ export function renderQuery(result: QueryResult): string {
   const cdb = result.kind === 'cdb' || result.items.some((item) => item.kind === 'cdb')
   const instance = result.kind === 'cvm' || result.kind === 'lighthouse'
     || result.items.some((item) => item.kind === 'cvm' || item.kind === 'lighthouse')
-  const hint = result.kind === 'cert'
-    ? '用一两句话概括即可，请用户点击证书 ID 或绑定域名查看完整详情。不要打印密钥或证书正文。'
-    : cluster
-    ? '用一两句话概括即可，列表默认广州，用户可在顶栏切换地域并点击集群 ID 进入配置。不要询问地域、不要打印密钥或集群凭证，不要套用域名解析页。'
-    : cdb
-      ? '用一两句话概括即可，请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。不要打印密钥。'
-      : instance
-        ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
-        : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
+  const hint = result.kind === 'cos'
+    ? '用一两句话概括即可，请用户点击存储桶名称进入文件列表。不要打印密钥或签名 URL。'
+    : result.kind === 'cert'
+      ? '用一两句话概括即可，请用户点击证书 ID 或绑定域名查看完整详情。不要打印密钥或证书正文。'
+      : cluster
+        ? '用一两句话概括即可，列表默认广州，用户可在顶栏切换地域并点击集群 ID 进入配置。不要询问地域、不要打印密钥或集群凭证，不要套用域名解析页。'
+        : cdb
+          ? '用一两句话概括即可，请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。不要打印密钥。'
+          : instance
+            ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
+            : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
   return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
 }
 

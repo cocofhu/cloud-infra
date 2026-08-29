@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { COS_REGIONS } from '../providers/tencent/cos-regions.js'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const root = join(dir, '../..')
@@ -20,6 +21,18 @@ test('host and query core do not switch on vendor names', () => {
   assert.doesNotMatch(query, /tencent\s*\|\s*aliyun/)
   assert.match(host, /settings\.register\('cloud-infra'/)
   assert.match(host, /cloud_infra_query/)
+  assert.match(host, /kind=cos/)
+  assert.match(host, /OMIT region/)
+  assert.match(host, /Never use Ask question/)
+  assert.match(host, /still call kind=cos and omit region/)
+  assert.doesNotMatch(host, /Do not call kind=cos without/)
+  assert.doesNotMatch(host, /MUST pass a valid official region/)
+  assert.doesNotMatch(host, /Required for kind=cos/)
+  assert.match(query, /region: input\.region/)
+  const writeAt = host.indexOf('writeOverlay(cfg)')
+  const saveAt = host.indexOf('if (body.save)')
+  assert.ok(writeAt > 0 && saveAt > 0 && writeAt > saveAt)
+  assert.equal(host.split('writeOverlay(cfg)').length - 1, 1)
   assert.match(host, /kind=registrar/)
   assert.match(host, /kind=my-domain/)
   assert.match(host, /do not send them to settings/i)
@@ -527,6 +540,146 @@ test('host tool kind lists domain lighthouse cvm auto and default stays domain',
   assert.match(host, /args\.kind != null \? String\(args\.kind\) : 'domain'/)
   assert.match(host, /云服务器 \/ 轻量 \/ CVM \/ 实例/)
   assert.doesNotMatch(host, /if\s*\(.*provider\s*===\s*['"]tencent['"]/)
+})
+
+test('g3 COS console two pages use region combo and file list, not an expand tree', () => {
+  const client = read('src/client.js')
+  const host = read('src/host.ts')
+  const readme = read('README.md')
+  assert.match(client, /function CosConsoleView/)
+  assert.match(client, /function CosRegionCombo/)
+  assert.match(client, /function CosBucketTable/)
+  assert.match(client, /function CosFileTable/)
+  assert.match(client, /\.ci-table-wrap\{[^}]*overflow-x:auto/)
+  assert.match(client, /\.ci-table th,\.ci-table td\{[^}]*white-space:nowrap/)
+  assert.match(client, /请输入并选择地域/)
+  assert.match(client, /DEFAULT_COS_REGION_ID = "ap-guangzhou"/)
+  assert.match(client, /function defaultCosRegion/)
+  assert.match(client, /useState\(\(\) => defaultCosRegion/)
+  assert.match(client, /comboNeedle/)
+  assert.match(client, /创建存储桶/)
+  assert.match(client, /请输入存储桶名称/)
+  assert.match(client, /"名称"/)
+  assert.match(client, /"访问权限"/)
+  assert.match(client, /上传文件/)
+  assert.match(client, /创建文件夹/)
+  assert.match(client, /搜索文件名/)
+  assert.match(client, /"文件名"/)
+  assert.match(client, /"存储类型"/)
+  assert.match(client, /"最后修改时间"/)
+  assert.match(client, /复制临时链接/)
+  assert.match(client, /kind === "cos"/)
+  assert.match(client, /id: "ci-cos-region"/)
+  assert.match(client, /htmlFor: "ci-cos-region"/)
+  assert.match(client, /\.ci-bar\{[^}]*flex-wrap:nowrap/)
+  assert.match(client, /\.ci-regionbar label\{[^}]*font-size:13px/)
+  assert.match(client, /\.ci-combo input\{[^}]*font-size:13px/)
+  assert.match(client, /\.ci-mini\{[^}]*font-size:13px/)
+  assert.match(client, /\.ci-search\{[^}]*font-size:13px/)
+  assert.match(client, /prefixCrumbs/)
+  assert.doesNotMatch(client, /function CosTree\b|ci-tree-expand|展开全部/)
+  assert.doesNotMatch(client, /if\s*\(.*===\s*['"]tencent['"]/)
+  assert.match(host, /对象存储/)
+  assert.match(host, /defaults #ci-cos-region to 广州/)
+  assert.match(host, /stays selectable/)
+  assert.doesNotMatch(host, /对象存储 · 请选择地域/)
+  assert.match(host, /needsRegion/)
+  assert.match(readme, /可以不带 region/)
+  assert.match(readme, /默认选中广州/)
+  assert.match(readme, /禁止用 Ask question/)
+  assert.match(readme, /上一页 \/ 下一页/)
+  assert.match(readme, /设置 → 插件 → 云资源/)
+  assert.match(readme, /x-cos-copy-source/)
+  assert.match(client, /下一页/)
+  assert.match(client, /id: "ci-cos-file-next"/)
+  assert.match(client, /id: "ci-cos-file-prev"/)
+  assert.doesNotMatch(client, /className: "ci-page-btns" \},\)/)
+  assert.doesNotMatch(client, /id: "ci-cos-load-more"/)
+  assert.doesNotMatch(client, /加载更多/)
+  assert.doesNotMatch(client, /一层过多可翻页/)
+  assert.doesNotMatch(client, /已加载 \$\{/)
+  assert.match(client, /仅搜索当前页的文件/)
+  assert.match(client, /id: "ci-cos-cred-err"/)
+  assert.match(client, /result\.errors/)
+  assert.match(client, /function formatFileTime/)
+  assert.match(client, /na-siliconvalley/)
+  assert.match(client, /eu-frankfurt/)
+  assert.match(client, /ap-beijing-fsi/)
+  assert.match(client, /setTimeout\(\(\) => fetchBuckets/)
+  assert.match(client, /id: "ci-cos-presign-url"/)
+  assert.match(client, /readOnly: true/)
+  assert.match(client, /剪贴板不可用/)
+  assert.match(client, /stat\.copied === false && stat\.expiresSec/)
+  assert.match(client, /function isPresignStat/)
+  assert.match(client, /function detailStatRows/)
+  assert.match(client, /stat\.address/)
+  assert.doesNotMatch(client, /stat\.url && !stat\.copied/)
+  assert.match(client, /fileSeq/)
+  assert.match(client, /if \(n !== fileSeq\.current\) return/)
+  assert.match(client, /withoutAp\.replace\(\/-\/g, ""\)/)
+  assert.match(client, /列表已截断，但未返回下一页标记/)
+  assert.match(host, /对象存储 · 请先配置凭证/)
+})
+
+test('g3.2 object.stat modal is not the presign clipboard-fail dialog', () => {
+  const src = read('src/client.js')
+  const start = src.indexOf('function isPresignStat')
+  const end = src.indexOf('\n    function matchCosRegion', start)
+  assert.ok(start >= 0 && end > start)
+  const helpers = new Function(`
+    ${src.slice(start, end)}
+    return { isPresignStat, detailStatRows };
+  `)() as {
+    isPresignStat: (stat: unknown) => boolean
+    detailStatRows: (stat: unknown) => Array<[string, unknown]>
+  }
+  const stat = {
+    name: 'readme.txt',
+    sizeLabel: '10 B',
+    storageClass: '标准存储',
+    lastModified: '2025-02-01 00:00:00',
+    address: 'https://assets-1250000000.cos.ap-guangzhou.myqcloud.com/readme.txt',
+    url: 'https://assets-1250000000.cos.ap-guangzhou.myqcloud.com/readme.txt',
+  }
+  assert.equal(helpers.isPresignStat(stat), false)
+  const rows = helpers.detailStatRows(stat)
+  assert.deepEqual(rows.map((row) => row[0]), ['名称', '大小', '存储类型', '修改时间', '对象地址'])
+  assert.equal(rows[0][1], 'readme.txt')
+  assert.equal(rows[1][1], '10 B')
+  assert.doesNotMatch(JSON.stringify(rows), /剪贴板不可用/)
+  const presignFail = { url: 'https://signed.example/tmp', copied: false, expiresSec: 900 }
+  assert.equal(helpers.isPresignStat(presignFail), true)
+  assert.deepEqual(helpers.detailStatRows(presignFail), [])
+})
+
+test('g3.1 client region fallback ids and compact tokens stay aligned with COS_REGIONS', () => {
+  const client = read('src/client.js')
+  for (const region of COS_REGIONS) {
+    assert.match(client, new RegExp(`id: "${region.id}"`))
+  }
+  const start = client.indexOf('function normRegion')
+  const end = client.indexOf('\n    function isPresignStat', start)
+  const regionTokens = new Function('region', `${client.slice(start, end)}\nreturn regionTokens(region);`) as (
+    region: { id: string; label: string; aliases?: string[] },
+  ) => string[]
+  const tokens = regionTokens({ id: 'ap-beijing-fsi', label: '北京金融', aliases: ['beijing-fsi'] })
+  assert.equal(tokens.includes('beijingfsi'), true)
+  assert.equal(tokens.includes('ap-beijing-fsi'), true)
+})
+
+test('g1.3 settings card fields and layout stay schema-driven without COS extras', () => {
+  const client = read('src/client.js')
+  const start = client.indexOf('function ConfigCard')
+  const end = client.indexOf('const inject = ["slots"]')
+  const card = client.slice(start, end)
+  assert.match(card, /配置各云厂商 AccessKey，查询域名与解析记录/)
+  assert.match(card, /provider\.fields/)
+  assert.match(card, /SecretId|field\.label/)
+  assert.doesNotMatch(card, /默认地域|defaultRegion|COS 地域/)
+  assert.doesNotMatch(card, /创建存储桶|文件列表|CosRegionCombo/)
+  assert.match(card, /"产品模块"/)
+  assert.match(card, /className: "ci-cfg-mod-list"/)
+  assert.match(card, /写操作免确认（删除仍会确认）/)
 })
 
 test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () => {

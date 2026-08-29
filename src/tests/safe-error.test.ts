@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { COS_SAFE_ERRORS } from '../providers/tencent/products/cos.js'
 import { actionErrorMessage, publicErrorMessage } from '../core/safe-error.js'
 import { TencentApiError } from '../providers/tencent/client.js'
 
@@ -80,4 +81,18 @@ test('actionErrorMessage keeps module business copy for the HTTP 400 path', () =
     '云厂商鉴权失败，请检查设置中的密钥',
   )
   assert.doesNotMatch(actionErrorMessage(new Error('got AKIDabcdefghijklmnop')), /AKID/)
+})
+
+test('g2.3 publicErrorMessage keeps COS rename/folder-delete local hints', () => {
+  assert.equal(
+    publicErrorMessage('已复制到新名称，但源对象删除失败，请手动删除源文件'),
+    '已复制到新名称，但源对象删除失败，请手动删除源文件',
+  )
+  assert.equal(
+    publicErrorMessage('已删除 1 个对象，剩余 2 个未删尽，请重试'),
+    '已删除 1 个对象，剩余 2 个未删尽，请重试',
+  )
+  for (const message of COS_SAFE_ERRORS) {
+    assert.equal(publicErrorMessage(message), message, message)
+  }
 })

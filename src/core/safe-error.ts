@@ -14,6 +14,16 @@ const SAFE_SNIPPETS = [
   '无法连接实例',
   '网络不可达',
   'unknown method',
+  '请先选择地域',
+  '存储桶',
+  '文件夹',
+  '不能超过',
+  '不支持重命名',
+  '未列尽',
+  '未删尽',
+  '源对象删除失败',
+  '对象已存在',
+  '缺少文件',
 ]
 
 const CODE_HINTS: Record<string, string> = {
@@ -32,6 +42,11 @@ const CODE_HINTS: Record<string, string> = {
   RequestLimitExceeded: '请求过于频繁，请稍后重试',
   LimitExceeded: '超出配额',
   InternalError: '云厂商请求失败',
+  AccessDenied: '当前密钥没有该操作的权限',
+  NoSuchBucket: '存储桶不存在',
+  NoSuchKey: '对象不存在',
+  BucketNotEmpty: '存储桶非空，请先清空对象',
+  EntityTooLarge: '上传文件不能超过 20MB',
 }
 
 const SECRET_RE = /AKID[0-9A-Za-z]{8,}|LTAI[0-9A-Za-z]{8,}|sk-[A-Za-z0-9]{16,}|-----BEGIN |\bsecret(?:id|key)\b\s*[:=]/i
