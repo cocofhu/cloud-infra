@@ -13,7 +13,8 @@ window.__ModuleLoader__.load({
 .ci-bar-title{font-size:14px;font-weight:650;line-height:22px;color:var(--dsw-alias-label-primary)}
 .ci-bar-count{color:var(--dsw-alias-label-tertiary);font-size:12px}
 .ci-search-wrap{position:relative;width:min(220px,100%);flex:none}
-.ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption);pointer-events:none}
+.ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption);pointer-events:none;display:flex;align-items:center;justify-content:center;width:14px;height:14px}
+.ci-search-ico .ci-spin{margin:0}
 .ci-search{width:100%;height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 28px 0 32px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none}
 .ci-search::-webkit-search-cancel-button,.ci-search::-webkit-search-decoration{appearance:none;-webkit-appearance:none;display:none}
 .ci-search:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
@@ -327,6 +328,35 @@ window.__ModuleLoader__.load({
 
     function Spin() {
       return h("span", { className: "ci-spin", "aria-hidden": "true" });
+    }
+
+    function SearchField({ value, onChange, onSubmit, busy, placeholder }) {
+      return h("div", { className: "ci-search-wrap" },
+        busy
+          ? h("span", { className: "ci-search-ico", "aria-hidden": "true" }, h(Spin))
+          : h(SearchIcon),
+        h("input", {
+          className: "ci-search",
+          type: "search",
+          placeholder: placeholder || "搜索 ID / 名称 / IP",
+          value: value || "",
+          onChange: (e) => onChange && onChange(e.target.value),
+          onKeyDown: (e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            onSubmit && onSubmit(e.target.value);
+          },
+        }),
+        value ? h("button", {
+          type: "button",
+          className: "ci-search-x",
+          onClick: () => {
+            onChange && onChange("");
+            onSubmit && onSubmit("");
+          },
+          "aria-label": "清空",
+        }, "×") : null,
+      );
     }
 
     function inferColumns(item) {
@@ -853,7 +883,7 @@ window.__ModuleLoader__.load({
       ];
     }
 
-    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery }) {
+    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery, onSubmit, busy }) {
       const [localRegion, setLocalRegion] = useState("华南地区（广州）");
       const [localQ, setLocalQ] = useState("");
       const regionValue = onRegion ? (region || defaultRegionName(regions)) : localRegion;
@@ -882,22 +912,13 @@ window.__ModuleLoader__.load({
             h("span", { className: "ci-bar-title" }, "实例"),
             h(RegionSelect, { regions: regionNames, value: regionValue, onChange: setRegion }),
           ),
-          h("div", { className: "ci-search-wrap" },
-            h(SearchIcon),
-            h("input", {
-              className: "ci-search",
-              type: "search",
-              placeholder: "搜索 ID / 名称 / IP",
-              value: qValue,
-              onChange: (e) => setQ(e.target.value),
-            }),
-            qValue ? h("button", {
-              type: "button",
-              className: "ci-search-x",
-              onClick: () => setQ(""),
-              "aria-label": "清空",
-            }, "×") : null,
-          ),
+          h(SearchField, {
+            value: qValue,
+            onChange: setQ,
+            onSubmit: onSubmit,
+            busy,
+            placeholder: "搜索 ID / 名称 / IP",
+          }),
         ),
         rows.length ? h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
@@ -923,11 +944,13 @@ window.__ModuleLoader__.load({
             h("td", null, cellValue(item, "实例计费模式") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : h("div", { key: "empty", className: "ci-empty" }, emptyHint || (qValue ? `没有匹配「${qValue}」的实例` : "没有匹配的实例")),
+        )) : busy
+          ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…")
+          : h("div", { key: "empty", className: "ci-empty" }, emptyHint || (qValue ? `没有匹配「${qValue}」的实例` : "没有匹配的实例")),
       ];
     }
 
-    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery }) {
+    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery, onSubmit, busy }) {
       const regionValue = region || defaultRegionName(regions);
       const qValue = onQuery ? (q || "") : "";
       const rows = Array.isArray(items) ? items : [];
@@ -937,22 +960,13 @@ window.__ModuleLoader__.load({
             h("span", { className: "ci-bar-title" }, "服务器"),
             h(RegionSelect, { regions, value: regionValue, onChange: onRegion }),
           ),
-          h("div", { className: "ci-search-wrap" },
-            h(SearchIcon),
-            h("input", {
-              className: "ci-search",
-              type: "search",
-              placeholder: "搜索 ID / 名称 / IP",
-              value: qValue,
-              onChange: (e) => onQuery && onQuery(e.target.value),
-            }),
-            qValue ? h("button", {
-              type: "button",
-              className: "ci-search-x",
-              onClick: () => onQuery && onQuery(""),
-              "aria-label": "清空",
-            }, "×") : null,
-          ),
+          h(SearchField, {
+            value: qValue,
+            onChange: onQuery,
+            onSubmit: onSubmit,
+            busy,
+            placeholder: "搜索 ID / 名称 / IP",
+          }),
         ),
         rows.length ? h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
@@ -975,7 +989,9 @@ window.__ModuleLoader__.load({
             h("td", null, cellValue(item, "到期时间") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : h("div", { key: "empty", className: "ci-empty" }, emptyHint || "没有资源"),
+        )) : busy
+          ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…")
+          : h("div", { key: "empty", className: "ci-empty" }, emptyHint || "没有资源"),
       ];
     }
 
@@ -1197,7 +1213,7 @@ window.__ModuleLoader__.load({
       const onDraft = (value) => {
         setDraftQ(value);
         if (debounce.current) clearTimeout(debounce.current);
-        debounce.current = setTimeout(() => runSearch(value), 400);
+        debounce.current = setTimeout(() => runSearch(value), 800);
       };
       const counted = Number(total) || rows.length;
       const pages = Math.max(1, Math.ceil(counted / pageSize) || 1);
@@ -1312,10 +1328,10 @@ window.__ModuleLoader__.load({
         }),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
         errors.length ? h("div", { key: "perr", className: "ci-err" }, errors.map((e) => e.message).join("；")) : null,
-        listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : [
+        [
           showCvm && (!showLh || kindTab === "cvm") ? h(CvmConsole, {
             key: "cvm",
-            items: (kind === "cvm" ? rows : cvmRows).filter((row) => matchLocalInstance(row, draftQ)),
+            items: kind === "cvm" ? rows : cvmRows,
             pendingId,
             onOpen: openItem,
             onAction: onInstanceAction,
@@ -1328,10 +1344,12 @@ window.__ModuleLoader__.load({
             },
             q: draftQ,
             onQuery: onDraft,
+            onSubmit: runSearch,
+            busy: listBusy,
           }) : null,
           showLh && (!showCvm || kindTab === "lighthouse") ? h(LhConsole, {
             key: "lh",
-            items: (kind === "lighthouse" ? rows : lhRows).filter((row) => matchLocalInstance(row, draftQ)),
+            items: kind === "lighthouse" ? rows : lhRows,
             pendingId,
             onOpen: openItem,
             onAction: onInstanceAction,
@@ -1344,6 +1362,8 @@ window.__ModuleLoader__.load({
             },
             q: draftQ,
             onQuery: onDraft,
+            onSubmit: runSearch,
+            busy: listBusy,
           }) : null,
         ],
         h(Pager, {
@@ -1371,40 +1391,26 @@ window.__ModuleLoader__.load({
             h("span", { className: "ci-bar-title" }, kind === "domain" ? "域名解析" : "云资源"),
             h("span", { className: "ci-bar-count" }, `${counted} 条`),
           ),
-          h("div", { className: "ci-search-wrap" },
-            h(SearchIcon),
-            h("input", {
-              className: "ci-search",
-              type: "search",
-              placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
-              value: draftQ,
-              onChange: (e) => onDraft(e.target.value),
-              onKeyDown: (e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  runSearch(draftQ);
-                }
-              },
-            }),
-            draftQ ? h("button", {
-              type: "button",
-              className: "ci-search-x",
-              disabled: listBusy,
-              onClick: () => { setDraftQ(""); runSearch(""); },
-              "aria-label": "清空",
-            }, "×") : null,
-          ),
+          h(SearchField, {
+            value: draftQ,
+            onChange: onDraft,
+            onSubmit: runSearch,
+            busy: listBusy,
+            placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
+          }),
         ),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
-        listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ResourceTable, {
-          key: "table",
-          items: kind === "domain" ? rows : domainRows,
-          pendingId,
-          onOpen: openItem,
-          extraCols,
-          showProvider,
-          emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
-        }),
+        listBusy && !(kind === "domain" ? rows : domainRows).length
+          ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…")
+          : h(ResourceTable, {
+            key: "table",
+            items: kind === "domain" ? rows : domainRows,
+            pendingId,
+            onOpen: openItem,
+            extraCols,
+            showProvider,
+            emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
+          }),
         h(Pager, {
           key: "pager",
           total: counted,
