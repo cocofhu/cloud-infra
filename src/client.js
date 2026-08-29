@@ -13,8 +13,7 @@ window.__ModuleLoader__.load({
 .ci-bar-title{font-size:14px;font-weight:650;line-height:22px;color:var(--dsw-alias-label-primary)}
 .ci-bar-count{color:var(--dsw-alias-label-tertiary);font-size:12px}
 .ci-search-wrap{position:relative;width:min(220px,100%);flex:none}
-.ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption);pointer-events:none;display:flex;align-items:center;justify-content:center;width:14px;height:14px}
-.ci-search-ico .ci-spin{margin:0}
+.ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption);pointer-events:none}
 .ci-search{width:100%;height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 28px 0 32px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none}
 .ci-search::-webkit-search-cancel-button,.ci-search::-webkit-search-decoration{appearance:none;-webkit-appearance:none;display:none}
 .ci-search:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
@@ -82,6 +81,9 @@ window.__ModuleLoader__.load({
 .ci-actions{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 .ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;margin:8px 14px}
 .ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
+.ci-list-body{position:relative;min-height:160px}
+.ci-list-mask{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:8px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 82%,transparent);color:var(--dsw-alias-label-caption);font-size:13px;z-index:2}
+.ci-list-mask .ci-spin{margin:0}
 .ci-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:ci-spin .7s linear infinite;vertical-align:-1px;margin-right:6px}
 @keyframes ci-spin{to{transform:rotate(360deg)}}
 .ci-modal-mask{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--dsw-alias-bg-mask-3);box-sizing:border-box}
@@ -330,11 +332,9 @@ window.__ModuleLoader__.load({
       return h("span", { className: "ci-spin", "aria-hidden": "true" });
     }
 
-    function SearchField({ value, onChange, onSubmit, busy, placeholder }) {
+    function SearchField({ value, onChange, onSubmit, placeholder }) {
       return h("div", { className: "ci-search-wrap" },
-        busy
-          ? h("span", { className: "ci-search-ico", "aria-hidden": "true" }, h(Spin))
-          : h(SearchIcon),
+        h(SearchIcon),
         h("input", {
           className: "ci-search",
           type: "search",
@@ -356,6 +356,13 @@ window.__ModuleLoader__.load({
           },
           "aria-label": "清空",
         }, "×") : null,
+      );
+    }
+
+    function ListPane({ busy, children }) {
+      return h("div", { className: "ci-list-body" },
+        children,
+        busy ? h("div", { className: "ci-list-mask", "aria-live": "polite" }, h(Spin), "加载列表…") : null,
       );
     }
 
@@ -916,11 +923,11 @@ window.__ModuleLoader__.load({
             value: qValue,
             onChange: setQ,
             onSubmit: onSubmit,
-            busy,
             placeholder: "搜索 ID / 名称 / IP",
           }),
         ),
-        rows.length ? h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
+        h(ListPane, { key: "body", busy },
+          rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
             ["ID/名称", "状态", "可用区", "实例类型", "操作系统", "实例配置", "主IPv4地址", "实例计费模式", "操作"]
               .map((label) => h("th", { key: label }, label)),
@@ -944,9 +951,8 @@ window.__ModuleLoader__.load({
             h("td", null, cellValue(item, "实例计费模式") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : busy
-          ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…")
-          : h("div", { key: "empty", className: "ci-empty" }, emptyHint || (qValue ? `没有匹配「${qValue}」的实例` : "没有匹配的实例")),
+        )) : h("div", { className: "ci-empty" }, emptyHint || (qValue ? `没有匹配「${qValue}」的实例` : "没有匹配的实例")),
+        ),
       ];
     }
 
@@ -964,11 +970,11 @@ window.__ModuleLoader__.load({
             value: qValue,
             onChange: onQuery,
             onSubmit: onSubmit,
-            busy,
             placeholder: "搜索 ID / 名称 / IP",
           }),
         ),
-        rows.length ? h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
+        h(ListPane, { key: "body", busy },
+          rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
             ["ID/名称", "状态", "地域", "公网 IP", "套餐", "到期时间", "操作"].map((label) => h("th", { key: label }, label)),
           )),
@@ -989,9 +995,8 @@ window.__ModuleLoader__.load({
             h("td", null, cellValue(item, "到期时间") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : busy
-          ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…")
-          : h("div", { key: "empty", className: "ci-empty" }, emptyHint || "没有资源"),
+        )) : h("div", { className: "ci-empty" }, emptyHint || "没有资源"),
+        ),
       ];
     }
 
@@ -1395,14 +1400,12 @@ window.__ModuleLoader__.load({
             value: draftQ,
             onChange: onDraft,
             onSubmit: runSearch,
-            busy: listBusy,
             placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
           }),
         ),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
-        listBusy && !(kind === "domain" ? rows : domainRows).length
-          ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…")
-          : h(ResourceTable, {
+        h(ListPane, { key: "body", busy: listBusy },
+          h(ResourceTable, {
             key: "table",
             items: kind === "domain" ? rows : domainRows,
             pendingId,
@@ -1411,6 +1414,7 @@ window.__ModuleLoader__.load({
             showProvider,
             emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
           }),
+        ),
         h(Pager, {
           key: "pager",
           total: counted,
