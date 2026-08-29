@@ -133,7 +133,13 @@ details.ci-cfg>summary.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:
 .ci-filter:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}
 .ci-score{border:0;background:none;padding:0;cursor:pointer;font:inherit;font-weight:600;color:var(--dsw-alias-state-warn-label)}
 .ci-score:hover{text-decoration:underline}
+.ci-nav{border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-groups{display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px 6px}
+.ci-group{height:28px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;font-size:13px}
+.ci-group.on{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:600}
+.ci-group:disabled,.ci-tab:disabled,.ci-chip-btn:disabled{opacity:.45;cursor:wait}
 .ci-tabs{display:flex;gap:0;overflow:auto;border-bottom:1px solid var(--dsw-alias-border-l1);padding:0 8px}
+.ci-nav .ci-tabs{border-bottom:0;padding:0 8px 6px}
 .ci-tab{padding:8px 10px;color:var(--dsw-alias-label-tertiary);white-space:nowrap;border:0;border-bottom:2px solid transparent;background:none;cursor:pointer;font:inherit;font-size:13px}
 .ci-tab.on{color:var(--dsw-alias-brand-primary);border-bottom-color:var(--dsw-alias-brand-primary);font-weight:600}
 .ci-subtabs{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px 0}
@@ -789,21 +795,84 @@ details.ci-cfg>summary.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:
       );
     }
 
-    function ChipRow({ items, active, onPick }) {
+    function ChipRow({ items, active, onPick, disabled }) {
       if (!Array.isArray(items) || !items.length) return null;
       return h("div", { className: "ci-subtabs" },
         items.map((item) => h("button", {
           key: item.id,
           type: "button",
+          disabled: !!disabled,
           className: "ci-chip-btn" + (item.id === active ? " on" : ""),
-          onClick: () => onPick(item.id),
+          onClick: () => { if (!disabled) onPick(item.id); },
         }, item.label)),
       );
     }
 
+    // MySQL: 异常诊断 / 性能趋势 / 实时会话 / 慢SQL分析 / 空间分析 / SQL优化 / 自治中心 / 死锁可视化 / 事件通知 / 健康报告
+    // Redis: 内存分析 / 访问分析 / 慢日志分析; MongoDB: 索引推荐 / 会话. No left nav.
+    const TAB_GROUPS = [
+      { id: "diag", label: "诊断", ids: ["diag", "deadlock", "notify"] },
+      { id: "perf", label: "性能", ids: ["trend", "slow", "sqlopt", "memory", "access", "index"] },
+      { id: "session", label: "会话", ids: ["session"] },
+      { id: "space", label: "空间", ids: ["space"] },
+      { id: "gov", label: "治理", ids: ["autonomy", "report"] },
+    ];
+
+    function tabGroupsOf(tabs) {
+      const byId = new Map((tabs || []).map((tab) => [tab.id, tab]));
+      return TAB_GROUPS.map((group) => ({
+        ...group,
+        tabs: group.ids.map((id) => byId.get(id)).filter(Boolean),
+      })).filter((group) => group.tabs.length);
+    }
+
+    function DbbrainNav({ tabs, active, loading, onPick }) {
+      const list = Array.isArray(tabs) ? tabs : [];
+      if (!list.length) return null;
+      const pick = (id) => {
+        if (loading || id === active) return;
+        onPick(id);
+      };
+      if (list.length <= 4) {
+        return h("div", { className: "ci-tabs" },
+          list.map((tab) => h("button", {
+            key: tab.id,
+            type: "button",
+            disabled: !!loading,
+            className: "ci-tab" + (tab.id === active ? " on" : ""),
+            onClick: () => pick(tab.id),
+          }, tab.label)),
+        );
+      }
+      const groups = tabGroupsOf(list);
+      const current = groups.find((group) => group.tabs.some((tab) => tab.id === active)) || groups[0];
+      return h("div", { className: "ci-nav" },
+        h("div", { className: "ci-groups" },
+          groups.map((group) => h("button", {
+            key: group.id,
+            type: "button",
+            disabled: !!loading,
+            className: "ci-group" + (group.id === current?.id ? " on" : ""),
+            onClick: () => {
+              if (group.tabs.some((tab) => tab.id === active)) return;
+              pick(group.tabs[0].id);
+            },
+          }, group.label)),
+        ),
+        current && current.tabs.length > 1 ? h("div", { className: "ci-tabs" },
+          current.tabs.map((tab) => h("button", {
+            key: tab.id,
+            type: "button",
+            disabled: !!loading,
+            className: "ci-tab" + (tab.id === active ? " on" : ""),
+            onClick: () => pick(tab.id),
+          }, tab.label)),
+        ) : null,
+      );
+    }
+
     function DbbrainDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
-      // Tabs from module: 异常诊断 / 性能趋势 / 实时会话 / 慢SQL分析 / 空间分析 / SQL优化 / 自治中心 / 健康报告;
-      // Redis 内存分析 / 访问分析 / 慢日志分析; MongoDB 索引推荐 / 会话. No left nav.
+      // Grouped nav when many tabs (诊断/性能/会话/空间/治理). Redis/Mongo keep a short tab row.
       const ident = instanceIdentity(item);
       const [confirm, setConfirm] = useState(null);
       const [busy, setBusy] = useState(false);
@@ -812,15 +881,17 @@ details.ci-cfg>summary.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:
       const [formDraft, setFormDraft] = useState({});
       const [customStart, setCustomStart] = useState("");
       const [customEnd, setCustomEnd] = useState("");
+      const [pendingTab, setPendingTab] = useState("");
       useEffect(() => {
         setSqlDraft(detail?.form?.values?.sql || "");
         setFormDraft(detail?.form?.values || {});
         setErr("");
+        setPendingTab("");
       }, [item.id, detail?.activeTab, detail?.form?.id, detail?.form?.values?.sql]);
       const filtersOf = (extra) => ({
         product: ident.product,
         region: ident.region,
-        tab: extra.tab != null ? extra.tab : (detail?.activeTab || "diag"),
+        tab: extra.tab != null ? extra.tab : (pendingTab || detail?.activeTab || "diag"),
         subTab: extra.subTab != null ? extra.subTab : (detail?.activeSubTab || ""),
         range: extra.range != null ? extra.range : (detail?.activeRange || ""),
         eventId: extra.eventId != null ? extra.eventId : "",
@@ -829,6 +900,11 @@ details.ci-cfg>summary.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:
         startTime: extra.startTime != null ? extra.startTime : customStart,
         endTime: extra.endTime != null ? extra.endTime : customEnd,
       });
+      const pickTab = (id) => {
+        setPendingTab(id);
+        onReload(filtersOf({ tab: id, subTab: "", eventId: "", range: "" }));
+      };
+      const activeTab = pendingTab || detail?.activeTab;
       const run = async (action, payload) => {
         setBusy(true);
         setErr("");
@@ -912,93 +988,95 @@ details.ci-cfg>summary.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:
           h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
           h("span", { className: "ci-head-t", title: item.title }, item.title),
         ),
-        loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
-        !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
-        !loading && detail ? [
+        !detail && loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        !detail && !loading && error ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
+        detail ? [
           h("div", { key: "chips", className: "ci-chips" },
             (detail.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" },
               row.label,
               h("b", null, row.value),
             )),
           ),
-          h("div", { key: "tabs", className: "ci-tabs" },
-            (detail.tabs || []).map((tab) => h("button", {
-              key: tab.id,
-              type: "button",
-              className: "ci-tab" + (tab.id === detail.activeTab ? " on" : ""),
-              onClick: () => onReload(filtersOf({ tab: tab.id, subTab: "", eventId: "", range: "" })),
-            }, tab.label)),
-          ),
-          h(ChipRow, { key: "sub", items: detail.subTabs, active: detail.activeSubTab, onPick: (id) => onReload(filtersOf({ subTab: id, eventId: "" })) }),
-          h(ChipRow, { key: "range", items: detail.ranges, active: detail.activeRange, onPick: (id) => onReload(filtersOf({ range: id, eventId: "" })) }),
-          detail.activeRange === "custom" ? h("div", { key: "custom", className: "ci-filters" },
-            h("input", { className: "ci-filter", type: "text", placeholder: "开始 2019-01-01 00:00:00", value: customStart, onChange: (e) => setCustomStart(e.target.value) }),
-            h("input", { className: "ci-filter", type: "text", placeholder: "结束", value: customEnd, onChange: (e) => setCustomEnd(e.target.value) }),
-            h("button", { type: "button", className: "ci-mini", onClick: () => onReload(filtersOf({ range: "custom", startTime: customStart, endTime: customEnd })) }, "应用"),
-          ) : null,
-          err ? h("p", { key: "err", className: "ci-err" }, err) : null,
-          (detail.hints || []).map((hint, idx) => h("p", { key: "h" + idx, className: "ci-hint" }, hint)),
-          detail.form ? h("div", { key: "form", style: { padding: "8px 14px" } },
-            (detail.form.fields || []).map((field) => h("div", { className: "ci-field", key: field.key },
-              h("label", null, field.label),
-              h(field.kind === "textarea" ? "textarea" : "input", {
-                placeholder: field.placeholder || "",
-                value: field.key === "sql" ? sqlDraft : (formDraft[field.key] || ""),
-                onChange: (e) => {
-                  const next = e.target.value;
-                  if (field.key === "sql") setSqlDraft(next);
-                  setFormDraft((prev) => ({ ...prev, [field.key]: next }));
-                },
-              }),
-            )),
-            h("button", {
-              type: "button",
-              className: "ci-mini primary",
-              disabled: busy,
-              onClick: () => {
-                if (detail.form.action === "session.kill") {
-                  const duration = String(formDraft.duration || "").trim();
-                  request(
-                    { id: "session.kill", label: "创建中断任务", confirm: "always" },
-                    {
-                      duration,
-                      time: String(formDraft.time || "").trim(),
-                      host: String(formDraft.host || "").trim(),
-                      type: String(formDraft.type || "").trim(),
-                    },
-                    `将创建中断任务，持续时间 ${duration || "?"} 秒，可能中断该实例上多条匹配会话，不只针对某一条 sessionId。此操作不可撤销。`,
-                  );
-                  return;
-                }
-                onReload(filtersOf({ sql: sqlDraft }));
-              },
-            }, detail.form.submitLabel || "分析"),
-          ) : null,
-          detail.activeTab === "report" ? h("div", { key: "rpt", className: "ci-sec" },
-            h("span", { className: "ci-sec-t" }, "健康报告"),
-            h("button", {
-              type: "button",
-              className: "ci-mini primary",
-              onClick: () => request(
-                { id: "report.create", label: "生成健康报告", confirm: "default" },
-                { range: detail.activeRange || "24h" },
-                "确认生成健康报告？",
-              ),
-            }, "生成健康报告"),
-          ) : null,
-          (detail.tables || []).map((table) => h("div", { key: table.id || table.title, className: "ci-table-wrap" },
-            table.title ? h("div", { className: "ci-sec" }, h("span", { className: "ci-sec-t" }, table.title)) : null,
-            table.rows && table.rows.length ? h("table", { className: "ci-table" },
-              h("thead", null, h("tr", null,
-                (table.columns || []).map((col) => h("th", { key: col }, col)),
-                h("th", null, "操作"),
+          h(DbbrainNav, {
+            key: "tabs",
+            tabs: detail.tabs,
+            active: activeTab,
+            loading,
+            onPick: pickTab,
+          }),
+          loading ? h("div", { key: "tabload", className: "ci-load" }, h(Spin), "加载中…") : [
+            h(ChipRow, { key: "sub", items: detail.subTabs, active: detail.activeSubTab, disabled: loading, onPick: (id) => onReload(filtersOf({ subTab: id, eventId: "" })) }),
+            h(ChipRow, { key: "range", items: detail.ranges, active: detail.activeRange, disabled: loading, onPick: (id) => onReload(filtersOf({ range: id, eventId: "" })) }),
+            detail.activeRange === "custom" ? h("div", { key: "custom", className: "ci-filters" },
+              h("input", { className: "ci-filter", type: "text", placeholder: "开始 2019-01-01 00:00:00", value: customStart, onChange: (e) => setCustomStart(e.target.value) }),
+              h("input", { className: "ci-filter", type: "text", placeholder: "结束", value: customEnd, onChange: (e) => setCustomEnd(e.target.value) }),
+              h("button", { type: "button", className: "ci-mini", onClick: () => onReload(filtersOf({ range: "custom", startTime: customStart, endTime: customEnd })) }, "应用"),
+            ) : null,
+            err ? h("p", { key: "err", className: "ci-err" }, err) : null,
+            (detail.hints || []).map((hint, idx) => h("p", { key: "h" + idx, className: "ci-hint" }, hint)),
+            detail.form ? h("div", { key: "form", style: { padding: "8px 14px" } },
+              (detail.form.fields || []).map((field) => h("div", { className: "ci-field", key: field.key },
+                h("label", null, field.label),
+                h(field.kind === "textarea" ? "textarea" : "input", {
+                  placeholder: field.placeholder || "",
+                  value: field.key === "sql" ? sqlDraft : (formDraft[field.key] || ""),
+                  onChange: (e) => {
+                    const next = e.target.value;
+                    if (field.key === "sql") setSqlDraft(next);
+                    setFormDraft((prev) => ({ ...prev, [field.key]: next }));
+                  },
+                }),
               )),
-              h("tbody", null, table.rows.map((row, idx) => h("tr", { key: row.sessionId || row.eventId || row.taskId || idx },
-                (table.columns || []).map((col) => h("td", { key: col }, row[col] || "")),
-                h("td", { className: "ci-ops-cell" }, rowActions(table, row)),
-              ))),
-            ) : h("div", { className: "ci-empty" }, table.empty || "暂无数据"),
-          )),
+              h("button", {
+                type: "button",
+                className: "ci-mini primary",
+                disabled: busy || loading,
+                onClick: () => {
+                  if (detail.form.action === "session.kill") {
+                    const duration = String(formDraft.duration || "").trim();
+                    request(
+                      { id: "session.kill", label: "创建中断任务", confirm: "always" },
+                      {
+                        duration,
+                        time: String(formDraft.time || "").trim(),
+                        host: String(formDraft.host || "").trim(),
+                        type: String(formDraft.type || "").trim(),
+                      },
+                      `将创建中断任务，持续时间 ${duration || "?"} 秒，可能中断该实例上多条匹配会话，不只针对某一条 sessionId。此操作不可撤销。`,
+                    );
+                    return;
+                  }
+                  onReload(filtersOf({ sql: sqlDraft }));
+                },
+              }, detail.form.submitLabel || "分析"),
+            ) : null,
+            activeTab === "report" ? h("div", { key: "rpt", className: "ci-sec" },
+              h("span", { className: "ci-sec-t" }, "健康报告"),
+              h("button", {
+                type: "button",
+                className: "ci-mini primary",
+                disabled: loading,
+                onClick: () => request(
+                  { id: "report.create", label: "生成健康报告", confirm: "default" },
+                  { range: detail.activeRange || "24h" },
+                  "确认生成健康报告？",
+                ),
+              }, "生成健康报告"),
+            ) : null,
+            (detail.tables || []).map((table) => h("div", { key: table.id || table.title, className: "ci-table-wrap" },
+              table.title ? h("div", { className: "ci-sec" }, h("span", { className: "ci-sec-t" }, table.title)) : null,
+              table.rows && table.rows.length ? h("table", { className: "ci-table" },
+                h("thead", null, h("tr", null,
+                  (table.columns || []).map((col) => h("th", { key: col }, col)),
+                  h("th", null, "操作"),
+                )),
+                h("tbody", null, table.rows.map((row, idx) => h("tr", { key: row.sessionId || row.eventId || row.taskId || idx },
+                  (table.columns || []).map((col) => h("td", { key: col }, row[col] || "")),
+                  h("td", { className: "ci-ops-cell" }, rowActions(table, row)),
+                ))),
+              ) : h("div", { className: "ci-empty" }, table.empty || "暂无数据"),
+            )),
+          ],
         ] : null,
         h(ConfirmDialog, {
           key: "confirm",
@@ -1038,6 +1116,7 @@ details.ci-cfg>summary.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:
       const [product, setProduct] = useState((fromTool && fromTool[0] && fromTool[0].product) || "mysql");
       const [region, setRegion] = useState("");
       const seq = useRef(0);
+      const detailSeq = useRef(0);
       const debounce = useRef(0);
       const refreshSkip = () => {
         api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
@@ -1112,6 +1191,7 @@ details.ci-cfg>summary.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:
       const page = Math.floor(offset / pageSize) + 1;
       const goPage = (next) => fetchList((next - 1) * pageSize, String(activeQ || "").trim());
       const openItem = async (item, tab) => {
+        const n = ++detailSeq.current;
         const filters = {
           tab: tab || (item.kind === "dbbrain" ? "diag" : ""),
           product: item.product || product,
@@ -1122,23 +1202,34 @@ details.ci-cfg>summary.ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:
         refreshSkip();
         try {
           const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: item.title, filters });
+          if (n !== detailSeq.current) return;
           setSession({ item, loading: false, detail, filters });
         } catch (e) {
+          if (n !== detailSeq.current) return;
           setSession({ item, loading: false, detail: null, filters, error: publicErrorMessage(e) });
         } finally {
-          setPendingId("");
+          if (n === detailSeq.current) setPendingId("");
         }
       };
       const reload = async (extra) => {
         if (!session?.item) return;
+        const item = session.item;
+        const n = ++detailSeq.current;
         const filters = { ...(session.filters || {}), ...(extra || {}) };
-        const detail = await api("detail", {
-          moduleId: session.item.moduleId,
-          id: session.item.id,
-          title: session.item.title,
-          filters,
-        });
-        setSession((cur) => cur ? { ...cur, detail, filters, loading: false, error: "" } : cur);
+        setSession((cur) => cur ? { ...cur, loading: true, filters, error: "" } : cur);
+        try {
+          const detail = await api("detail", {
+            moduleId: item.moduleId,
+            id: item.id,
+            title: item.title,
+            filters,
+          });
+          if (n !== detailSeq.current) return;
+          setSession((cur) => cur && cur.item.id === item.id ? { ...cur, detail, filters, loading: false, error: "" } : cur);
+        } catch (e) {
+          if (n !== detailSeq.current) return;
+          setSession((cur) => cur && cur.item.id === item.id ? { ...cur, loading: false, error: publicErrorMessage(e) } : cur);
+        }
       };
       if (running) return null;
       const errors = payload?.errors || [];
