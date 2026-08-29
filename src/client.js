@@ -12,7 +12,7 @@ window.__ModuleLoader__.load({
 .ci-bar-left{display:flex;align-items:baseline;gap:8px;flex:none;white-space:nowrap}
 .ci-bar-title{font-size:14px;font-weight:650;line-height:22px;color:var(--dsw-alias-label-primary)}
 .ci-bar-count{color:var(--dsw-alias-label-tertiary);font-size:12px}
-.ci-search-wrap{position:relative;flex:1 1 140px;width:auto;min-width:112px;max-width:200px}
+.ci-search-wrap{position:relative;width:200px;flex:none}
 .ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption);pointer-events:none}
 .ci-search{width:100%;height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 28px 0 32px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none}
 .ci-search::-webkit-search-cancel-button,.ci-search::-webkit-search-decoration{appearance:none;-webkit-appearance:none;display:none}
@@ -63,12 +63,12 @@ window.__ModuleLoader__.load({
 .ci-chip b{color:var(--dsw-alias-label-primary);margin-left:4px;font-weight:600}
 .ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
 .ci-sec-t{font-size:13px;font-weight:650}
-.ci-table-wrap{width:100%;overflow:auto}
-.ci-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
-.ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle}
+.ci-table-wrap{width:100%;overflow-x:auto}
+.ci-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:13px}
+.ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle;white-space:nowrap;word-break:normal}
 .ci-table th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px}
-.ci-table td{word-break:break-all;color:var(--dsw-alias-label-secondary)}
-.ci-table td.ci-ops-cell{white-space:nowrap;word-break:normal}
+.ci-table td{color:var(--dsw-alias-label-secondary)}
+.ci-table td.ci-ops-cell{white-space:nowrap}
 .ci-table tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-rec-page{margin:0}
 .ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px;flex:none;white-space:nowrap}
@@ -1630,11 +1630,6 @@ window.__ModuleLoader__.load({
                     if (!target) return setNotice("请先选择实例");
                     askListAction(target, "instance.restart", `确认重启实例 ${target.title}？`);
                   } }, "重启"),
-                  h("button", { key: "p", type: "button", className: "ci-mini", onClick: () => {
-                    const target = selectedItems[0] || rows[0];
-                    if (!target) return setNotice("请先选择实例");
-                    openItem(target, "数据库管理");
-                  } }, "参数设置"),
                 ] : null,
                 h("div", { className: "ci-search-wrap" },
                   h(SearchIcon),
