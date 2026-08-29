@@ -145,13 +145,13 @@ html[data-theme=dark] .ci-image,.ci-image[data-theme=dark]{--ci-title:#f7f8fb;co
 .ci-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .ci-chip-sel{height:32px;padding:0 10px 0 12px;border-radius:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--ci-title);font:inherit;display:flex;align-items:center;gap:8px}
 .ci-chip-sel span{color:var(--ci-muted);font-size:12px}
-.ci-chip-sel select{border:0;background:transparent;color:var(--ci-title);font:inherit;outline:none;max-width:160px;color-scheme:inherit}
+.ci-chip-sel select{border:0;background:transparent;color:var(--ci-title);font:inherit;outline:none;max-width:200px;color-scheme:inherit}
 .ci-chip-sel select option,.ci-field select option,.ci-root select option{background-color:Field;color:FieldText}
 [data-theme=light] .ci-chip-sel select,[data-theme=light] .ci-field select{color-scheme:light}
 [data-theme=dark] .ci-chip-sel select,[data-theme=dark] .ci-field select{color-scheme:dark}
-[data-theme=light] .ci-chip-sel select option,[data-theme=light] .ci-field select option{background-color:#fff;color:#0f1419}
-[data-theme=dark] .ci-chip-sel select option,[data-theme=dark] .ci-field select option{background-color:#262b36;color:#f7f8fb}
-@media (prefers-color-scheme: dark){html:not([data-theme=light]) .ci-chip-sel select,html:not([data-theme=light]) .ci-field select{color-scheme:dark}html:not([data-theme=light]) .ci-chip-sel select option,html:not([data-theme=light]) .ci-field select option{background-color:#262b36;color:#f7f8fb}}
+[data-theme=light] .ci-chip-sel select option,[data-theme=light] .ci-field select option{background-color:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}
+[data-theme=dark] .ci-chip-sel select option,[data-theme=dark] .ci-field select option{background-color:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+@media (prefers-color-scheme: dark){html:not([data-theme=light]) .ci-chip-sel select,html:not([data-theme=light]) .ci-field select{color-scheme:dark}html:not([data-theme=light]) .ci-chip-sel select option,html:not([data-theme=light]) .ci-field select option{background-color:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}}
 .ci-search-wide{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:12px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2)}
 .ci-search-wide:focus-within{border-color:var(--dsw-alias-brand-primary)}
 .ci-search-wide svg{flex:none;color:var(--ci-muted)}
@@ -743,26 +743,47 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
     const TCR_REGIONS = [
       { id: "ap-guangzhou", label: "广州" },
       { id: "ap-shanghai", label: "上海" },
-      { id: "ap-beijing", label: "北京" },
       { id: "ap-nanjing", label: "南京" },
+      { id: "ap-beijing", label: "北京" },
       { id: "ap-chengdu", label: "成都" },
+      { id: "ap-chongqing", label: "重庆" },
+      { id: "ap-hongkong", label: "中国香港" },
+      { id: "ap-singapore", label: "新加坡" },
+      { id: "ap-jakarta", label: "雅加达" },
+      { id: "ap-bangkok", label: "曼谷" },
+      { id: "ap-seoul", label: "首尔" },
+      { id: "ap-tokyo", label: "东京" },
+      { id: "na-ashburn", label: "弗吉尼亚" },
+      { id: "na-siliconvalley", label: "硅谷" },
+      { id: "sa-saopaulo", label: "圣保罗" },
+      { id: "eu-frankfurt", label: "法兰克福" },
     ];
     const PERSONAL_DOMAIN = "ccr.ccs.tencentyun.com";
     const DIGEST_WARNING = "注意：删除指定版本可能同时删除相同镜像 ID（SHA256）的其它版本。";
 
     function inferImageRegion(query, fallback) {
       const text = String(query || "");
-      const pairs = [
-        [/广州|guangzhou/i, "ap-guangzhou"],
-        [/上海|shanghai/i, "ap-shanghai"],
-        [/北京|beijing/i, "ap-beijing"],
-        [/南京|nanjing/i, "ap-nanjing"],
-        [/成都|chengdu/i, "ap-chengdu"],
-      ];
-      for (const [re, id] of pairs) {
-        if (re.test(text)) return id;
+      const catalog = TCR_REGIONS.slice().sort((a, b) => b.label.length - a.label.length);
+      for (const item of catalog) {
+        const re = new RegExp(item.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "|" + item.id, "i");
+        if (re.test(text)) return item.id;
       }
+      if (/香港/.test(text)) return "ap-hongkong";
       return fallback || "ap-guangzhou";
+    }
+
+    function normalizeRegions(list) {
+      if (!Array.isArray(list) || !list.length) return null;
+      const seen = new Set();
+      const rows = [];
+      for (const item of list) {
+        const id = String(item && item.id || "").trim();
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        const known = TCR_REGIONS.find((row) => row.id === id);
+        rows.push({ id, label: String(item.label || known?.label || id) });
+      }
+      return rows.length ? rows : null;
     }
 
     function imageCol(item, label) {
@@ -815,6 +836,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const provider = String(args.provider || "");
       const errors = payload?.errors || [];
       const [region, setRegion] = useState(payload?.region || inferImageRegion(initialQuery, "ap-guangzhou"));
+      const [regions, setRegions] = useState(normalizeRegions(payload?.regions) || TCR_REGIONS);
       const [instances, setInstances] = useState(Array.isArray(fromTool) ? fromTool : []);
       const [instanceId, setInstanceId] = useState((fromTool && fromTool[0] && fromTool[0].id) || "");
       const [view, setView] = useState("inst");
@@ -839,6 +861,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const toolSig = `${payload?.region || ""}|${(fromTool || []).map((i) => i.id).join(",")}|${(payload?.errors || []).length}|${args.kind || payload?.resourceKind || ""}`;
       useEffect(() => {
         if (payload?.region) setRegion(payload.region);
+        const nextRegions = normalizeRegions(payload?.regions);
+        if (nextRegions) setRegions(nextRegions);
         setDraftQ("");
         setErr(errors.map((e) => e.message).join("；"));
         if (fromTool && fromTool.length) {
@@ -866,6 +890,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           const nextId = keepId && items.some((item) => item.id === keepId) ? keepId : (items[0]?.id || "");
           setInstanceId(nextId);
           setTruncated(!!result.hasMore);
+          const nextRegions = normalizeRegions(result.regions);
+          if (nextRegions) setRegions(nextRegions);
           if (result.errors?.length) setErr(result.errors.map((e) => e.message).join("；"));
         } catch (e) {
           if (n !== seq.current) return;
@@ -1145,7 +1171,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               h("label", { className: "ci-chip-sel" },
                 h("span", null, "地域"),
                 h("select", { value: region, onChange: (e) => changeRegion(e.target.value) },
-                  TCR_REGIONS.map((item) => h("option", { key: item.id, value: item.id }, item.label)),
+                  (regions.some((item) => item.id === region) ? regions : [{ id: region, label: region }, ...regions]).map((item) => h("option", { key: item.id, value: item.id }, item.label)),
                 ),
               ),
               h("label", { className: "ci-chip-sel" },

@@ -9,7 +9,7 @@ import {
   registry,
 } from './registry.js'
 import { publicErrorMessage } from './safe-error.js'
-import type { ModuleError, PluginConfig, QueryResult, ResourceCard, ResourceModule } from './types.js'
+import type { ModuleError, PluginConfig, QueryResult, RegionOption, ResourceCard, ResourceModule } from './types.js'
 
 export interface QueryInput {
   kind?: string
@@ -61,6 +61,7 @@ export async function queryResources(
   let hasMore = false
   let region = String(input.region || '').trim()
   let instanceId = String(input.instanceId || '').trim()
+  let regions: RegionOption[] | undefined
 
   await Promise.allSettled(candidates.map(async (module) => {
     const providerDef = source.getProvider(module.provider)
@@ -95,6 +96,7 @@ export async function queryResources(
       if (result.hasMore) hasMore = true
       if (!region && result.region) region = result.region
       if (!instanceId && result.instanceId) instanceId = result.instanceId
+      if (!regions?.length && result.regions?.length) regions = result.regions
     } catch (err) {
       errors.push({ moduleId: module.id, message: publicErrorMessage(err) })
     }
@@ -112,6 +114,7 @@ export async function queryResources(
     hasMore,
     ...(region ? { region } : {}),
     ...(instanceId ? { instanceId } : {}),
+    ...(regions?.length ? { regions } : {}),
   }
 }
 

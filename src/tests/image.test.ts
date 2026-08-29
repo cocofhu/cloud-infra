@@ -71,12 +71,39 @@ test('g2.2 guangzhou list includes personal instance; shanghai does not', async 
   assert.equal(calls.find((row) => row.action === 'DescribeInstances' && row.region === 'ap-shanghai')?.region, 'ap-shanghai')
 })
 
+test('g2.2 list pulls TCR regions from DescribeRegions like the console', async () => {
+  const calls: Array<{ action: string; region?: string }> = []
+  const call = async (action: string, _payload: unknown, _creds: unknown, opts: { region?: string }) => {
+    calls.push({ action, region: opts.region })
+    if (action === 'DescribeRegions') return fixture('tcr-regions.json')
+    if (action === 'DescribeInstances') return fixture('tcr-instances-guangzhou.json')
+    return {}
+  }
+  const module = createImageModule(call as never)
+  const result = await module.list(ctx({ region: 'ap-guangzhou' }))
+  assert.equal(calls.some((row) => row.action === 'DescribeRegions'), true)
+  assert.deepEqual((result.regions || []).map((item) => item.id), [
+    'ap-guangzhou',
+    'ap-shanghai',
+    'ap-nanjing',
+    'ap-beijing',
+    'ap-chengdu',
+    'ap-chongqing',
+    'ap-hongkong',
+    'ap-singapore',
+  ])
+  assert.equal(result.regions?.find((item) => item.id === 'ap-hongkong')?.label, '中国香港')
+})
+
 test('inferRegion reads 上海 from query and defaults to guangzhou', () => {
   assert.deepEqual(inferRegion('上海 nginx'), { region: 'ap-shanghai', rest: 'nginx' })
   assert.equal(inferRegion('').region, 'ap-guangzhou')
+  assert.equal(inferRegion('香港 nginx').region, 'ap-hongkong')
   assert.equal(personalCard().columns?.find((col) => col.label === '访问域名')?.value, 'ccr.ccs.tencentyun.com')
   assert.deepEqual(parseInstanceRef('tencent.image:tcr-prod'), { moduleId: 'tencent.image', instanceId: 'tcr-prod' })
-  assert.equal(TCR_REGIONS.map((item) => item.id).join(','), 'ap-guangzhou,ap-shanghai,ap-beijing,ap-nanjing,ap-chengdu')
+  assert.ok(TCR_REGIONS.some((item) => item.id === 'ap-guangzhou'))
+  assert.ok(TCR_REGIONS.some((item) => item.id === 'ap-hongkong'))
+  assert.ok(TCR_REGIONS.length > 5)
 })
 
 test('resourceKeyword strips chat utterance so 查一下我的镜像 is not an instance filter', () => {

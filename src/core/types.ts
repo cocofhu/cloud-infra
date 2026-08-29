@@ -89,6 +89,11 @@ export interface ResourceAction {
   fields?: CredentialField[]
 }
 
+export interface RegionOption {
+  id: string
+  label: string
+}
+
 export interface ListResult {
   items: ResourceCard[]
   total?: number
@@ -96,6 +101,7 @@ export interface ListResult {
   hasMore?: boolean
   region?: string
   instanceId?: string
+  regions?: RegionOption[]
   errors?: ModuleError[]
 }
 
@@ -114,6 +120,7 @@ export interface QueryResult {
   hasMore?: boolean
   region?: string
   instanceId?: string
+  regions?: RegionOption[]
 }
 
 export interface ModuleContext {

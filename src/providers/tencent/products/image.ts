@@ -20,13 +20,26 @@ export const MODULE_ID = 'tencent.image'
 export const LIST_PAGE_SIZE = 100
 export const TRUNCATED_HINT = '仅显示前 100 条'
 
-export const TCR_REGIONS = [
-  { id: 'ap-guangzhou', label: '广州' },
-  { id: 'ap-shanghai', label: '上海' },
-  { id: 'ap-beijing', label: '北京' },
-  { id: 'ap-nanjing', label: '南京' },
-  { id: 'ap-chengdu', label: '成都' },
-] as const
+export const TCR_REGION_LABELS: Record<string, string> = {
+  'ap-guangzhou': '广州',
+  'ap-shanghai': '上海',
+  'ap-nanjing': '南京',
+  'ap-beijing': '北京',
+  'ap-chengdu': '成都',
+  'ap-chongqing': '重庆',
+  'ap-hongkong': '中国香港',
+  'ap-singapore': '新加坡',
+  'ap-jakarta': '雅加达',
+  'ap-bangkok': '曼谷',
+  'ap-seoul': '首尔',
+  'ap-tokyo': '东京',
+  'na-ashburn': '弗吉尼亚',
+  'na-siliconvalley': '硅谷',
+  'sa-saopaulo': '圣保罗',
+  'eu-frankfurt': '法兰克福',
+}
+
+export const TCR_REGIONS = Object.entries(TCR_REGION_LABELS).map(([id, label]) => ({ id, label }))
 
 export type TcrCall = typeof tcrCall
 
@@ -74,21 +87,22 @@ const ACTIONS: ResourceAction[] = [
 export const DIGEST_WARNING = '注意：删除指定版本可能同时删除相同镜像 ID（SHA256）的其它版本。'
 
 export function regionLabel(id: string): string {
-  return TCR_REGIONS.find((item) => item.id === id)?.label || id
+  const key = String(id || '').trim()
+  return TCR_REGION_LABELS[key] || key
+}
+
+function escapeRe(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 export function inferRegion(query: string): { region: string; rest: string } {
   const text = String(query || '').trim()
-  const pairs: Array<[RegExp, string]> = [
-    [/广州|guangzhou/i, 'ap-guangzhou'],
-    [/上海|shanghai/i, 'ap-shanghai'],
-    [/北京|beijing/i, 'ap-beijing'],
-    [/南京|nanjing/i, 'ap-nanjing'],
-    [/成都|chengdu/i, 'ap-chengdu'],
-  ]
-  for (const [re, id] of pairs) {
-    if (re.test(text)) return { region: id, rest: text.replace(re, ' ').replace(/\s+/g, ' ').trim() }
+  const catalog = [...TCR_REGIONS].sort((a, b) => b.label.length - a.label.length || b.id.length - a.id.length)
+  for (const item of catalog) {
+    const re = new RegExp(`${escapeRe(item.label)}|${escapeRe(item.id)}`, 'i')
+    if (re.test(text)) return { region: item.id, rest: text.replace(re, ' ').replace(/\s+/g, ' ').trim() }
   }
+  if (/香港/.test(text)) return { region: 'ap-hongkong', rest: text.replace(/香港/g, ' ').replace(/\s+/g, ' ').trim() }
   return { region: DEFAULT_REGION, rest: text }
 }
 
@@ -250,6 +264,7 @@ export function createImageModule(call: TcrCall = tcrCall): ResourceModule {
       const region = (ctx.region || '').trim() || inferred.region
       const items: ResourceCard[] = []
       const errors: ModuleError[] = []
+      const regionsPromise = listTcrRegions(call, ctx)
       if (region === DEFAULT_REGION) items.push(personalCard(module.id))
       try {
         const data = await call<{ Registries?: RegistryItem[]; TotalCount?: number }>(
@@ -270,6 +285,7 @@ export function createImageModule(call: TcrCall = tcrCall): ResourceModule {
           offset: 0,
           hasMore: totalCount > fetched,
           region,
+          regions: await regionsPromise,
           errors,
         }
       } catch (err) {
@@ -281,6 +297,7 @@ export function createImageModule(call: TcrCall = tcrCall): ResourceModule {
           offset: 0,
           hasMore: false,
           region,
+          regions: await regionsPromise,
           errors,
         }
       }
@@ -626,6 +643,39 @@ function creds(ctx: ModuleContext): { secretId: string; secretKey: string } {
 
 function opts(ctx: ModuleContext, region: string): { timeoutMs: number; signal?: AbortSignal; region: string } {
   return { timeoutMs: ctx.timeoutMs, signal: ctx.signal, region }
+}
+
+export async function listTcrRegions(call: TcrCall, ctx: ModuleContext): Promise<Array<{ id: string; label: string }>> {
+  try {
+    const data = await call<{ Regions?: Array<{ RegionName?: string }> }>(
+      'DescribeRegions',
+      {},
+      creds(ctx),
+      opts(ctx, DEFAULT_REGION),
+    )
+    const seen = new Set<string>()
+    const mapped: Array<{ id: string; label: string }> = []
+    for (const item of data.Regions || []) {
+      const id = String(item.RegionName || '').trim()
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      mapped.push({ id, label: regionLabel(id) })
+    }
+    if (mapped.length) return sortTcrRegions(mapped)
+  } catch {
+    /* keep fallback catalog */
+  }
+  return TCR_REGIONS.map((item) => ({ ...item }))
+}
+
+function sortTcrRegions(rows: Array<{ id: string; label: string }>): Array<{ id: string; label: string }> {
+  const order = new Map(TCR_REGIONS.map((item, idx) => [item.id, idx]))
+  return [...rows].sort((a, b) => {
+    const ia = order.has(a.id) ? Number(order.get(a.id)) : 1000
+    const ib = order.has(b.id) ? Number(order.get(b.id)) : 1000
+    if (ia !== ib) return ia - ib
+    return a.label.localeCompare(b.label, 'zh')
+  })
 }
 
 function col(card: ResourceCard, label: string): string {
