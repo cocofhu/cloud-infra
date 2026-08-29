@@ -25,6 +25,7 @@ window.__ModuleLoader__.load({
 .ci-row:last-child{border-bottom:0}
 .ci-row:not(.head):hover{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary)}
+.ci-cell.ci-ops-cell{overflow:visible}
 .ci-row.head .ci-cell{color:var(--dsw-alias-label-tertiary)}
 .ci-cell.num{font-variant-numeric:tabular-nums}
 .ci-name{font-weight:550;color:var(--dsw-alias-label-primary);background:none;border:0;padding:0;cursor:pointer;font:inherit;font-size:13px;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -131,7 +132,7 @@ window.__ModuleLoader__.load({
 .ci-dl span{color:var(--dsw-alias-label-tertiary)}
 .ci-dl b{font-weight:600;color:var(--dsw-alias-label-primary);word-break:break-all}
 .ci-more{position:relative;display:inline-flex}
-.ci-more-menu{position:absolute;right:0;top:100%;z-index:5;min-width:128px;padding:6px 0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);box-shadow:var(--dsw-alias-shadow)}
+.ci-more-menu{position:fixed;z-index:50;min-width:128px;padding:6px 0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);box-shadow:var(--dsw-alias-shadow)}
 .ci-more-item{display:block;width:100%;text-align:left;background:none;border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-primary)}
 .ci-more-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-more-item.danger{color:var(--dsw-alias-state-error-primary)}
@@ -585,7 +586,7 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function MoreMenu({ item, open, onToggle, onAction }) {
+    function MoreMenu({ item, open, onToggle, onClose, onAction }) {
       const meta = certMeta(item);
       const status = Number(meta.status);
       const items = [];
@@ -596,16 +597,71 @@ window.__ModuleLoader__.load({
       } else {
         items.push({ id: "cert.delete", label: "删除", danger: true });
       }
+      const btn = useRef(null);
+      const menuRef = useRef(null);
+      const [pos, setPos] = useState(null);
+      useEffect(() => {
+        if (!open) {
+          setPos(null);
+          return;
+        }
+        const place = () => {
+          const el = btn.current;
+          if (!el || typeof el.getBoundingClientRect !== "function") return;
+          const r = el.getBoundingClientRect();
+          const width = 140;
+          const vw = typeof window !== "undefined" ? window.innerWidth : r.right;
+          const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+          const left = Math.max(8, Math.min(r.right - width, vw - width - 8));
+          const height = items.length * 32 + 12;
+          const top = r.bottom + 4 + height > vh - 8 ? Math.max(8, r.top - height - 4) : r.bottom + 4;
+          setPos({ top, left, width });
+        };
+        place();
+        const onDoc = (e) => {
+          const t = e.target;
+          if (btn.current && btn.current.contains(t)) return;
+          if (menuRef.current && menuRef.current.contains(t)) return;
+          onClose();
+        };
+        const onKey = (e) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("mousedown", onDoc);
+        document.addEventListener("keydown", onKey);
+        window.addEventListener("resize", place);
+        window.addEventListener("scroll", place, true);
+        return () => {
+          document.removeEventListener("mousedown", onDoc);
+          document.removeEventListener("keydown", onKey);
+          window.removeEventListener("resize", place);
+          window.removeEventListener("scroll", place, true);
+        };
+      }, [open, items.length, onClose]);
+      const menu = open && pos
+        ? createPortal(h("div", {
+          className: "ci-more-menu",
+          role: "menu",
+          ref: menuRef,
+          style: { top: pos.top + "px", left: pos.left + "px", minWidth: pos.width + "px" },
+        }, items.map((row) => h("button", {
+          key: row.id,
+          type: "button",
+          role: "menuitem",
+          className: "ci-more-item" + (row.danger ? " danger" : ""),
+          onMouseDown: (e) => e.stopPropagation(),
+          onClick: (e) => { e.stopPropagation(); onAction(row); },
+        }, row.label))), document.body)
+        : null;
       return h("span", { className: "ci-more" },
-        h("button", { type: "button", className: "ci-link", onClick: onToggle }, "更多"),
-        open ? h("div", { className: "ci-more-menu", role: "menu" },
-          items.map((row) => h("button", {
-            key: row.id,
-            type: "button",
-            className: "ci-more-item" + (row.danger ? " danger" : ""),
-            onClick: () => onAction(row),
-          }, row.label)),
-        ) : null,
+        h("button", {
+          type: "button",
+          className: "ci-link",
+          ref: btn,
+          "aria-haspopup": "menu",
+          "aria-expanded": open ? "true" : "false",
+          onMouseDown: (e) => e.stopPropagation(),
+          onClick: (e) => { e.preventDefault(); e.stopPropagation(); onToggle(); },
+        }, "更多"),
+        menu,
       );
     }
 
@@ -619,6 +675,7 @@ window.__ModuleLoader__.load({
           item,
           open: moreId === item.id,
           onToggle: () => setMoreId(moreId === item.id ? "" : item.id),
+          onClose: () => setMoreId(""),
           onAction: (row) => { setMoreId(""); onMore(item, row); },
         }),
       );
@@ -657,7 +714,7 @@ window.__ModuleLoader__.load({
               meta.renewable ? h("button", { type: "button", className: "ci-link ci-renew", onClick: () => onMore(item, { id: "cert.renew", label: "快速续期" }) }, "快速续期") : null,
             ),
             h("div", { className: "ci-cell" }, meta.validTo || certCol(item, "有效期") || "—"),
-            h("div", { className: "ci-cell" }, h(CertOps, { item, pendingId, moreId, setMoreId, onDeploy, onDownload, onMore })),
+            h("div", { className: "ci-cell ci-ops-cell" }, h(CertOps, { item, pendingId, moreId, setMoreId, onDeploy, onDownload, onMore })),
           );
         }),
       );
