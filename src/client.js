@@ -64,7 +64,7 @@ window.__ModuleLoader__.load({
 .ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
 .ci-sec-t{font-size:13px;font-weight:650}
 .ci-table-wrap{width:100%;overflow:auto}
-.ci-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
+.ci-table{width:100%;min-width:720px;border-collapse:collapse;font-size:13px}
 .ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle}
 .ci-table th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px}
 .ci-table td{word-break:break-all;color:var(--dsw-alias-label-secondary)}
@@ -77,6 +77,7 @@ window.__ModuleLoader__.load({
 .ci-mini:disabled{opacity:.4;cursor:default}
 .ci-actions{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 .ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;margin:8px 14px}
+.ci-trunc{margin:0 0 10px;color:var(--dsw-alias-label-caption);font-size:12px}
 .ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
 .ci-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:ci-spin .7s linear infinite;vertical-align:-1px;margin-right:6px}
 @keyframes ci-spin{to{transform:rotate(360deg)}}
@@ -244,6 +245,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       try { return JSON.parse(raw); } catch { return {}; }
     }
 
+    function isQueryPayload(node) {
+      if (!node || typeof node !== "object" || Array.isArray(node)) return false;
+      if (!Array.isArray(node.items)) return false;
+      if (node.kind === "cloud-infra-query" || node.kind === "image" || node.resourceKind === "image") return true;
+      if (node.items[0] && node.items[0].moduleId) return true;
+      if (Array.isArray(node.errors) && node.errors.length) return true;
+      return false;
+    }
+
     function pickPayload(props) {
       const found = [];
       const visit = (node, depth) => {
@@ -253,8 +263,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           for (const x of node) visit(x, depth + 1);
           return;
         }
-        if (node.kind === "cloud-infra-query" && Array.isArray(node.items)) found.push(node);
-        else if (Array.isArray(node.items) && node.items[0] && node.items[0].moduleId) found.push(node);
+        if (isQueryPayload(node)) found.push(node);
         for (const key of ["meta", "presentationMeta", "result", "content", "block", "call", "output"]) {
           if (node[key]) visit(node[key], depth + 1);
         }
@@ -783,26 +792,29 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [tags, setTags] = useState([]);
       const [repo, setRepo] = useState(null);
       const [fields, setFields] = useState([]);
-      const [draftQ, setDraftQ] = useState(initialQuery || "");
+      const [draftQ, setDraftQ] = useState("");
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState(errors.map((e) => e.message).join("；"));
       const [copied, setCopied] = useState("");
       const [confirm, setConfirm] = useState(null);
       const [actBusy, setActBusy] = useState(false);
+      const [truncated, setTruncated] = useState(!!payload?.hasMore);
       const seq = useRef(0);
       const debounce = useRef(0);
       const current = (Array.isArray(instances) ? instances : []).find((item) => item && item.id === instanceId) || instances[0];
 
-      const toolSig = fromTool
-        ? `${payload?.region || ""}|${fromTool.map((i) => i.id).join(",")}|${initialQuery}`
-        : "";
+      const toolSig = `${payload?.region || ""}|${(fromTool || []).map((i) => i.id).join(",")}|${(payload?.errors || []).length}|${args.kind || payload?.resourceKind || ""}`;
       useEffect(() => {
-        if (!fromTool) return;
-        setInstances(fromTool);
         if (payload?.region) setRegion(payload.region);
-        if (fromTool[0]?.id) setInstanceId(fromTool[0].id);
-        setDraftQ(initialQuery || "");
+        setDraftQ("");
         setErr(errors.map((e) => e.message).join("；"));
+        if (fromTool && fromTool.length) {
+          setInstances(fromTool);
+          if (fromTool[0]?.id) setInstanceId(fromTool[0].id);
+          setTruncated(!!payload?.hasMore);
+          return;
+        }
+        loadInstances(payload?.region || region);
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
 
@@ -817,12 +829,14 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           setInstances(items);
           const nextId = keepId && items.some((item) => item.id === keepId) ? keepId : (items[0]?.id || "");
           setInstanceId(nextId);
+          setTruncated(!!result.hasMore);
           if (result.errors?.length) setErr(result.errors.map((e) => e.message).join("；"));
         } catch (e) {
           if (n !== seq.current) return;
           setErr(publicErrorMessage(e));
           setInstances([]);
           setInstanceId("");
+          setTruncated(false);
         } finally {
           if (n === seq.current) setBusy(false);
         }
@@ -856,6 +870,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           else if (nextView === "tags") setTags(rows);
           else setRepos(rows);
           setFields(detail.fields || []);
+          setTruncated(!!table.hasMore || (Number(table.total) > rows.length));
         } catch (e) {
           if (n !== seq.current) return;
           setErr(publicErrorMessage(e));
@@ -982,33 +997,45 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
 
       const body = () => {
         if (busy) return h("div", { className: "ci-load" }, h(Spin), "加载中…");
+        const trunc = truncated ? h("div", { key: "trunc", className: "ci-trunc" }, "仅显示前 100 条") : null;
         if (view === "inst") {
-          if (!filteredInstances.length) return h("div", { className: "ci-empty" }, draftQ ? "没有匹配的实例" : "该地域没有实例");
-          return h("div", { className: "ci-grid" }, filteredInstances.map((item) => h("button", {
-            key: item.id,
-            type: "button",
-            className: "ci-ic" + (item.id === instanceId ? " on" : ""),
-            onClick: () => selectInstance(item, "repo"),
-          },
-            h(ImageIcon),
-            h("h3", null, item.title),
-            h("div", { className: "ci-tags" },
-              h("span", { className: "ci-tag ok" }, item.status === "enable" ? "运行中" : (item.status || "未知")),
-              h("span", { className: "ci-tag blue" }, imageEdition(item)),
-            ),
-            h("div", { className: "ci-ic-meta" }, imageDomain(item)),
-          )));
+          if (!filteredInstances.length) {
+            const empty = err
+              ? "无法加载实例"
+              : (draftQ ? "没有匹配的实例" : "该地域没有实例");
+            return h("div", { className: "ci-empty" }, empty);
+          }
+          return [
+            trunc,
+            h("div", { key: "grid", className: "ci-grid" }, filteredInstances.map((item) => h("button", {
+              key: item.id,
+              type: "button",
+              className: "ci-ic" + (item.id === instanceId ? " on" : ""),
+              onClick: () => selectInstance(item, "repo"),
+            },
+              h(ImageIcon),
+              h("h3", null, item.title),
+              h("div", { className: "ci-tags" },
+                h("span", { className: "ci-tag ok" }, item.status === "enable" ? "运行中" : (item.status || "未知")),
+                h("span", { className: "ci-tag blue" }, imageEdition(item)),
+              ),
+              h("div", { className: "ci-ic-meta" }, imageDomain(item)),
+            ))),
+          ];
         }
         if (view === "ns") {
           const rows = (namespaces || []).filter((row) => hitKw(draftQ, row.cells?.name, row.cells?.access));
           if (!rows.length) return h("div", { className: "ci-empty" }, "没有匹配的命名空间");
-          return h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
-            h("thead", null, h("tr", null, h("th", null, "名称"), h("th", null, "访问级别"))),
-            h("tbody", null, rows.map((row) => h("tr", { key: row.id },
-              h("td", null, row.cells?.name || row.id),
-              h("td", null, h("span", { className: "ci-tag" }, row.cells?.access || "私有")),
-            ))),
-          ));
+          return [
+            trunc,
+            h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null, h("th", null, "名称"), h("th", null, "访问级别"))),
+              h("tbody", null, rows.map((row) => h("tr", { key: row.id },
+                h("td", null, row.cells?.name || row.id),
+                h("td", null, h("span", { className: "ci-tag" }, row.cells?.access || "私有")),
+              ))),
+            )),
+          ];
         }
         if (view === "detail") {
           const rows = (tags || []).filter((row) => hitKw(draftQ, row.cells?.version, row.cells?.digest));
@@ -1021,6 +1048,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               fields.map((row) => h("span", { key: row.label, className: "ci-chip" }, row.label, h("b", null, row.value))),
             ) : null,
             copied ? h("p", { key: "copied", className: "ci-copied" }, "已复制：" + copied) : null,
+            trunc,
             rows.length ? h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
               h("thead", null, h("tr", null,
                 h("th", null, "镜像版本"),
@@ -1044,18 +1072,27 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         }
         const rows = (repos || []).filter((row) => (nsFilter ? row.cells?.namespace === nsFilter : true) && hitKw(draftQ, row.cells?.name, row.cells?.namespace));
         if (!rows.length) return h("div", { className: "ci-empty" }, "没有匹配的仓库");
-        return h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
-          h("thead", null, h("tr", null,
-            h("th", null, "仓库名称"),
-            h("th", null, "命名空间"),
-            h("th", null, "类型"),
+        return [
+          trunc,
+          h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+            h("thead", null, h("tr", null,
+              h("th", null, "仓库名称"),
+              h("th", null, "命名空间"),
+              h("th", null, "类型"),
+              h("th", null, "Tag 数"),
+              h("th", null, "创建时间"),
+              h("th", null, "更新时间"),
+            )),
+            h("tbody", null, rows.map((row) => h("tr", { key: row.id },
+              h("td", null, h("button", { type: "button", className: "ci-link", onClick: () => openRepo(row) }, row.cells?.name || row.id)),
+              h("td", null, row.cells?.namespace || ""),
+              h("td", null, h("span", { className: "ci-tag" }, row.cells?.access || "私有")),
+              h("td", null, row.cells?.tags || "-"),
+              h("td", null, row.cells?.created || "-"),
+              h("td", null, row.cells?.updated || "-"),
+            ))),
           )),
-          h("tbody", null, rows.map((row) => h("tr", { key: row.id },
-            h("td", null, h("button", { type: "button", className: "ci-link", onClick: () => openRepo(row) }, row.cells?.name || row.id)),
-            h("td", null, row.cells?.namespace || ""),
-            h("td", null, h("span", { className: "ci-tag" }, row.cells?.access || "私有")),
-          ))),
-        ));
+        ];
       };
 
       return h("div", { className: "ci-root ci-tool" },
@@ -1135,7 +1172,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const args = parseToolArgs(props);
       const fromTool = Array.isArray(payload?.items) ? payload.items : null;
       const running = !!(props?.block && !("kind" in props.block));
-      const kind = payload?.kind || args.kind || "domain";
+      const kind = String(args.kind || payload?.resourceKind || (payload?.items && payload.items[0] && payload.items[0].kind) || "domain");
       const provider = String(args.provider || "");
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");

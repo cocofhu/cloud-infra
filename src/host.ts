@@ -4,7 +4,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import Schema from '@deepseek-ai/schemastery'
 import { assignConfig, publicConfig, readOverlay, sanitizePatch, withDefaults, writeOverlay } from './core/config-store.js'
 import { queryResources, renderQuery } from './core/query.js'
-import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, SETTINGS_HINT, supportedKinds } from './core/registry.js'
+import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, resolveModuleId, SETTINGS_HINT, supportedKinds } from './core/registry.js'
 import { publicErrorMessage } from './core/safe-error.js'
 import { isPost, trustedUiRequest } from './core/trusted-request.js'
 import type { PluginConfig, QueryResult } from './core/types.js'
@@ -39,7 +39,11 @@ export function apply(ctx: Context, config: Config): void {
     output: {
       schema: { type: 'object', additionalProperties: true },
       render: (_args, value) => [{ type: 'text', text: renderQuery(value as unknown as QueryResult) }],
-      presentationMeta: (_args, value) => ({ kind: 'cloud-infra-query', ...(value as object) }),
+      presentationMeta: (_args, value) => ({
+        ...(value as object),
+        resourceKind: String((value as { kind?: string }).kind || ''),
+        kind: 'cloud-infra-query',
+      }),
     },
     presentCall: (args) => ({
       card: 'generic',
@@ -263,7 +267,7 @@ async function runAction(
 }
 
 function readyModule(cfg: PluginConfig, moduleId: string, id: string) {
-  const resolvedId = moduleId || (id.includes(':') ? id.slice(0, id.lastIndexOf(':')) : '')
+  const resolvedId = resolveModuleId(moduleId, id)
   const module = registry.getModule(resolvedId)
   if (!module) throw new Error('未知模块')
   const provider = registry.getProvider(module.provider)

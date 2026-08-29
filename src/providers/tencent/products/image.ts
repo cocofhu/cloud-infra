@@ -2,6 +2,7 @@ import { publicErrorMessage } from '../../../core/safe-error.js'
 import { registerModule } from '../../../core/registry.js'
 import type {
   ModuleContext,
+  ModuleError,
   ResourceAction,
   ResourceCard,
   ResourceDetail,
@@ -16,6 +17,8 @@ export const PERSONAL_INSTANCE_ID = 'personal:ap-guangzhou'
 export const PERSONAL_DOMAIN = 'ccr.ccs.tencentyun.com'
 export const DEFAULT_REGION = 'ap-guangzhou'
 export const MODULE_ID = 'tencent.image'
+export const LIST_PAGE_SIZE = 100
+export const TRUNCATED_HINT = '仅显示前 100 条'
 
 export const TCR_REGIONS = [
   { id: 'ap-guangzhou', label: '广州' },
@@ -87,6 +90,38 @@ export function inferRegion(query: string): { region: string; rest: string } {
     if (re.test(text)) return { region: id, rest: text.replace(re, ' ').replace(/\s+/g, ' ').trim() }
   }
   return { region: DEFAULT_REGION, rest: text }
+}
+
+const UTTERANCE_PHRASES = [
+  '镜像仓库',
+  '容器镜像',
+  '镜像服务',
+  '查一下',
+  '看一下',
+  '请帮我',
+  '腾讯云',
+  '查下',
+  '看看',
+  '帮我',
+  '列出',
+  '列表',
+  '查询',
+  '我的',
+  '一下',
+  '请',
+  '镜像',
+  '实例',
+  '仓库',
+  '版本',
+]
+
+/** Strip chat filler / region words so "查一下我的镜像" is not used as an instance keyword. */
+export function resourceKeyword(query: string): string {
+  let { rest } = inferRegion(query)
+  for (const phrase of UTTERANCE_PHRASES) rest = rest.split(phrase).join(' ')
+  rest = rest.replace(/\b(?:listing|list|images?|registry|tencent)\b/gi, ' ')
+  rest = rest.replace(/(?:^|\s)TCR(?:\s|$)/gi, ' ')
+  return rest.replace(/[，。！？、]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 export function parseInstanceRef(id: string): { moduleId: string; instanceId: string } {
@@ -213,41 +248,47 @@ export function createImageModule(call: TcrCall = tcrCall): ResourceModule {
     async list(ctx) {
       const inferred = inferRegion(ctx.query)
       const region = (ctx.region || '').trim() || inferred.region
-      const keyword = inferred.rest
       const items: ResourceCard[] = []
+      const errors: ModuleError[] = []
       if (region === DEFAULT_REGION) items.push(personalCard(module.id))
       try {
         const data = await call<{ Registries?: RegistryItem[]; TotalCount?: number }>(
           'DescribeInstances',
-          { Offset: 0, Limit: Math.max(ctx.limit, 20) },
+          { Offset: 0, Limit: LIST_PAGE_SIZE },
           creds(ctx),
           opts(ctx, region),
         )
-        for (const item of data.Registries || []) {
+        const registries = data.Registries || []
+        for (const item of registries) {
           items.push(mapEnterpriseInstance(item, region, module.id))
+        }
+        const fetched = registries.length
+        const totalCount = data.TotalCount ?? fetched
+        return {
+          items,
+          total: items.length,
+          offset: 0,
+          hasMore: totalCount > fetched,
+          region,
+          errors,
         }
       } catch (err) {
         if (!items.length) throw err
-      }
-      const filtered = items.filter((item) => matchesQuery(
-        keyword,
-        item.title,
-        item.description,
-        ...(item.badges || []),
-        ...(item.columns || []).map((col) => col.value),
-      ))
-      return {
-        items: filtered,
-        total: filtered.length,
-        offset: 0,
-        hasMore: false,
-        region,
+        errors.push({ moduleId: module.id, message: publicErrorMessage(err) })
+        return {
+          items,
+          total: items.length,
+          offset: 0,
+          hasMore: false,
+          region,
+          errors,
+        }
       }
     },
     async detail(ctx) {
       const inferred = inferRegion(ctx.query)
       const region = (ctx.region || '').trim() || inferred.region
-      const keyword = inferred.rest
+      const keyword = resourceKeyword(ctx.query)
       const { instanceId } = parseInstanceRef(String(ctx.instanceId || ctx.id || ''))
       const view = normalizeView(ctx.view)
       const personal = isPersonalInstance(instanceId)
@@ -329,6 +370,7 @@ const REPO_COLUMNS = [
   { key: 'name', label: '仓库名称' },
   { key: 'namespace', label: '命名空间' },
   { key: 'access', label: '类型' },
+  { key: 'tags', label: 'Tag 数' },
   { key: 'created', label: '创建时间' },
   { key: 'updated', label: '更新时间' },
 ]
@@ -348,7 +390,26 @@ function normalizeView(view?: string): 'namespaces' | 'repos' | 'tags' {
 }
 
 function emptyTable(id: string, columns: ResourceTable['columns']): ResourceTable {
-  return { id, columns, rows: [], total: 0 }
+  return { id, columns, rows: [], total: 0, hasMore: false }
+}
+
+function pagedTable(
+  id: string,
+  columns: ResourceTable['columns'],
+  rows: ResourceTableRow[],
+  totalCount: number | undefined,
+  fetched: number,
+): ResourceTable {
+  const total = Number.isFinite(Number(totalCount)) ? Number(totalCount) : fetched
+  const hasMore = total > fetched
+  return {
+    id,
+    columns,
+    rows,
+    total,
+    hasMore,
+    title: hasMore ? TRUNCATED_HINT : undefined,
+  }
 }
 
 function namespaceFields(card: ResourceCard) {
@@ -403,7 +464,7 @@ function emptyDetail(card: ResourceCard, region: string, instanceId: string, vie
 async function loadEnterpriseCard(call: TcrCall, ctx: ModuleContext, region: string, instanceId: string): Promise<ResourceCard> {
   const data = await call<{ Registries?: RegistryItem[] }>(
     'DescribeInstances',
-    { Offset: 0, Limit: 100 },
+    { Offset: 0, Limit: LIST_PAGE_SIZE },
     creds(ctx),
     opts(ctx, region),
   )
@@ -419,7 +480,7 @@ function itemOr(item: RegistryItem): RegistryItem {
 async function listPersonalNamespaces(call: TcrCall, ctx: ModuleContext, keyword: string): Promise<ResourceTable> {
   const data = await call<{ Data?: { NamespaceInfo?: NamespaceItem[]; NamespaceCount?: number } }>(
     'DescribeNamespacePersonal',
-    { Offset: 0, Limit: 100, Namespace: keyword || undefined },
+    { Offset: 0, Limit: LIST_PAGE_SIZE, Namespace: keyword || undefined },
     creds(ctx),
     opts(ctx, DEFAULT_REGION),
   )
@@ -433,17 +494,18 @@ async function listPersonalNamespaces(call: TcrCall, ctx: ModuleContext, keyword
       } satisfies ResourceTableRow
     })
     .filter((row) => matchesQuery(keyword, row.cells.name))
-  return { id: 'namespaces', columns: NS_COLUMNS, rows, total: rows.length }
+  return pagedTable('namespaces', NS_COLUMNS, rows, data.Data?.NamespaceCount ?? raw.length, raw.length)
 }
 
 async function listEnterpriseNamespaces(call: TcrCall, ctx: ModuleContext, region: string, instanceId: string, keyword: string): Promise<ResourceTable> {
   const data = await call<{ NamespaceList?: NamespaceItem[]; TotalCount?: number }>(
     'DescribeNamespaces',
-    { RegistryId: instanceId, NamespaceName: keyword || undefined, Offset: 0, Limit: 100 },
+    { RegistryId: instanceId, NamespaceName: keyword || undefined, Offset: 0, Limit: LIST_PAGE_SIZE },
     creds(ctx),
     opts(ctx, region),
   )
-  const rows = (data.NamespaceList || [])
+  const raw = data.NamespaceList || []
+  const rows = raw
     .map((item) => {
       const name = String(item.Name || item.Namespace || '')
       return {
@@ -452,23 +514,24 @@ async function listEnterpriseNamespaces(call: TcrCall, ctx: ModuleContext, regio
       } satisfies ResourceTableRow
     })
     .filter((row) => matchesQuery(keyword, row.cells.name))
-  return { id: 'namespaces', columns: NS_COLUMNS, rows, total: rows.length }
+  return pagedTable('namespaces', NS_COLUMNS, rows, data.TotalCount ?? raw.length, raw.length)
 }
 
 async function listPersonalRepos(call: TcrCall, ctx: ModuleContext, keyword: string, nsFilter: string): Promise<ResourceTable> {
   const data = await call<{ Data?: { RepoInfo?: RepositoryItem[]; TotalCount?: number } }>(
     'DescribeRepositoryOwnerPersonal',
-    { Offset: 0, Limit: 100, RepoName: keyword || undefined },
+    { Offset: 0, Limit: LIST_PAGE_SIZE, RepoName: keyword || undefined },
     creds(ctx),
     opts(ctx, DEFAULT_REGION),
   )
-  const rows = (data.Data?.RepoInfo || [])
+  const raw = data.Data?.RepoInfo || []
+  const rows = raw
     .map((item) => mapRepoRow(item))
     .filter((row) => {
       if (nsFilter && row.cells.namespace !== nsFilter) return false
       return matchesQuery(keyword, row.cells.name, row.cells.namespace)
     })
-  return { id: 'repos', columns: REPO_COLUMNS, rows, total: rows.length }
+  return pagedTable('repos', REPO_COLUMNS, rows, data.Data?.TotalCount ?? raw.length, raw.length)
 }
 
 async function listEnterpriseRepos(call: TcrCall, ctx: ModuleContext, region: string, instanceId: string, keyword: string, nsFilter: string): Promise<ResourceTable> {
@@ -479,18 +542,19 @@ async function listEnterpriseRepos(call: TcrCall, ctx: ModuleContext, region: st
       NamespaceName: nsFilter || undefined,
       RepositoryName: keyword || undefined,
       Offset: 0,
-      Limit: 100,
+      Limit: LIST_PAGE_SIZE,
     },
     creds(ctx),
     opts(ctx, region),
   )
-  const rows = (data.RepositoryList || [])
+  const raw = data.RepositoryList || []
+  const rows = raw
     .map((item) => mapRepoRow(item))
     .filter((row) => {
       if (nsFilter && row.cells.namespace !== nsFilter) return false
       return matchesQuery(keyword, row.cells.name, row.cells.namespace)
     })
-  return { id: 'repos', columns: REPO_COLUMNS, rows, total: rows.length }
+  return pagedTable('repos', REPO_COLUMNS, rows, data.TotalCount ?? raw.length, raw.length)
 }
 
 function mapRepoRow(item: RepositoryItem): ResourceTableRow {
@@ -501,6 +565,7 @@ function mapRepoRow(item: RepositoryItem): ResourceTableRow {
       name: parsed.full,
       namespace: parsed.namespace,
       access: accessLabel(item.Public),
+      tags: item.TagCount != null ? String(item.TagCount) : '-',
       created: String(item.CreationTime || item.CreateTime || ''),
       updated: String(item.UpdateTime || ''),
     },
@@ -510,14 +575,15 @@ function mapRepoRow(item: RepositoryItem): ResourceTableRow {
 async function listPersonalTags(call: TcrCall, ctx: ModuleContext, namespace: string, repository: string, keyword: string): Promise<ResourceTable> {
   const data = await call<{ Data?: { TagInfo?: ImageItem[]; TagCount?: number } }>(
     'DescribeImagePersonal',
-    { RepoName: `${namespace}/${repository}`, Offset: 0, Limit: 100, Tag: keyword || undefined },
+    { RepoName: `${namespace}/${repository}`, Offset: 0, Limit: LIST_PAGE_SIZE, Tag: keyword || undefined },
     creds(ctx),
     opts(ctx, DEFAULT_REGION),
   )
-  const rows = (data.Data?.TagInfo || [])
+  const raw = data.Data?.TagInfo || []
+  const rows = raw
     .map(mapTagRow)
     .filter((row) => matchesQuery(keyword, row.cells.version, row.cells.digest))
-  return { id: 'tags', columns: TAG_COLUMNS, rows, total: rows.length }
+  return pagedTable('tags', TAG_COLUMNS, rows, data.Data?.TagCount ?? raw.length, raw.length)
 }
 
 async function listEnterpriseTags(call: TcrCall, ctx: ModuleContext, region: string, instanceId: string, namespace: string, repository: string, keyword: string): Promise<ResourceTable> {
@@ -529,15 +595,16 @@ async function listEnterpriseTags(call: TcrCall, ctx: ModuleContext, region: str
       RepositoryName: repository,
       ImageVersion: keyword || undefined,
       Offset: 0,
-      Limit: 100,
+      Limit: LIST_PAGE_SIZE,
     },
     creds(ctx),
     opts(ctx, region),
   )
-  const rows = (data.ImageInfoList || [])
+  const raw = data.ImageInfoList || []
+  const rows = raw
     .map(mapTagRow)
     .filter((row) => matchesQuery(keyword, row.cells.version, row.cells.digest))
-  return { id: 'tags', columns: TAG_COLUMNS, rows, total: rows.length }
+  return pagedTable('tags', TAG_COLUMNS, rows, data.TotalCount ?? raw.length, raw.length)
 }
 
 function mapTagRow(item: ImageItem): ResourceTableRow {

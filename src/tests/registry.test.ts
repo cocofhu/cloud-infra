@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { withDefaults } from '../core/config-store.js'
 import { queryResources } from '../core/query.js'
-import { createRegistry } from '../core/registry.js'
+import { createRegistry, resolveModuleId } from '../core/registry.js'
 import type { ResourceModule } from '../core/types.js'
 
 test('queryResources fans out to a newly registered fake cloud without core changes', async () => {
@@ -87,4 +87,60 @@ test('missing credentials point the user at settings', async () => {
   const result = await queryResources({ kind: 'domain' }, withDefaults({}), undefined, source)
   assert.equal(result.items.length, 0)
   assert.match(result.errors[0]?.message || '', /设置/)
+})
+
+test('resolveModuleId uses known module prefix not the last colon', () => {
+  const source = createRegistry()
+  source.registerProvider({ id: 'tencent', title: '腾讯云', fields: [] })
+  source.registerModule({
+    id: 'tencent.image',
+    provider: 'tencent',
+    kind: 'image',
+    title: '镜像',
+    implemented: true,
+    async list() {
+      return { items: [] }
+    },
+  })
+  assert.equal(resolveModuleId('tencent.image', 'tencent.image:personal:ap-guangzhou', source), 'tencent.image')
+  assert.equal(resolveModuleId('', 'tencent.image:personal:ap-guangzhou', source), 'tencent.image')
+  assert.equal(resolveModuleId('', 'unknown:foo', source), '')
+})
+
+test('queryResources keeps module items when list returns partial errors', async () => {
+  const source = createRegistry()
+  source.registerProvider({
+    id: 'fake',
+    title: '假云',
+    fields: [{ key: 'token', label: 'Token' }],
+  })
+  source.registerModule({
+    id: 'fake.image',
+    provider: 'fake',
+    kind: 'image',
+    title: '假云镜像',
+    implemented: true,
+    async list() {
+      return {
+        items: [{
+          id: 'fake.image:personal',
+          moduleId: 'fake.image',
+          provider: 'fake',
+          kind: 'image',
+          title: '个人版实例',
+          description: 'x',
+        }],
+        errors: [{ moduleId: 'fake.image', message: '企业版鉴权失败' }],
+      }
+    },
+  })
+  const result = await queryResources(
+    { kind: 'image' },
+    withDefaults({ providers: { fake: { token: 'abc' } } }),
+    undefined,
+    source,
+  )
+  assert.equal(result.items.length, 1)
+  assert.equal(result.items[0].title, '个人版实例')
+  assert.match(result.errors.map((item) => item.message).join(' '), /企业版鉴权失败/)
 })

@@ -55,6 +55,19 @@ export function registerModule(module: ResourceModule): void {
   registry.registerModule(module)
 }
 
+/** Resolve module id from an explicit id or a resource id such as tencent.image:personal:ap-guangzhou. */
+export function resolveModuleId(moduleId: string | undefined, resourceId: string, source: Registry = registry): string {
+  const explicit = String(moduleId || '').trim()
+  if (explicit) return explicit
+  const raw = String(resourceId || '').trim()
+  if (!raw) return ''
+  const ids = source.listModules().map((module) => module.id).sort((a, b) => b.length - a.length)
+  for (const id of ids) {
+    if (raw === id || raw.startsWith(`${id}:`)) return id
+  }
+  return ''
+}
+
 export function isModuleEnabled(module: ResourceModule, config: PluginConfig): boolean {
   if (config.modules[module.id] === false) return false
   if (config.modules[module.id] === true) return true

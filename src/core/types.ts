@@ -71,6 +71,7 @@ export interface ResourceTable {
   columns: ResourceTableColumn[]
   rows: ResourceTableRow[]
   total?: number
+  hasMore?: boolean
 }
 
 export interface ResourceDetail {
@@ -95,6 +96,7 @@ export interface ListResult {
   hasMore?: boolean
   region?: string
   instanceId?: string
+  errors?: ModuleError[]
 }
 
 export interface ModuleError {

@@ -192,8 +192,11 @@ test('g1.2 g3 image kind renders a chat card with region-first instance wall and
   assert.match(host, /kind=image/)
   assert.match(host, /Default kind is domain/)
   assert.match(host, /kind: args\.kind != null \? String\(args\.kind\) : 'domain'/)
+  assert.match(host, /resourceKind/)
+  assert.match(host, /kind: 'cloud-infra-query'/)
   assert.match(client, /function ImageToolView/)
   assert.match(client, /kind === "image"/)
+  assert.match(client, /args\.kind \|\| payload\?\.resourceKind/)
   assert.match(client, /容器镜像/)
   assert.match(client, /当前范围内的实例、仓库与版本/)
   assert.match(client, /"地域"/)
@@ -217,6 +220,50 @@ test('g1.2 g3 image kind renders a chat card with region-first instance wall and
   assert.doesNotMatch(client, /腾讯云控制台站点|整页控制台/)
   assert.match(client, /请输入域名关键字/)
   assert.match(client, /没有解析记录/)
+})
+
+test('review v1-v2 pickPayload binds empty image errors and search box stays empty', () => {
+  const src = read('src/client.js')
+  const start = src.indexOf('function isQueryPayload')
+  assert.ok(start >= 0)
+  const end = src.indexOf('\n    function ChevronDown', start)
+  const fn = new Function('props', `${src.slice(start, end)}\nreturn pickPayload(props)`) as (props: unknown) => {
+    items?: unknown[]
+    errors?: Array<{ message: string }>
+    kind?: string
+  } | null
+  const emptyImage = fn({
+    meta: {
+      kind: 'image',
+      items: [],
+      errors: [{ moduleId: 'tencent.image', message: '腾讯云 未配置 SecretId、SecretKey。请在 设置 → 插件 → 云资源 填写对应云厂商的 AccessKey' }],
+      query: '查一下我的镜像',
+      region: 'ap-guangzhou',
+    },
+  })
+  assert.ok(emptyImage)
+  assert.equal(emptyImage?.items?.length, 0)
+  assert.equal(emptyImage?.errors?.length, 1)
+  const presented = fn({
+    presentationMeta: {
+      kind: 'cloud-infra-query',
+      resourceKind: 'image',
+      items: [],
+      errors: [{ message: 'x' }],
+    },
+  })
+  assert.ok(presented)
+  assert.equal(presented?.kind, 'cloud-infra-query')
+  const imageView = src.slice(src.indexOf('function ImageToolView'))
+  assert.match(imageView, /setDraftQ\(""\)/)
+  assert.doesNotMatch(imageView.slice(0, imageView.indexOf('const loadInstances')), /setDraftQ\(initialQuery/)
+  assert.match(imageView, /query:\s*""/)
+  assert.match(imageView, /无法加载实例/)
+  assert.match(imageView, /className: "ci-err"/)
+  assert.match(src, /仅显示前 100 条/)
+  assert.match(src, /"Tag 数"/)
+  assert.match(src, /"创建时间"/)
+  assert.match(src, /"更新时间"/)
 })
 
 test('g3.3 instance h3 uses dual-theme title color and ConfigCard stays unchanged', () => {

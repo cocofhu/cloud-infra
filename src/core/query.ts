@@ -89,6 +89,7 @@ export async function queryResources(
         instanceId: instanceId || undefined,
       })
       lists.push(result.items || [])
+      if (result.errors?.length) errors.push(...result.errors)
       if (result.total != null) total += result.total
       else total += result.items?.length || 0
       if (result.hasMore) hasMore = true

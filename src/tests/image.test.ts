@@ -13,6 +13,7 @@ import {
   personalCard,
   PERSONAL_INSTANCE_ID,
   pullCommand,
+  resourceKeyword,
   TCR_REGIONS,
 } from '../providers/tencent/products/image.js'
 
@@ -78,6 +79,76 @@ test('inferRegion reads 上海 from query and defaults to guangzhou', () => {
   assert.equal(TCR_REGIONS.map((item) => item.id).join(','), 'ap-guangzhou,ap-shanghai,ap-beijing,ap-nanjing,ap-chengdu')
 })
 
+test('resourceKeyword strips chat utterance so 查一下我的镜像 is not an instance filter', () => {
+  assert.equal(resourceKeyword('查一下我的镜像'), '')
+  assert.equal(resourceKeyword('列出 TCR 仓库'), '')
+  assert.equal(resourceKeyword('上海 nginx'), 'nginx')
+  assert.equal(resourceKeyword('prod-tcr'), 'prod-tcr')
+  assert.equal(resourceKeyword('1.2'), '1.2')
+})
+
+test('g2.2 utterance 查一下我的镜像 still lists personal instance in guangzhou', async () => {
+  const call = async (action: string, _payload: unknown, _creds: unknown, opts: { region?: string }) => {
+    if (action === 'DescribeInstances' && opts.region === 'ap-shanghai') return fixture('tcr-instances-shanghai.json')
+    if (action === 'DescribeInstances') return fixture('tcr-instances-guangzhou.json')
+    return {}
+  }
+  const module = createImageModule(call as never)
+  const result = await module.list(ctx({ query: '查一下我的镜像' }))
+  assert.equal(result.region, 'ap-guangzhou')
+  assert.equal(result.items.some((item) => item.title === '个人版实例'), true)
+  assert.equal(result.items.some((item) => item.title === 'prod-tcr'), true)
+  assert.equal(result.errors?.length || 0, 0)
+})
+
+test('g2.2 guangzhou DescribeInstances failure keeps personal card and surfaces error', async () => {
+  const call = async () => {
+    throw new Error('AuthFailure.UnauthorizedOperation')
+  }
+  const module = createImageModule(call as never)
+  const result = await module.list(ctx({ region: 'ap-guangzhou' }))
+  assert.equal(result.items.length, 1)
+  assert.equal(result.items[0].title, '个人版实例')
+  assert.ok(result.errors && result.errors.length >= 1)
+  assert.match(result.errors[0].message, /鉴权|权限|失败|未/)
+})
+
+test('g2.3 repo table maps created/updated/tag count and hasMore when TotalCount exceeds page', async () => {
+  const call = async (action: string) => {
+    if (action === 'DescribeRepositoryOwnerPersonal') {
+      return {
+        Data: {
+          TotalCount: 140,
+          RepoInfo: [
+            {
+              RepoName: 'team-01/nginx',
+              Public: 0,
+              TagCount: 3,
+              CreateTime: '2024-01-02',
+              UpdateTime: '2024-06-01',
+            },
+          ],
+        },
+      }
+    }
+    if (action === 'DescribeInstances') return fixture('tcr-instances-guangzhou.json')
+    return {}
+  }
+  const module = createImageModule(call as never)
+  const repos = await module.detail?.(ctx({
+    id: `tencent.image:${PERSONAL_INSTANCE_ID}`,
+    region: 'ap-guangzhou',
+    view: 'repos',
+  }))
+  const table = repos?.tables?.[0]
+  assert.equal(table?.rows[0].cells.created, '2024-01-02')
+  assert.equal(table?.rows[0].cells.updated, '2024-06-01')
+  assert.equal(table?.rows[0].cells.tags, '3')
+  assert.equal(table?.hasMore, true)
+  assert.equal(table?.total, 140)
+  assert.match(String(table?.title || ''), /仅显示前 100 条/)
+})
+
 test('g2.3 namespaces repos and version search stay in current instance', async () => {
   const calls: Array<{ action: string; payload: unknown; region?: string }> = []
   const call = async (action: string, payload: unknown, _creds: unknown, opts: { region?: string }) => {
@@ -106,6 +177,8 @@ test('g2.3 namespaces repos and version search stay in current instance', async 
   }))
   assert.equal(repos?.tables?.[0].rows.length, 1)
   assert.equal(repos?.tables?.[0].rows[0].cells.name, 'team-01/nginx')
+  assert.equal(repos?.tables?.[0].rows[0].cells.created, '2024-01-02')
+  assert.equal(repos?.tables?.[0].rows[0].cells.tags, '3')
   const tags = await module.detail?.(ctx({
     id: `tencent.image:${PERSONAL_INSTANCE_ID}`,
     region: 'ap-guangzhou',
