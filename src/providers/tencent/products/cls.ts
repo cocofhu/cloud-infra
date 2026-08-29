@@ -257,7 +257,7 @@ export function createClsModule(call: ClsCall = clsCall): ResourceModule {
         topicId = parseTopicRef(card.id).topicId
       }
       const window = resolveTimeRange(ctx.range, ctx.from, ctx.to)
-      const queryString = ctx.queryString == null ? '' : String(ctx.queryString)
+      const queryString = normalizeCql(ctx.queryString)
       try {
         const data = await call<{
           Context?: string
@@ -265,13 +265,12 @@ export function createClsModule(call: ClsCall = clsCall): ResourceModule {
           Results?: SearchLogItem[]
         }>('SearchLog', {
           TopicId: topicId,
-          TopicIds: [topicId],
           From: window.from,
           To: window.to,
-          Query: queryString,
+          QueryString: queryString,
+          QuerySyntax: 1,
           Limit: Math.max(1, Math.min(ctx.limit || 100, 1000)),
           Sort: 'desc',
-          SyntaxRule: 0,
           ...(ctx.context ? { Context: ctx.context } : {}),
         }, creds(ctx), opts(ctx, region))
         const logs = (data.Results || []).map(mapLogHit)
@@ -321,6 +320,15 @@ function wrapClsError(err: unknown): Error {
   if (/TopicNotExist|TopicNotFound/i.test(code)) return new Error('没有找到该日志主题')
   const message = publicErrorMessage(err)
   return Object.assign(new Error(message), { code })
+}
+
+/** Map common Chinese operators from the card placeholder to CQL. */
+export function normalizeCql(raw?: string): string {
+  return String(raw ?? '')
+    .replace(/并且|且/g, ' AND ')
+    .replace(/或/g, ' OR ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function resolveListQuery(ctx: ModuleContext): { region: string; query: string } {

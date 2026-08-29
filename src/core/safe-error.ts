@@ -31,6 +31,8 @@ const PASSTHROUGH = new Set([
   ...Object.values(CODE_HINTS),
   '云厂商请求失败',
   '云厂商请求超时',
+  '检索语句语法错误',
+  '没有找到该日志主题',
   '请求来源不受信任',
   '写操作仅允许 POST',
   'unknown method',
@@ -45,6 +47,7 @@ function errorCode(err: unknown): string {
 function hintForCode(code: string): string {
   if (!code) return '云厂商请求失败'
   if (/TopicNotExist|TopicNotFound/i.test(code)) return '没有找到该日志主题'
+  if (/SyntaxError|QueryError/i.test(code)) return '检索语句语法错误'
   if (CODE_HINTS[code]) return CODE_HINTS[code]
   const head = code.split('.')[0] || ''
   return CODE_HINTS[head] || '云厂商请求失败'

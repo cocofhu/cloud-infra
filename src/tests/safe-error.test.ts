@@ -21,5 +21,9 @@ test('publicErrorMessage maps vendor codes and never echoes secrets', () => {
   )
   assert.equal(publicErrorMessage(new Error('timeout 20000ms')), '云厂商请求超时')
   assert.equal(publicErrorMessage(new Error('HTTP 502')), '云厂商请求失败')
+  assert.equal(
+    publicErrorMessage(new TencentApiError('query syntax invalid', 'FailedOperation.SyntaxError')),
+    '检索语句语法错误',
+  )
   assert.doesNotMatch(publicErrorMessage(new Error('got AKIDabcdefghijklmnop')), /AKID/)
 })

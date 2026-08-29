@@ -983,7 +983,7 @@ window.__ModuleLoader__.load({
               h("textarea", {
                 className: "ci-cql",
                 value: cql,
-                placeholder: "status:500  或  level:ERROR",
+                placeholder: "status:500 OR level:ERROR",
                 onChange: (e) => setCql(e.target.value),
               }),
             ),
@@ -1022,11 +1022,13 @@ window.__ModuleLoader__.load({
               }, logBusy ? "检索中" : "检索分析"),
             ),
           ),
-          h("div", { className: "ci-hist", "aria-hidden": "true" },
+          logs.length && !listErr ? h("div", { className: "ci-hist", "aria-hidden": "true" },
             bars.map((hgt, idx) => h("i", { key: idx, style: { height: hgt + "%" } })),
-          ),
+          ) : null,
           listErr ? h("div", { className: "ci-err" }, listErr) : null,
-          logBusy && !logs.length ? h("div", { className: "ci-load" }, h(Spin), "检索日志…") : h("div", { className: "ci-split" },
+          logBusy && !logs.length ? h("div", { className: "ci-load" }, h(Spin), "检索日志…")
+            : listErr && !logs.length ? null
+            : h("div", { className: "ci-split" },
             h("div", { className: "ci-fields" },
               h("div", { className: "ci-tiny" }, "字段"),
               fieldNames.map((name) => h("button", {

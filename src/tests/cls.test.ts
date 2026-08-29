@@ -14,6 +14,7 @@ import {
   createClsModule,
   mapLogHit,
   mapTopicItem,
+  normalizeCql,
   parseTopicRef,
   periodLabel,
   resolveTimeRange,
@@ -175,14 +176,20 @@ test('createClsModule search sends SearchLog TopicId/From/To/CQL (g1.3)', async 
   assert.ok(searchCall)
   const payload = searchCall!.payload as {
     TopicId?: string
+    TopicIds?: string[]
     From?: number
     To?: number
     Query?: string
+    QueryString?: string
+    QuerySyntax?: number
     SyntaxRule?: number
   }
   assert.equal(payload.TopicId, 'cce2db26-4a11-43f3-ae7d-3502a4b424fd')
-  assert.equal(payload.Query, 'status:500')
-  assert.equal(payload.SyntaxRule, 0)
+  assert.equal(payload.QueryString, 'status:500')
+  assert.equal(payload.QuerySyntax, 1)
+  assert.equal(payload.Query, undefined)
+  assert.equal(payload.SyntaxRule, undefined)
+  assert.equal(payload.TopicIds, undefined)
   assert.ok((payload.From || 0) > 0)
   assert.ok((payload.To || 0) > (payload.From || 0))
   assert.equal(searchCall!.region, 'ap-guangzhou')
@@ -205,9 +212,20 @@ test('empty CQL still searches the window (g1.3)', async () => {
     queryString: '',
     range: '15m',
   })
-  const payload = calls.find((row) => row.action === 'SearchLog')?.payload as { Query?: string }
-  assert.equal(payload.Query, '')
+  const payload = calls.find((row) => row.action === 'SearchLog')?.payload as {
+    QueryString?: string
+    QuerySyntax?: number
+    TopicIds?: string[]
+  }
+  assert.equal(payload.QueryString, '')
+  assert.equal(payload.QuerySyntax, 1)
+  assert.equal(payload.TopicIds, undefined)
   assert.equal(calls.find((row) => row.action === 'SearchLog')?.region, 'ap-beijing')
+})
+
+test('normalizeCql maps Chinese 或 to CQL OR', () => {
+  assert.equal(normalizeCql('status:500 或 level:ERROR'), 'status:500 OR level:ERROR')
+  assert.equal(normalizeCql('  '), '')
 })
 
 test('duplicate topic names ask for id or logset (g1.3)', async () => {
@@ -377,6 +395,8 @@ test('client CLS card stays inside ci-panel and does not save config (g2.3 g1.4)
   assert.match(client, /继续拉取/)
   assert.match(client, /近 15 分钟/)
   assert.match(client, /自定义/)
+  assert.match(client, /status:500 OR level:ERROR/)
+  assert.doesNotMatch(client, /status:500 {2}或/)
   const start = client.indexOf('function ClsCard')
   const end = client.indexOf('function SearchToolView', start)
   const clsCard = client.slice(start, end > start ? end : undefined)
