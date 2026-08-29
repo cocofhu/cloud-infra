@@ -262,6 +262,34 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-idcell{display:flex;flex-direction:column;gap:2px;min-width:0}
 .ci-pane{padding:12px 14px}
 .ci-subtabs{display:flex;gap:8px;margin:0 0 12px}
+.ci-field textarea{min-height:72px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:8px 10px;font:inherit;resize:vertical}
+.ci-filters{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 10px;align-items:center}
+.ci-filters select,.ci-filters input,.ci-region{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit;font-size:13px}
+.ci-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:14px}
+.ci-type-card{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;padding:14px;background:var(--dsw-alias-bg-layer-2);text-align:left;cursor:pointer;font:inherit;color:inherit}
+.ci-type-card:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary)}
+.ci-type-card:disabled,.ci-type-card.closed{opacity:.7;cursor:default}
+.ci-type-card h4{margin:0 0 6px;font-size:14px}
+.ci-type-card p{margin:0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.5}
+.ci-steps{display:flex;gap:8px;padding:10px 14px;flex-wrap:wrap}
+.ci-step{font-size:12px;color:var(--dsw-alias-label-tertiary)}
+.ci-step.on{color:var(--dsw-alias-brand-primary);font-weight:650}
+.ci-wizard{padding:8px 14px 16px}
+.ci-side{display:grid;grid-template-columns:168px 1fr;min-height:360px}
+.ci-side-nav{border-right:1px solid var(--dsw-alias-border-l1);padding:8px}
+.ci-side-btn{display:block;width:100%;text-align:left;border:0;background:transparent;color:inherit;font:inherit;font-size:13px;padding:8px 10px;border-radius:8px;cursor:pointer}
+.ci-side-btn.on,.ci-side-btn:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-side-main{min-width:0;padding:8px 0 16px}
+.ci-block{margin:0 14px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:10px 12px}
+.ci-block h4{margin:0 0 8px;font-size:13px}
+.ci-np-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;padding:0 14px 14px}
+.ci-np-card{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;padding:12px;background:var(--dsw-alias-bg-layer-2)}
+.ci-np-id{background:none;border:0;padding:0;color:var(--dsw-alias-brand-primary);cursor:pointer;font:inherit;font-size:13px}
+.ci-form-panel{margin:0 14px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:10px 12px;background:var(--dsw-alias-bg-layer-2)}
+.ci-form-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:650;margin:0 0 8px}
+.ci-form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.ci-menu.ci-menu-portal{position:fixed;right:auto;top:auto}
+.ci-check input[type=checkbox],input.ci-check{width:15px;height:15px;accent-color:var(--dsw-alias-brand-primary)}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -2842,6 +2870,992 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       ];
     }
 
+    const TKE_REGIONS = [
+      { id: "ap-guangzhou", label: "广州" },
+      { id: "ap-shanghai", label: "上海" },
+      { id: "ap-nanjing", label: "南京" },
+      { id: "ap-beijing", label: "北京" },
+      { id: "ap-chengdu", label: "成都" },
+      { id: "ap-chongqing", label: "重庆" },
+      { id: "ap-hongkong", label: "香港" },
+      { id: "ap-singapore", label: "新加坡" },
+      { id: "ap-jakarta", label: "雅加达" },
+      { id: "ap-tokyo", label: "东京" },
+      { id: "ap-seoul", label: "首尔" },
+      { id: "ap-bangkok", label: "曼谷" },
+      { id: "na-siliconvalley", label: "硅谷" },
+      { id: "na-ashburn", label: "弗吉尼亚" },
+      { id: "eu-frankfurt", label: "法兰克福" },
+    ];
+    const CLUSTER_TYPES = [
+      { id: "", label: "全部类型" },
+      { id: "MANAGED_CLUSTER", label: "标准集群" },
+      { id: "INDEPENDENT_CLUSTER", label: "独立集群" },
+      { id: "SERVERLESS_CLUSTER", label: "弹性集群" },
+      { id: "EDGE_CLUSTER", label: "边缘集群" },
+      { id: "EXTERNAL_CLUSTER", label: "注册集群" },
+    ];
+    const CLUSTER_STATUS = [
+      { id: "", label: "全部状态" },
+      { id: "Running", label: "运行中" },
+      { id: "Initializing", label: "创建中" },
+      { id: "Idling", label: "空闲" },
+      { id: "Abnormal", label: "异常" },
+    ];
+    const SIDEBAR_PAGES = [
+      { id: "basic", title: "基本信息" },
+      { id: "nodes", title: "节点管理" },
+      { id: "pools", title: "节点池" },
+      { id: "namespaces", title: "命名空间" },
+      { id: "addons", title: "组件管理" },
+      { id: "rbac", title: "授权管理" },
+      { id: "policy", title: "策略管理" },
+      { id: "ops", title: "运维功能" },
+    ];
+    const CREATE_TYPES = [
+      { id: "MANAGED_CLUSTER", title: "标准集群", desc: "托管 Master，四步向导创建，可先建空集群。" },
+      { id: "SERVERLESS_CLUSTER", title: "弹性集群", desc: "新建入口已关闭。存量仍可管理；请改用标准集群并添加超级节点。", closed: true },
+      { id: "EDGE_CLUSTER", title: "边缘集群", desc: "适用于边缘节点的官方创建向导。" },
+      { id: "EXTERNAL_CLUSTER", title: "注册集群", desc: "将已有 Kubernetes 集群注册到 TKE。" },
+    ];
+
+    function col(item, label) {
+      return cellValue(item, label);
+    }
+
+    function isSuperPool(pool) {
+      const type = String((pool && pool.flags && pool.flags.type) || "").toLowerCase();
+      const badge = String((pool && pool.badges && pool.badges[0]) || "");
+      return type.includes("super") || type.includes("eklet") || badge.includes("超级");
+    }
+
+    function ClusterMoreMenu({ open, onToggle, onClose, children }) {
+      const btnRef = useRef(null);
+      const [pos, setPos] = useState(null);
+      useEffect(() => {
+        if (!open) {
+          setPos(null);
+          return undefined;
+        }
+        const place = () => {
+          const el = btnRef.current;
+          if (!el || typeof document === "undefined") return;
+          const r = el.getBoundingClientRect();
+          const width = 168;
+          const vw = window.innerWidth || 800;
+          const left = Math.min(Math.max(8, r.right - width), Math.max(8, vw - width - 8));
+          setPos({ top: r.bottom + 4, left, width });
+        };
+        place();
+        const onDoc = (e) => {
+          const t = e.target;
+          if (btnRef.current && btnRef.current.contains(t)) return;
+          if (t && typeof t.closest === "function" && t.closest(".ci-menu-portal")) return;
+          onClose();
+        };
+        window.addEventListener("resize", place);
+        window.addEventListener("scroll", place, true);
+        document.addEventListener("pointerdown", onDoc, true);
+        return () => {
+          window.removeEventListener("resize", place);
+          window.removeEventListener("scroll", place, true);
+          document.removeEventListener("pointerdown", onDoc, true);
+        };
+      }, [open, onClose]);
+      const menuNode = open
+        ? h("div", {
+          className: "ci-menu" + (pos ? " ci-menu-portal" : ""),
+          role: "menu",
+          style: pos ? { top: pos.top, left: pos.left, width: pos.width, zIndex: 80 } : undefined,
+        }, children)
+        : null;
+      const menu = pos && typeof document !== "undefined" && document.body
+        ? createPortal(menuNode, document.body)
+        : menuNode;
+      return h("div", { className: "ci-more", ref: btnRef },
+        h("button", {
+          type: "button",
+          className: "ci-link",
+          "aria-haspopup": "menu",
+          "aria-expanded": !!open,
+          onPointerDown: (e) => { e.stopPropagation(); },
+          onMouseDown: (e) => { e.stopPropagation(); },
+          onClick: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggle();
+          },
+        }, "更多"),
+        menu,
+      );
+    }
+
+    function ClusterListTable({ items, pendingId, menuId, onOpen, onMenu, onProtect, onDelete }) {
+      const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, "请选择地域后查看该地域集群，或当前筛选无数据");
+      const template = "minmax(160px,1.6fr) 84px minmax(88px,0.8fr) 64px minmax(88px,0.8fr) minmax(120px,1fr) 88px";
+      return h("div", { className: "ci-list" },
+        h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
+          h("div", { className: "ci-cell" }, "集群 ID/名称"),
+          h("div", { className: "ci-cell" }, "状态"),
+          h("div", { className: "ci-cell" }, "Kubernetes 版本"),
+          h("div", { className: "ci-cell" }, "节点数"),
+          h("div", { className: "ci-cell" }, "所在网络"),
+          h("div", { className: "ci-cell" }, "创建时间"),
+          h("div", { className: "ci-cell" }, "操作"),
+        ),
+        rows.map((item) => h("div", { key: item.id, className: "ci-row", style: { gridTemplateColumns: template } },
+          h("div", { className: "ci-cell" },
+            h("button", {
+              type: "button",
+              className: "ci-name",
+              title: col(item, "集群ID") || item.title,
+              disabled: pendingId === item.id,
+              onClick: () => onOpen(item),
+            }, col(item, "集群ID") || item.title),
+            h("div", { style: { fontSize: 12, color: "var(--dsw-alias-label-tertiary)" } }, item.title),
+          ),
+          h("div", { className: "ci-cell" }, h(StatusCell, { status: item.status })),
+          h("div", { className: "ci-cell" }, col(item, "Kubernetes 版本") || "-"),
+          h("div", { className: "ci-cell num" }, col(item, "节点数") || "0"),
+          h("div", { className: "ci-cell" }, col(item, "所在网络") || "-"),
+          h("div", { className: "ci-cell" }, col(item, "创建时间") || "-"),
+          h("div", { className: "ci-cell ci-ops" },
+            h(ClusterMoreMenu, {
+              open: menuId === item.id,
+              onToggle: () => onMenu(menuId === item.id ? "" : item.id),
+              onClose: () => onMenu(""),
+            }, [
+              h("button", {
+                key: "protect",
+                type: "button",
+                role: "menuitem",
+                onClick: (e) => { e.stopPropagation(); onProtect(item); },
+              }, "关闭删除保护"),
+              h("button", {
+                key: "delete",
+                type: "button",
+                role: "menuitem",
+                className: "ci-link danger",
+                onClick: (e) => { e.stopPropagation(); onDelete(item); },
+              }, "删除"),
+            ]),
+          ),
+        )),
+      );
+    }
+
+    function CreateWizard({ createType, onBack, onCreated, region, busy, setBusy, setErr }) {
+      const [step, setStep] = useState(1);
+      const [spec, setSpec] = useState("");
+      const [draft, setDraft] = useState({
+        clusterName: "",
+        clusterVersion: "1.28.3",
+        runtime: "containerd",
+        vpcId: "",
+        clusterCidr: "172.16.0.0/16",
+        serviceCidr: "10.200.0.0/22",
+        maxNodePodNum: "64",
+        maxClusterServiceNum: "256",
+        description: "",
+        addons: "",
+        sla: false,
+      });
+      const steps = createType === "MANAGED_CLUSTER"
+        ? ["集群信息", "网络", "组件", "确认"]
+        : createType === "EDGE_CLUSTER"
+          ? ["集群信息", "网络", "确认"]
+          : ["基本信息", "导入说明", "确认"];
+      const max = steps.length;
+      const set = (key, value) => setDraft({ ...draft, [key]: value });
+      const submit = async () => {
+        setBusy(true);
+        setErr("");
+        try {
+          const result = await api("action", {
+            moduleId: "tencent.tke",
+            action: "cluster.create",
+            region,
+            payload: {
+              region,
+              clusterType: createType,
+              clusterName: draft.clusterName,
+              clusterVersion: draft.clusterVersion,
+              runtime: draft.runtime,
+              vpcId: draft.vpcId,
+              clusterCidr: draft.clusterCidr,
+              serviceCidr: draft.serviceCidr,
+              maxNodePodNum: Number(draft.maxNodePodNum || 64) || 64,
+              maxClusterServiceNum: Number(draft.maxClusterServiceNum || 256) || 256,
+              description: draft.description,
+              addons: String(draft.addons || "").split(/[,\s]+/).filter(Boolean),
+              sla: draft.sla === true,
+            },
+          });
+          const yaml = result && result.data && (result.data.spec || result.data.kubeconfig);
+          if (createType === "EXTERNAL_CLUSTER" && yaml) {
+            setSpec(String(yaml));
+            return;
+          }
+          onCreated();
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h("span", { className: "ci-head-t" }, "新建 · " + (CREATE_TYPES.find((x) => x.id === createType)?.title || "")),
+        ),
+        h("div", { key: "steps", className: "ci-steps" }, steps.map((label, idx) => h("span", {
+          key: label,
+          className: "ci-step" + (step === idx + 1 ? " on" : ""),
+        }, `${idx + 1}. ${label}`))),
+        h("div", { key: "wiz", className: "ci-wizard" },
+          spec ? [
+            h("p", { className: "ci-hint", key: "ok" }, "已生成注册配置，请在第三方集群执行后返回列表。"),
+            h("textarea", { key: "spec", readOnly: true, value: spec, style: { width: "100%" } }),
+            h("div", { className: "ci-modal-actions", key: "done" },
+              h("button", { type: "button", className: "ci-mini primary", onClick: onCreated }, "完成"),
+            ),
+          ] : [
+            step === 1 ? [
+              h("div", { className: "ci-field", key: "n" }, h("label", null, "集群名称"), h("input", { value: draft.clusterName, onChange: (e) => set("clusterName", e.target.value) })),
+              h("div", { className: "ci-field", key: "v" }, h("label", null, "Kubernetes 版本"), h("input", { value: draft.clusterVersion, onChange: (e) => set("clusterVersion", e.target.value) })),
+              createType !== "EXTERNAL_CLUSTER" ? h("div", { className: "ci-field", key: "r" }, h("label", null, "运行时"), h("input", { value: draft.runtime, onChange: (e) => set("runtime", e.target.value) })) : null,
+              h("div", { className: "ci-field", key: "d" }, h("label", null, "描述（可选）"), h("input", { value: draft.description, onChange: (e) => set("description", e.target.value) })),
+            ] : null,
+            createType !== "EXTERNAL_CLUSTER" && step === 2 ? [
+              h("div", { className: "ci-field", key: "vpc" }, h("label", null, "VPC"), h("input", { value: draft.vpcId, placeholder: "vpc-xxxxxxxx", onChange: (e) => set("vpcId", e.target.value) })),
+              h("div", { className: "ci-field", key: "cc" }, h("label", null, createType === "EDGE_CLUSTER" ? "Pod 网段" : "容器网段"), h("input", { value: draft.clusterCidr, onChange: (e) => set("clusterCidr", e.target.value) })),
+              h("div", { className: "ci-field", key: "sc" }, h("label", null, "Service 网段"), h("input", { value: draft.serviceCidr, onChange: (e) => set("serviceCidr", e.target.value) })),
+              h("div", { className: "ci-field", key: "mp" }, h("label", null, "单节点 Pod 上限"), h("input", { value: draft.maxNodePodNum, onChange: (e) => set("maxNodePodNum", e.target.value) })),
+              createType === "MANAGED_CLUSTER" ? h("div", { className: "ci-field", key: "ms" }, h("label", null, "集群 Service 上限"), h("input", { value: draft.maxClusterServiceNum, onChange: (e) => set("maxClusterServiceNum", e.target.value) })) : null,
+            ] : null,
+            createType === "EXTERNAL_CLUSTER" && step === 2 ? [
+              h("p", { className: "ci-hint", key: "imp" }, "确认后将先创建注册集群拿到 ClusterId，再调用 DescribeExternalClusterSpec 生成 YAML/注册命令，请在第三方 Kubernetes 集群执行。"),
+            ] : null,
+            createType === "MANAGED_CLUSTER" && step === 3 ? [
+              h("p", { className: "ci-hint", key: "hint" }, "组件可跳过。空集群可以不含 Worker 节点。"),
+              h("div", { className: "ci-field", key: "ad" }, h("label", null, "组件（可选，逗号分隔）"), h("input", { value: draft.addons, placeholder: "CBS, COS", onChange: (e) => set("addons", e.target.value) })),
+            ] : null,
+            step === max ? [
+              h("p", { className: "ci-hint", key: "sum" }, `将在 ${region} ${createType === "EXTERNAL_CLUSTER" ? "注册" : "创建"}${CREATE_TYPES.find((x) => x.id === createType)?.title || "集群"}「${draft.clusterName || "-"}」${createType === "EXTERNAL_CLUSTER" ? "" : "，版本 " + draft.clusterVersion}。`),
+              h("label", { className: "ci-check", key: "sla" },
+                h("input", { type: "checkbox", checked: !!draft.sla, onChange: (e) => set("sla", e.target.checked) }),
+                "我已阅读并同意腾讯云 TKE 服务等级协议（SLA）",
+              ),
+            ] : null,
+            h("div", { className: "ci-modal-actions", key: "nav" },
+              step > 1 ? h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: () => setStep(step - 1) }, "上一步") : null,
+              createType === "MANAGED_CLUSTER" && step === 3 ? h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: () => setStep(4) }, "跳过") : null,
+              step < max ? h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: () => setStep(step + 1) }, "下一步")
+                : h("button", { type: "button", className: "ci-mini primary", disabled: busy || !draft.sla, onClick: submit }, busy ? "提交中" : (createType === "EXTERNAL_CLUSTER" ? "生成导入配置" : "确定创建")),
+            ),
+          ],
+        ),
+      ];
+    }
+
+    function DeleteWizard({ item, region, onBack, onDone, busy, setBusy, setErr }) {
+      const [step, setStep] = useState(1);
+      const [retainCbs, setRetainCbs] = useState(true);
+      const [mode, setMode] = useState("retain");
+      const [riskAck, setRiskAck] = useState(false);
+      const protectedOn = (item.badges || []).some((row) => String(row).includes("删除保护"));
+      const disableProtection = async () => {
+        setBusy(true);
+        setErr("");
+        try {
+          await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action: "cluster.protection",
+            region,
+            payload: { region, clusterId: col(item, "集群ID"), enable: false },
+          });
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      const submit = async () => {
+        setBusy(true);
+        setErr("");
+        try {
+          await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action: "cluster.delete",
+            region,
+            payload: { region, clusterId: col(item, "集群ID"), instanceDeleteMode: mode, retainCbs, riskAck: true },
+          });
+          onDone();
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h("span", { className: "ci-head-t" }, "删除集群 · " + item.title),
+        ),
+        h("div", { key: "wiz", className: "ci-wizard" },
+          step === 1 ? [
+            h("p", { className: "ci-hint", key: "h1" }, "删除前请先关闭删除保护。若仍存在普通、原生或超级节点，将禁止删除。"),
+            h("p", { className: "ci-hint", key: "h2" }, protectedOn ? "当前列表标记为已开启删除保护。" : "若基本信息仍显示删除保护已开启，请先关闭后再继续。"),
+            h("button", { type: "button", className: "ci-mini", key: "off", disabled: busy, onClick: disableProtection }, "关闭删除保护"),
+          ] : null,
+          step === 2 ? [
+            h("p", { className: "ci-hint", key: "h" }, "删除项确认：选择保留或销毁关联资源。"),
+            h("label", { className: "ci-check", key: "m1" }, h("input", { type: "radio", checked: mode === "retain", onChange: () => setMode("retain") }), "保留已有节点实例"),
+            h("label", { className: "ci-check", key: "m2" }, h("input", { type: "radio", checked: mode === "terminate", onChange: () => setMode("terminate") }), "销毁按量节点实例"),
+            h("label", { className: "ci-check", key: "d" }, h("input", { type: "checkbox", checked: retainCbs, onChange: (e) => setRetainCbs(e.target.checked) }), "保留 CBS 云盘"),
+          ] : null,
+          step === 3 ? h("label", { className: "ci-check" },
+            h("input", { type: "checkbox", checked: riskAck, onChange: (e) => setRiskAck(e.target.checked) }),
+            "我已知晓风险，集群删除后不可恢复",
+          ) : null,
+          h("div", { className: "ci-modal-actions", key: "nav" },
+            step > 1 ? h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: () => setStep(step - 1) }, "上一步") : null,
+            step < 3 ? h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: () => setStep(step + 1) }, "下一步")
+              : h("button", { type: "button", className: "ci-mini primary danger", disabled: busy || !riskAck, onClick: submit }, busy ? "删除中" : "确定删除"),
+          ),
+        ),
+      ];
+    }
+
+    function FormPanel({ title, onClose, children, onSubmit, submitLabel }) {
+      return h("div", { className: "ci-form-panel" },
+        h("div", { className: "ci-form-title" },
+          h("span", null, title),
+          h("button", { type: "button", className: "ci-link", onClick: onClose }, "取消"),
+        ),
+        children,
+        onSubmit ? h("div", { className: "ci-modal-actions" },
+          h("button", { type: "button", className: "ci-mini primary", onClick: onSubmit }, submitLabel || "提交"),
+        ) : null,
+      );
+    }
+
+    function Field({ label, value, onChange, placeholder }) {
+      return h("div", { className: "ci-field" },
+        h("label", null, label),
+        h("input", { value: value || "", placeholder: placeholder || "", onChange: (e) => onChange(e.target.value) }),
+      );
+    }
+
+    function ClusterDetail({ item, detail, loading, error, region, skipConfirm, onBack, onReload, onAction }) {
+      const [page, setPage] = useState("basic");
+      const [nodeQ, setNodeQ] = useState({ ip: "", label: "", unschedulable: "", status: "" });
+      const [panel, setPanel] = useState(null);
+      const pages = (detail && detail.pages) || SIDEBAR_PAGES;
+      const blocks = (detail && detail.blocks) || [];
+      const cards = (detail && detail.cards) || {};
+      const flags = (detail && detail.flags) || {};
+      const patch = (key, value) => setPanel(panel ? { ...panel, [key]: value } : panel);
+      const closePanel = () => setPanel(null);
+      const nodes = (cards.nodes || []).filter((row) => {
+        if (nodeQ.ip && !String((row.columns || []).find((c) => c.label === "IP")?.value || "").includes(nodeQ.ip)) return false;
+        if (nodeQ.status && String(row.status || "").toLowerCase() !== nodeQ.status.toLowerCase()) return false;
+        if (nodeQ.unschedulable) {
+          const locked = row.flags && row.flags.unschedulable;
+          if (nodeQ.unschedulable === "yes" && !locked) return false;
+          if (nodeQ.unschedulable === "no" && locked) return false;
+        }
+        if (nodeQ.label) {
+          const labels = String(row.flags?.labels || (row.columns || []).find((c) => c.label === "Label")?.value || "");
+          if (!labels.toLowerCase().includes(nodeQ.label.toLowerCase())) return false;
+        }
+        return true;
+      });
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h("span", { className: "ci-head-t", title: item.title }, item.title),
+        ),
+        loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
+        !loading && detail ? h("div", { key: "side", className: "ci-side" },
+          h("div", { className: "ci-side-nav" }, pages.map((nav) => h("button", {
+            key: nav.id,
+            type: "button",
+            className: "ci-side-btn" + (page === nav.id ? " on" : ""),
+            onClick: () => setPage(nav.id),
+          }, nav.title))),
+          h("div", { className: "ci-side-main" },
+            page === "basic" ? blocks.map((block) => h("div", { key: block.id, className: "ci-block" },
+              h("h4", null, block.title),
+              h("div", { className: "ci-chips" }, (block.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" }, row.label, h("b", null, row.value)))),
+              block.id === "cluster" ? h("div", { className: "ci-actions" },
+                h("button", { type: "button", className: "ci-mini", onClick: () => setPanel({ type: "upgrade-master", version: String(flags.kubernetesVersion || "") }) }, "Master 升级"),
+                h("button", { type: "button", className: "ci-mini", onClick: () => setPanel({ type: "upgrade-node", version: String(flags.kubernetesVersion || ""), upgradeType: "reset" }) }, "Node 升级"),
+                h("button", { type: "button", className: "ci-mini", onClick: () => onAction("cluster.protection", { enable: !flags.deletionProtection }, flags.deletionProtection ? "关闭删除保护？" : "开启删除保护？") }, flags.deletionProtection ? "关闭删除保护" : "开启删除保护"),
+              ) : null,
+              block.id === "apiserver" ? h("div", { className: "ci-actions" },
+                h("button", { type: "button", className: "ci-mini", onClick: () => onAction("cluster.endpoint", { scope: "intranet", enable: !flags.intranet }, flags.intranet ? "关闭内网访问？" : "开启内网访问？") }, flags.intranet ? "关闭内网" : "开启内网"),
+                h("button", { type: "button", className: "ci-mini", onClick: () => onAction("cluster.endpoint", { scope: "internet", enable: !flags.internet }, flags.internet ? "关闭外网访问？" : "开启外网访问？") }, flags.internet ? "关闭外网" : "开启外网"),
+                flags.kubeconfigAvailable ? h("button", { type: "button", className: "ci-mini primary", onClick: () => onAction("cluster.kubeconfig", {}, "", { copy: true }) }, "复制 kubeconfig") : null,
+                flags.kubeconfigAvailable ? h("button", { type: "button", className: "ci-mini", onClick: () => onAction("cluster.kubeconfig", {}, "", { download: true }) }, "下载 kubeconfig") : null,
+              ) : null,
+            )) : null,
+            page === "basic" && panel && panel.type === "upgrade-master" ? h(FormPanel, {
+              title: "Master 升级",
+              onClose: closePanel,
+              submitLabel: "确认升级 Master",
+              onSubmit: () => { onAction("cluster.upgrade.master", { version: panel.version }, "确认升级 Master？"); closePanel(); },
+            }, h(Field, { label: "目标版本", value: panel.version, onChange: (v) => patch("version", v) })) : null,
+            page === "basic" && panel && panel.type === "upgrade-node" ? h(FormPanel, {
+              title: "Node 升级",
+              onClose: closePanel,
+              submitLabel: "确认升级 Node",
+              onSubmit: () => { onAction("cluster.upgrade.node", { version: panel.version, upgradeType: panel.upgradeType }, "确认升级 Node？"); closePanel(); },
+            }, [
+              h(Field, { key: "v", label: "目标版本", value: panel.version, onChange: (v) => patch("version", v) }),
+              h("div", { className: "ci-field", key: "m" },
+                h("label", null, "升级方式"),
+                h("select", { value: panel.upgradeType, onChange: (e) => patch("upgradeType", e.target.value) },
+                  h("option", { value: "reset" }, "重装滚动"),
+                  h("option", { value: "in-place" }, "原地滚动"),
+                ),
+              ),
+            ]) : null,
+            page === "nodes" ? [
+              h("div", { key: "nf", className: "ci-filters" },
+                h("input", { placeholder: "Label", value: nodeQ.label, onChange: (e) => setNodeQ({ ...nodeQ, label: e.target.value }) }),
+                h("input", { placeholder: "IP", value: nodeQ.ip, onChange: (e) => setNodeQ({ ...nodeQ, ip: e.target.value }) }),
+                h("select", { value: nodeQ.unschedulable, onChange: (e) => setNodeQ({ ...nodeQ, unschedulable: e.target.value }) },
+                  h("option", { value: "" }, "封锁：全部"),
+                  h("option", { value: "yes" }, "已封锁"),
+                  h("option", { value: "no" }, "未封锁"),
+                ),
+                h("input", { placeholder: "节点状态", value: nodeQ.status, onChange: (e) => setNodeQ({ ...nodeQ, status: e.target.value }) }),
+                h("button", { type: "button", className: "ci-mini", onClick: () => setPanel({ type: "add-existed", instanceIds: "", securityGroupIds: "", loginKeyIds: "", password: "" }) }, "添加已有节点"),
+                h("button", { type: "button", className: "ci-mini primary", onClick: () => setPanel({ type: "create-node", instanceType: "", imageId: "", vpcId: "", subnetId: "", securityGroupIds: "", zone: "", instanceCount: "1", instanceChargeType: "POSTPAID_BY_HOUR", loginKeyIds: "", password: "" }) }, "新建节点"),
+              ),
+              panel && panel.type === "add-existed" ? h(FormPanel, {
+                key: "af",
+                title: "添加已有节点",
+                onClose: closePanel,
+                submitLabel: "确认添加",
+                onSubmit: () => {
+                  onAction("node.addExisted", {
+                    instanceIds: panel.instanceIds,
+                    securityGroupIds: panel.securityGroupIds,
+                    loginKeyIds: panel.loginKeyIds,
+                    password: panel.password,
+                  }, "确认添加已有节点？");
+                  closePanel();
+                },
+              }, h("div", { className: "ci-form-grid" },
+                h(Field, { label: "InstanceId（逗号分隔）", value: panel.instanceIds, onChange: (v) => patch("instanceIds", v), placeholder: "ins-xxxxxxxx" }),
+                h(Field, { label: "安全组", value: panel.securityGroupIds, onChange: (v) => patch("securityGroupIds", v), placeholder: "sg-xxxxxxxx" }),
+                h(Field, { label: "登录密钥", value: panel.loginKeyIds, onChange: (v) => patch("loginKeyIds", v), placeholder: "skey-xxxxxxxx" }),
+                h(Field, { label: "登录密码（无密钥时）", value: panel.password, onChange: (v) => patch("password", v) }),
+              )) : null,
+              panel && panel.type === "create-node" ? h(FormPanel, {
+                key: "cf",
+                title: "新建节点",
+                onClose: closePanel,
+                submitLabel: "确认新建节点",
+                onSubmit: () => {
+                  onAction("node.create", {
+                    instanceType: panel.instanceType,
+                    imageId: panel.imageId,
+                    vpcId: panel.vpcId,
+                    subnetId: panel.subnetId,
+                    securityGroupIds: panel.securityGroupIds,
+                    zone: panel.zone,
+                    instanceCount: Number(panel.instanceCount || 1) || 1,
+                    instanceChargeType: panel.instanceChargeType,
+                    loginKeyIds: panel.loginKeyIds,
+                    password: panel.password,
+                  }, "确认新建节点？");
+                  closePanel();
+                },
+              }, h("div", { className: "ci-form-grid" },
+                h(Field, { label: "机型", value: panel.instanceType, onChange: (v) => patch("instanceType", v), placeholder: "S5.MEDIUM2" }),
+                h(Field, { label: "镜像", value: panel.imageId, onChange: (v) => patch("imageId", v), placeholder: "img-xxxxxxxx" }),
+                h(Field, { label: "可用区", value: panel.zone, onChange: (v) => patch("zone", v), placeholder: "ap-guangzhou-3" }),
+                h(Field, { label: "VPC", value: panel.vpcId, onChange: (v) => patch("vpcId", v), placeholder: "vpc-xxxxxxxx" }),
+                h(Field, { label: "子网", value: panel.subnetId, onChange: (v) => patch("subnetId", v), placeholder: "subnet-xxxxxxxx" }),
+                h(Field, { label: "安全组", value: panel.securityGroupIds, onChange: (v) => patch("securityGroupIds", v), placeholder: "sg-xxxxxxxx" }),
+                h(Field, { label: "登录密钥", value: panel.loginKeyIds, onChange: (v) => patch("loginKeyIds", v), placeholder: "skey-xxxxxxxx" }),
+                h(Field, { label: "登录密码（无密钥时）", value: panel.password, onChange: (v) => patch("password", v) }),
+                h(Field, { label: "数量", value: panel.instanceCount, onChange: (v) => patch("instanceCount", v) }),
+                h("div", { className: "ci-field" },
+                  h("label", null, "计费"),
+                  h("select", { value: panel.instanceChargeType, onChange: (e) => patch("instanceChargeType", e.target.value) },
+                    h("option", { value: "POSTPAID_BY_HOUR" }, "按量计费"),
+                    h("option", { value: "PREPAID" }, "包年包月"),
+                  ),
+                ),
+              )) : null,
+              nodes.length ? h("div", { key: "nt", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+                h("thead", null, h("tr", null, h("th", null, "实例 ID"), h("th", null, "IP"), h("th", null, "封锁"), h("th", null, "状态"), h("th", null, "操作"))),
+                h("tbody", null, nodes.map((row) => h("tr", { key: row.id },
+                  h("td", null, row.id),
+                  h("td", null, (row.columns || []).find((c) => c.label === "IP")?.value || "-"),
+                  h("td", null, row.flags && row.flags.unschedulable ? "是" : "否"),
+                  h("td", null, row.status || "-"),
+                  h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
+                    h("button", { type: "button", className: "ci-link", onClick: () => onAction(row.flags && row.flags.unschedulable ? "node.uncordon" : "node.cordon", { instanceId: row.id, nodeName: row.flags?.nodeName || row.flags?.lanIp || row.id }, row.flags && row.flags.unschedulable ? "取消封锁？" : "封锁该节点？") }, row.flags && row.flags.unschedulable ? "取消封锁" : "封锁"),
+                    h("button", { type: "button", className: "ci-link", onClick: () => onAction("node.drain", { instanceId: row.id }, `确定驱逐 ${row.id}？`, { always: true }) }, "驱逐"),
+                    h("button", { type: "button", className: "ci-link danger", onClick: () => onAction("node.remove", { instanceId: row.id }, `确定移除 ${row.id}？`, { always: true }) }, "移除"),
+                  )),
+                ))),
+              )) : h("div", { key: "ne", className: "ci-empty" }, "没有节点"),
+            ] : null,
+            page === "pools" ? [
+              h("div", { key: "pa", className: "ci-sec" },
+                h("span", { className: "ci-sec-t" }, "节点池名片"),
+                h("button", { type: "button", className: "ci-mini primary", onClick: () => setPanel({
+                  type: "create-pool",
+                  poolType: "Regular",
+                  name: "",
+                  vpcId: "",
+                  subnetId: "",
+                  instanceType: "",
+                  imageId: "",
+                  securityGroupIds: "",
+                  desired: "0",
+                  instanceChargeType: "POSTPAID_BY_HOUR",
+                }) }, "新建节点池"),
+              ),
+              panel && panel.type === "create-pool" ? h(FormPanel, {
+                key: "pf",
+                title: "新建节点池",
+                onClose: closePanel,
+                submitLabel: "确认新建节点池",
+                onSubmit: () => {
+                  onAction("nodepool.create", {
+                    poolType: panel.poolType,
+                    name: panel.name,
+                    vpcId: panel.vpcId,
+                    subnetId: panel.subnetId,
+                    subnetIds: panel.subnetId,
+                    instanceType: panel.instanceType,
+                    instanceTypes: panel.instanceType,
+                    imageId: panel.imageId,
+                    securityGroupIds: panel.securityGroupIds,
+                    desired: Number(panel.desired || 0) || 0,
+                    instanceChargeType: panel.instanceChargeType,
+                  }, "确认新建节点池？");
+                  closePanel();
+                },
+              }, [
+                h("div", { className: "ci-field", key: "t" },
+                  h("label", null, "节点类型"),
+                  h("select", { value: panel.poolType, onChange: (e) => patch("poolType", e.target.value) },
+                    h("option", { value: "Regular" }, "普通节点"),
+                    h("option", { value: "Native" }, "原生节点"),
+                    h("option", { value: "Super" }, "超级节点"),
+                  ),
+                ),
+                h("div", { className: "ci-form-grid", key: "g" },
+                  h(Field, { label: "名称", value: panel.name, onChange: (v) => patch("name", v) }),
+                  panel.poolType !== "Super" ? h(Field, { label: "机型", value: panel.instanceType, onChange: (v) => patch("instanceType", v), placeholder: "S5.MEDIUM2" }) : null,
+                  panel.poolType === "Regular" ? h(Field, { label: "镜像", value: panel.imageId, onChange: (v) => patch("imageId", v), placeholder: "img-xxxxxxxx" }) : null,
+                  panel.poolType === "Regular" ? h(Field, { label: "VPC", value: panel.vpcId, onChange: (v) => patch("vpcId", v), placeholder: "vpc-xxxxxxxx" }) : null,
+                  panel.poolType !== "External" ? h(Field, { label: "子网", value: panel.subnetId, onChange: (v) => patch("subnetId", v), placeholder: "subnet-xxxxxxxx" }) : null,
+                  h(Field, { label: "安全组", value: panel.securityGroupIds, onChange: (v) => patch("securityGroupIds", v), placeholder: "sg-xxxxxxxx" }),
+                  h(Field, { label: "期望节点数", value: panel.desired, onChange: (v) => patch("desired", v) }),
+                  h("div", { className: "ci-field" },
+                    h("label", null, "计费"),
+                    h("select", { value: panel.instanceChargeType, onChange: (e) => patch("instanceChargeType", e.target.value) },
+                      h("option", { value: "POSTPAID_BY_HOUR" }, "按量计费"),
+                      h("option", { value: "PREPAID" }, "包年包月"),
+                    ),
+                  ),
+                ),
+              ]) : null,
+              panel && panel.type === "pool-detail" ? h(FormPanel, {
+                key: "pd",
+                title: "节点池详情 · " + (panel.pool?.title || panel.pool?.id || ""),
+                onClose: closePanel,
+                submitLabel: isSuperPool(panel.pool) ? "关闭" : "确认调整数量",
+                onSubmit: () => {
+                  if (isSuperPool(panel.pool)) { closePanel(); return; }
+                  onAction("nodepool.scale", {
+                    nodePoolId: panel.pool.id,
+                    desired: Number(panel.desired || 0),
+                    poolType: panel.pool?.flags?.type || "Regular",
+                  }, "确认调整数量？");
+                  closePanel();
+                },
+              }, [
+                h("p", { className: "ci-hint", key: "id" }, "节点池 ID：" + (panel.pool?.id || "")),
+                isSuperPool(panel.pool)
+                  ? h("p", { className: "ci-hint", key: "super" }, "超级节点池不按 ASG 期望节点数调整，请修改子网或安全组。")
+                  : h(Field, { key: "d", label: "期望节点数", value: panel.desired, onChange: (v) => patch("desired", v) }),
+              ]) : null,
+              (cards.nodePools || []).length ? h("div", { key: "pg", className: "ci-np-grid" }, (cards.nodePools || []).map((pool) => h("div", { key: pool.id, className: "ci-np-card" },
+                h("button", { type: "button", className: "ci-np-id", onClick: () => setPanel({ type: "pool-detail", pool, desired: String(pool.flags?.desired || 0) }) }, pool.id),
+                h("div", { className: "ci-head-t" }, pool.title),
+                h("div", { className: "ci-hint" }, (pool.badges || []).join(" · ")),
+                h("div", { className: "ci-chips" }, (pool.columns || []).map((row) => h("span", { key: row.label, className: "ci-chip" }, row.label, h("b", null, row.value)))),
+                h("div", { className: "ci-ops" },
+                  isSuperPool(pool) ? null : h("button", { type: "button", className: "ci-link", onClick: () => setPanel({ type: "pool-detail", pool, desired: String(pool.flags?.desired || 0) }) }, "调整数量"),
+                  h("button", { type: "button", className: "ci-link", onClick: () => onAction("nodepool.autoscale", { nodePoolId: pool.id, enable: !pool.flags?.autoscaling }, pool.flags?.autoscaling ? "关闭弹性伸缩？" : "开启弹性伸缩？") }, "弹性伸缩"),
+                  h("button", { type: "button", className: "ci-link", onClick: () => onAction("nodepool.protection", { nodePoolId: pool.id, enable: !pool.flags?.deletionProtection }, "切换节点池删除保护？") }, "删除保护"),
+                  h("button", { type: "button", className: "ci-link danger", onClick: () => onAction("nodepool.delete", { nodePoolId: pool.id }, `删除节点池 ${pool.title}？`, { always: true }) }, "删除"),
+                ),
+              ))) : h("div", { key: "pe", className: "ci-empty" }, "没有节点池"),
+            ] : null,
+            page === "namespaces" ? [
+              h("div", { key: "ns", className: "ci-sec" },
+                h("span", { className: "ci-sec-t" }, "命名空间"),
+                h("button", { type: "button", className: "ci-mini primary", onClick: () => setPanel({ type: "create-ns", name: "", cpu: "", memory: "" }) }, "新建"),
+              ),
+              panel && (panel.type === "create-ns" || panel.type === "quota-ns") ? h(FormPanel, {
+                key: "nsf",
+                title: panel.type === "quota-ns" ? "更新配额" : "新建命名空间",
+                onClose: closePanel,
+                submitLabel: panel.type === "quota-ns" ? "确认更新配额" : "确认新建命名空间",
+                onSubmit: () => {
+                  const quota = {};
+                  if (panel.cpu) quota.cpu = panel.cpu;
+                  if (panel.memory) quota.memory = panel.memory;
+                  onAction(panel.type === "quota-ns" ? "namespace.update" : "namespace.create", { name: panel.name, quota }, panel.type === "quota-ns" ? "确认更新配额？" : "确认新建命名空间？");
+                  closePanel();
+                },
+              }, [
+                h(Field, { key: "n", label: "名称", value: panel.name, onChange: (v) => patch("name", v) }),
+                h(Field, { key: "c", label: "CPU 配额（可空）", value: panel.cpu, onChange: (v) => patch("cpu", v) }),
+                h(Field, { key: "m", label: "内存配额（可空）", value: panel.memory, onChange: (v) => patch("memory", v) }),
+              ]) : null,
+              (cards.namespaces || []).length ? h("div", { key: "nl", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+                h("thead", null, h("tr", null, h("th", null, "名称"), h("th", null, "状态"), h("th", null, "操作"))),
+                h("tbody", null, (cards.namespaces || []).map((row) => h("tr", { key: row.id },
+                  h("td", null, row.title),
+                  h("td", null, row.status || "-"),
+                  h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
+                    h("button", { type: "button", className: "ci-link", onClick: () => setPanel({ type: "quota-ns", name: row.id, cpu: "", memory: "" }) }, "配额"),
+                    h("button", { type: "button", className: "ci-link danger", onClick: () => onAction("namespace.delete", { name: row.id }, `删除命名空间 ${row.title}？`, { always: true }) }, "删除"),
+                  )),
+                ))),
+              )) : h("div", { key: "ne2", className: "ci-empty" }, "没有命名空间"),
+            ] : null,
+            page === "addons" ? [
+              h("div", { key: "as", className: "ci-sec" },
+                h("span", { className: "ci-sec-t" }, "组件管理"),
+                h("button", { type: "button", className: "ci-mini primary", onClick: () => setPanel({ type: "install-addon", name: "", version: "" }) }, "安装组件"),
+              ),
+              panel && (panel.type === "install-addon" || panel.type === "upgrade-addon") ? h(FormPanel, {
+                key: "adf",
+                title: panel.type === "upgrade-addon" ? "升级组件" : "安装组件",
+                onClose: closePanel,
+                submitLabel: panel.type === "upgrade-addon" ? "确认升级组件" : "确认安装组件",
+                onSubmit: () => {
+                  onAction(panel.type === "upgrade-addon" ? "addon.upgrade" : "addon.install", { name: panel.name, version: panel.version }, panel.type === "upgrade-addon" ? "确认升级组件？" : "确认安装组件？");
+                  closePanel();
+                },
+              }, [
+                h(Field, { key: "n", label: "组件名称", value: panel.name, onChange: (v) => patch("name", v), placeholder: "CBS" }),
+                h(Field, { key: "v", label: "版本（可空则最新）", value: panel.version, onChange: (v) => patch("version", v) }),
+              ]) : null,
+              (cards.addons || []).length ? h("div", { key: "al", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+                h("thead", null, h("tr", null, h("th", null, "组件"), h("th", null, "版本"), h("th", null, "状态"), h("th", null, "操作"))),
+                h("tbody", null, (cards.addons || []).map((row) => h("tr", { key: row.id },
+                  h("td", null, row.title),
+                  h("td", null, (row.columns || []).find((c) => c.label === "版本")?.value || "-"),
+                  h("td", null, row.status || "-"),
+                  h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
+                    h("button", { type: "button", className: "ci-link", onClick: () => setPanel({ type: "upgrade-addon", name: row.id, version: "" }) }, "升级"),
+                    h("button", { type: "button", className: "ci-link danger", onClick: () => onAction("addon.uninstall", { name: row.id }, `卸载 ${row.title}？`, { always: true }) }, "卸载"),
+                  )),
+                ))),
+              )) : h("div", { key: "ae", className: "ci-empty" }, "没有组件"),
+            ] : null,
+            page === "rbac" ? [
+              h("div", { key: "rs", className: "ci-sec" },
+                h("span", { className: "ci-sec-t" }, "授权管理"),
+                h("button", { type: "button", className: "ci-mini primary", onClick: () => setPanel({ type: "bind-rbac", user: "", role: "tke:admin" }) }, "绑定角色"),
+              ),
+              panel && panel.type === "bind-rbac" ? h(FormPanel, {
+                key: "rf",
+                title: "绑定预设角色",
+                onClose: closePanel,
+                submitLabel: "确认绑定预设角色",
+                onSubmit: () => { onAction("rbac.bind", { user: panel.user, role: panel.role }, "确认绑定预设角色？"); closePanel(); },
+              }, [
+                h(Field, { key: "u", label: "子账号 UIN / 用户", value: panel.user, onChange: (v) => patch("user", v) }),
+                h("div", { className: "ci-field", key: "r" },
+                  h("label", null, "预设角色"),
+                  h("select", { value: panel.role, onChange: (e) => patch("role", e.target.value) },
+                    h("option", { value: "tke:admin" }, "tke:admin"),
+                    h("option", { value: "tke:ops" }, "tke:ops"),
+                    h("option", { value: "tke:ro" }, "tke:ro"),
+                    h("option", { value: "tke:ns-admin" }, "tke:ns-admin"),
+                  ),
+                ),
+              ]) : null,
+              (cards.bindings || []).length ? h("div", { key: "rl", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+                h("thead", null, h("tr", null, h("th", null, "绑定"), h("th", null, "角色"), h("th", null, "操作"))),
+                h("tbody", null, (cards.bindings || []).map((row) => h("tr", { key: row.id },
+                  h("td", null, row.title),
+                  h("td", null, (row.columns || []).find((c) => c.label === "角色")?.value || "-"),
+                  h("td", null, h("button", { type: "button", className: "ci-link danger", onClick: () => onAction("rbac.unbind", { name: row.id }, `解除 ${row.title}？`, { always: true }) }, "解除")),
+                ))),
+              )) : h("div", { key: "re", className: "ci-empty" }, "没有授权绑定"),
+            ] : null,
+            page === "policy" ? ((cards.policies || []).length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null, h("th", null, "策略"), h("th", null, "状态"), h("th", null, "操作"))),
+              h("tbody", null, (cards.policies || []).map((row) => h("tr", { key: row.id },
+                h("td", null, row.title),
+                h("td", null, row.flags && row.flags.enabled ? "已开启" : "已关闭"),
+                h("td", null, h("button", { type: "button", className: "ci-link", onClick: () => onAction("policy.toggle", { name: row.id, kind: row.flags?.kind, category: row.flags?.category, enable: !(row.flags && row.flags.enabled), confirmed: true }, row.flags && row.flags.enabled ? "关闭该预置策略？需二次确认。" : "开启该预置策略？", { always: !!(row.flags && row.flags.enabled) }) }, row.flags && row.flags.enabled ? "关闭" : "开启")),
+              ))),
+            )) : h("div", { className: "ci-empty" }, "没有预置策略")) : null,
+            page === "ops" ? h("div", { className: "ci-block" },
+              h("h4", null, "运维功能"),
+              h("p", { className: "ci-hint" }, "仅开关集群审计与事件投递，不内嵌 CLS 大盘，也不把日志正文打进对话。"),
+              h("div", { className: "ci-actions" },
+                h("button", { type: "button", className: "ci-mini", onClick: () => onAction("ops.audit", { enable: !flags.audit }, flags.audit ? "关闭集群审计？" : "开启集群审计？") }, flags.audit ? "关闭审计" : "开启审计"),
+                h("button", { type: "button", className: "ci-mini", onClick: () => onAction("ops.event", { enable: !flags.event }, flags.event ? "关闭事件投递？" : "开启事件投递？") }, flags.event ? "关闭事件投递" : "开启事件投递"),
+              ),
+            ) : null,
+          ),
+        ) : null,
+      ];
+    }
+
+    function ClusterConsole({ payload, args, running, skipConfirm, onSkipConfirm }) {
+      useEffect(() => ensureCss(), []);
+      const fromTool = Array.isArray(payload?.items) ? payload.items : null;
+      const provider = String(args.provider || "");
+      const pageSize = Math.max(1, Number(args.limit) || 12);
+      const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");
+      const [region, setRegion] = useState(String(payload?.region || args.region || "ap-guangzhou"));
+      const [filters, setFilters] = useState({ clusterType: "", status: "", vpcId: "", tag: "" });
+      const [rows, setRows] = useState(fromTool || []);
+      const [total, setTotal] = useState(Number(payload?.total) || (fromTool || []).length);
+      const [offset, setOffset] = useState(Number(payload?.offset) || 0);
+      const [hasMore, setHasMore] = useState(!!payload?.hasMore);
+      const [listBusy, setListBusy] = useState(false);
+      const [listErr, setListErr] = useState("");
+      const [draftQ, setDraftQ] = useState(initialQuery);
+      const [activeQ, setActiveQ] = useState(initialQuery);
+      const [pendingId, setPendingId] = useState("");
+      const [menuId, setMenuId] = useState("");
+      const [screen, setScreen] = useState("list");
+      const [createType, setCreateType] = useState("");
+      const [session, setSession] = useState(null);
+      const [deleteItem, setDeleteItem] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const [confirm, setConfirm] = useState(null);
+      const seq = useRef(0);
+      const fetchList = async (nextOffset, q, nextRegion, nextFilters) => {
+        const usedRegion = nextRegion != null ? nextRegion : region;
+        if (!usedRegion) {
+          setRows([]);
+          setTotal(0);
+          setListErr("");
+          return;
+        }
+        const n = ++seq.current;
+        setListBusy(true);
+        setListErr("");
+        try {
+          const result = await api("query", {
+            query: q,
+            kind: "cluster",
+            provider,
+            region: usedRegion,
+            filters: nextFilters || filters,
+            offset: nextOffset,
+            limit: pageSize,
+          });
+          if (n !== seq.current) return;
+          setRows(result.items || []);
+          setTotal(Number(result.total) || (result.items || []).length);
+          setHasMore(!!result.hasMore);
+          setOffset(Number(result.offset) || nextOffset);
+          setActiveQ(q);
+        } catch (e) {
+          if (n !== seq.current) return;
+          setListErr(publicErrorMessage(e));
+        } finally {
+          if (n === seq.current) setListBusy(false);
+        }
+      };
+      useEffect(() => {
+        if (region) fetchList(0, String(activeQ || draftQ || "").trim(), region, filters);
+      }, [region]);
+      const openItem = async (item) => {
+        setPendingId(item.id);
+        setSession({ item, loading: true, detail: null });
+        setScreen("detail");
+        try {
+          const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: item.title, region });
+          setSession({ item, loading: false, detail });
+        } catch (e) {
+          setSession({ item, loading: false, detail: null, error: publicErrorMessage(e) });
+        } finally {
+          setPendingId("");
+        }
+      };
+      const reload = async () => {
+        if (!session?.item) return;
+        const detail = await api("detail", { moduleId: session.item.moduleId, id: session.item.id, title: session.item.title, region });
+        setSession((cur) => cur ? { ...cur, detail, loading: false } : cur);
+      };
+      const runAction = async (action, payload, opts) => {
+        const target = (opts && opts.item) || session?.item || deleteItem;
+        setBusy(true);
+        setErr("");
+        try {
+          const result = await api("action", {
+            moduleId: target?.moduleId || "tencent.tke",
+            id: target?.id || "",
+            action,
+            region,
+            payload: { region, clusterId: target ? col(target, "集群ID") : "", ...payload },
+          });
+          if (opts && opts.copy && result.data && result.data.kubeconfig && navigator.clipboard) {
+            await navigator.clipboard.writeText(String(result.data.kubeconfig));
+          }
+          if (opts && opts.download && result.data && result.data.kubeconfig) {
+            const blob = new Blob([String(result.data.kubeconfig)], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = String(result.data.filename || "cluster.kubeconfig");
+            a.click();
+            URL.revokeObjectURL(url);
+          }
+          setConfirm(null);
+          if (session?.item) await reload();
+          else await fetchList(offset, activeQ, region, filters);
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      const requestAction = async (action, payload, text, opts) => {
+        let skip = skipConfirm;
+        try {
+          const d = await api("meta", {});
+          skip = !!d.skipConfirm;
+          if (onSkipConfirm) onSkipConfirm(skip);
+        } catch { /* keep */ }
+        const always = !!(opts && opts.always);
+        if (always || (!skip && text)) {
+          setConfirm({ action, payload, text, opts, danger: always });
+          return;
+        }
+        return runAction(action, payload, opts);
+      };
+      if (running) return null;
+      const counted = Number(total) || rows.length;
+      const pages = Math.max(1, Math.ceil(counted / pageSize) || 1);
+      const extra = hasMore && offset + rows.length >= counted ? 1 : 0;
+      const pageCount = Math.max(pages, Math.floor(offset / pageSize) + 1 + extra);
+      const page = Math.floor(offset / pageSize) + 1;
+      return h("div", { className: "ci-root ci-tool" },
+        h("div", { className: "ci-panel" },
+          screen === "create" && createType ? h(CreateWizard, {
+            createType,
+            region,
+            busy,
+            setBusy,
+            setErr,
+            onBack: () => { setScreen("list"); setCreateType(""); },
+            onCreated: () => { setScreen("list"); setCreateType(""); fetchList(0, activeQ, region, filters); },
+          }) : null,
+          screen === "create" && !createType ? [
+            h("div", { key: "crumb", className: "ci-crumb" },
+              h("button", { type: "button", className: "ci-back", onClick: () => setScreen("list") }, "返回"),
+              h("span", { className: "ci-head-t" }, "选择集群类型"),
+            ),
+            h("div", { key: "cards", className: "ci-type-grid" }, CREATE_TYPES.map((card) => h("button", {
+              key: card.id,
+              type: "button",
+              className: "ci-type-card" + (card.closed ? " closed" : ""),
+              disabled: !!card.closed,
+              onClick: () => { if (!card.closed) setCreateType(card.id); },
+            }, h("h4", null, card.title), h("p", null, card.desc)))),
+          ] : null,
+          screen === "delete" && deleteItem ? h(DeleteWizard, {
+            item: deleteItem,
+            region,
+            busy,
+            setBusy,
+            setErr,
+            onBack: () => { setScreen("list"); setDeleteItem(null); },
+            onDone: () => { setScreen("list"); setDeleteItem(null); fetchList(0, activeQ, region, filters); },
+          }) : null,
+          screen === "detail" && session ? h(ClusterDetail, {
+            item: session.item,
+            detail: session.detail,
+            loading: session.loading,
+            error: session.error,
+            region,
+            skipConfirm,
+            onBack: () => { setSession(null); setScreen("list"); },
+            onReload: reload,
+            onAction: requestAction,
+          }) : null,
+          screen === "list" ? [
+            h("div", { key: "bar", className: "ci-bar" },
+              h("div", { className: "ci-bar-left" },
+                h("span", { className: "ci-bar-title" }, "集群"),
+                h("span", { className: "ci-bar-count" }, `${counted} 条`),
+              ),
+              h("div", { className: "ci-ops" },
+                h("select", {
+                  className: "ci-region",
+                  value: region,
+                  onChange: (e) => { setRegion(e.target.value); setOffset(0); },
+                }, [h("option", { key: "", value: "" }, "选择地域"), ...TKE_REGIONS.map((item) => h("option", { key: item.id, value: item.id }, `${item.label}（${item.id}）`))]),
+                h("button", { type: "button", className: "ci-mini", disabled: listBusy || !region, onClick: () => fetchList(offset, activeQ, region, filters) }, "刷新"),
+                h("button", { type: "button", className: "ci-mini primary", disabled: !region, onClick: () => { setCreateType(""); setScreen("create"); } }, "新建"),
+              ),
+            ),
+            h("div", { key: "filters", className: "ci-filters" },
+              h("input", { className: "ci-search", style: { width: 160, paddingLeft: 10 }, placeholder: "名称", value: draftQ, onChange: (e) => setDraftQ(e.target.value), onKeyDown: (e) => { if (e.key === "Enter") fetchList(0, draftQ, region, filters); } }),
+              h("select", { value: filters.clusterType, onChange: (e) => { const next = { ...filters, clusterType: e.target.value }; setFilters(next); fetchList(0, draftQ, region, next); } }, CLUSTER_TYPES.map((item) => h("option", { key: item.id, value: item.id }, item.label))),
+              h("select", { value: filters.status, onChange: (e) => { const next = { ...filters, status: e.target.value }; setFilters(next); fetchList(0, draftQ, region, next); } }, CLUSTER_STATUS.map((item) => h("option", { key: item.id, value: item.id }, item.label))),
+              h("input", { placeholder: "VPC", value: filters.vpcId, onChange: (e) => setFilters({ ...filters, vpcId: e.target.value }), onBlur: () => fetchList(0, draftQ, region, filters) }),
+              h("input", { placeholder: "标签", value: filters.tag, onChange: (e) => setFilters({ ...filters, tag: e.target.value }), onBlur: () => fetchList(0, draftQ, region, filters) }),
+            ),
+            listErr || err ? h("div", { key: "lerr", className: "ci-err" }, listErr || err) : null,
+            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ClusterListTable, {
+              key: "table",
+              items: rows,
+              pendingId,
+              menuId,
+              onOpen: openItem,
+              onMenu: setMenuId,
+              onProtect: (item) => {
+                setMenuId("");
+                requestAction("cluster.protection", { enable: false, clusterId: col(item, "集群ID") }, "关闭删除保护？", { item });
+              },
+              onDelete: (item) => { setMenuId(""); setDeleteItem(item); setScreen("delete"); },
+            }),
+            h(Pager, { key: "pager", total: counted, page, pages: pageCount, busy: listBusy, onPage: (next) => fetchList((next - 1) * pageSize, activeQ, region, filters) }),
+          ] : null,
+          h(ConfirmDialog, {
+            key: "confirm",
+            open: !!confirm,
+            title: confirm?.action || "确认",
+            text: confirm?.text,
+            busy,
+            danger: !!confirm?.danger,
+            onCancel: () => { if (!busy) setConfirm(null); },
+            onConfirm: () => confirm && runAction(confirm.action, confirm.payload, confirm.opts),
+          }),
+        ),
+      );
+    }
+
     function SearchToolView(props) {
       useEffect(() => ensureCss(), []);
       const payload = pickPayload(props);
@@ -3169,6 +4183,15 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         }
       };
       if (running) return null;
+      if (kind === "cluster") {
+        return h(CiBoundary, null, h(ClusterConsole, {
+          payload,
+          args,
+          running,
+          skipConfirm,
+          onSkipConfirm: setSkipConfirm,
+        }));
+      }
       const errors = payload?.errors || [];
       const payloadErr = errors.map((e) => e && e.message).filter(Boolean).join("；");
       const keepCard = kind === "registrar" || kind === "my-domain";
@@ -3331,7 +4354,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       const showCdb = !registrarView && kind === "cdb";
       const showCert = kind === "cert";
       const showDomain = kind === "domain" || registrarView
-        || (kind !== "cvm" && kind !== "lighthouse" && kind !== "auto" && kind !== "cdb" && kind !== "cert" && !showCvm && !showLh && !showCdb && !showCert);
+        || (kind !== "cvm" && kind !== "lighthouse" && kind !== "auto" && kind !== "cdb" && kind !== "cert" && kind !== "cluster" && !showCvm && !showLh && !showCdb && !showCert);
       const cvmRows = rows.filter((row) => row && row.kind === "cvm");
       const lhRows = rows.filter((row) => row && row.kind === "lighthouse");
       const domainRows = rows.filter((row) => row && !isInstanceKind(row.kind));
@@ -4028,7 +5051,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           h("summary", { className: "ci-cfg-h" },
             h("span", { className: "ci-cfg-t" },
               h("span", { className: "ci-cfg-n" }, "云资源"),
-              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名、解析记录、云服务器与云数据库。"),
+              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名、解析记录、云服务器、云数据库与 TKE 集群。地域在资源列表中选择，不写入设置。TKE 列表默认广州。"),
             ),
             dirty ? h("span", { className: "ci-badge" }, "未保存") : null,
             h(ChevronDown, { className: "ci-cfg-ch" + (open ? " ci-cfg-ch-open" : "") }),

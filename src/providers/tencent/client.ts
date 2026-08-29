@@ -126,6 +126,29 @@ export function dnspodCall<T>(
   return serviceCall('dnspod', 'dnspod.tencentcloudapi.com', '2021-03-23', action, payload, creds, opts)
 }
 
+export function tkeCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext & { region: string; version?: string },
+): Promise<T> {
+  const region = String(opts.region || '').trim()
+  if (!region) throw new TencentApiError('缺少地域')
+  return callTencentApi<T>({
+    service: 'tke',
+    host: 'tke.tencentcloudapi.com',
+    version: opts.version || '2018-05-25',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+    region,
+  })
+}
+
 /** 腾讯云域名注册 Domain API：domain.tencentcloudapi.com / 2018-08-08 */
 export function domainCall<T>(
   action: string,

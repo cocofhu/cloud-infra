@@ -1,8 +1,8 @@
 # cloud-infra
 
-DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、证书、云服务器与云数据库，以对齐各产品控制台的列表展示；在设置页配置各云 AccessKey。
+DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、证书、TKE 集群、云服务器与云数据库，以对齐各产品控制台的列表展示；在设置页配置各云 AccessKey。
 
-已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录，[腾讯云 SSL「我的证书」](https://cloud.tencent.com/document/product/400/55741)（列表、完整详情、申请/上传/部署/下载/更多），对话卡片内的 [腾讯云域名注册](https://cloud.tencent.com/document/product/242/9595)（查询、立即加购、购物车、提交订单、核对信息、账户余额支付、我的域名），[CVM](https://cloud.tencent.com.cn/document/product/213/16533) 与 [轻量应用服务器](https://cloud.tencent.com/document/product/1207/44574)，以及 [腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦，后续加云不必改 Host 与查询核心。
+已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录，[腾讯云 SSL「我的证书」](https://cloud.tencent.com/document/product/400/55741)（列表、完整详情、申请/上传/部署/下载/更多），对话卡片内的 [腾讯云域名注册](https://cloud.tencent.com/document/product/242/9595)（查询、立即加购、购物车、提交订单、核对信息、账户余额支付、我的域名），[腾讯云 TKE](https://cloud.tencent.com/document/product/457/31824) 控制台「集群」配置树，[CVM](https://cloud.tencent.com.cn/document/product/213/16533) 与 [轻量应用服务器](https://cloud.tencent.com/document/product/1207/44574)，以及 [腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦；Host / Query 不按厂商名分支。地域只在对话参数或资源 UI 会话中传递，不写回设置。
 
 ## 功能
 
@@ -12,10 +12,16 @@ DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、
 - 顶栏申请免费证书、上传证书；行内部署（勾选匹配实例）、下载、更多（吊销/重颁发/删除）
 - 对话工具卡内查询可注册性、立即加购并走完余额支付（不改设置）
 - 对话工具卡内查看我的域名，筛选、自动续费、基本信息 / 域名安全
+- 对话里查询 TKE 集群（`kind=cluster` + 运行时 `region`），打开控制台风格集群列表
+- TKE 列表：顶栏选地域，按名称 / 类型 / 状态 / VPC / 标签筛选；列含集群 ID/名称、状态、Kubernetes 版本、节点数、所在网络、创建时间
+- 新建：类型卡（标准 / 弹性 / 边缘 / 注册）。标准集群四步向导（信息 → 网络含 GR 常用上限 → 组件可跳 → 确认+SLA）。边缘走独立网络步（VPC/Pod/Service CIDR）。注册集群先 `CreateCluster ClusterType=EXTERNAL_CLUSTER` 拿到 ClusterId，再 `DescribeExternalClusterSpec({ ClusterId, IsExtranet })` 生成导入 YAML。弹性新建入口关闭，引导标准集群 + 超级节点；独立集群不新建
+- 删除向导：第一步可关闭删除保护，有普通/原生/超级节点则拒绝，再选资源保留或销毁并勾选风险。标准走 `DeleteCluster`，边缘走 `DeleteTKEEdgeCluster`，弹性走 `DeleteEKSCluster`
+- 详情侧栏：基本信息（含 Master/Node 升级表单、APIServer 内外网分开关、删除保护）、节点（封锁用 K8s 节点名；新建需机型/镜像/可用区 Placement.Zone/安全组/子网/登录凭证；添加已有节点需安全组与密钥或密码；节点列表按 TotalCount 翻页并合并超级节点）、节点池名片（含计费；普通 `ModifyNodePoolDesiredCapacityAboutAsg` / 原生 `ModifyNodePool` 2022-05-01 / 超级不按 ASG 期望数缩容）、命名空间配额、组件（InstallAddon）、授权（K8s ClusterRoleBinding）、策略（DescribeOpenPolicyList/ModifyOpenPolicyList）、运维开关（DescribeLogSwitches ClusterIds/SwitchSet）
+- kubeconfig 只在 APIServer 区块的受信 UI 复制或下载，不进对话
 - 对话里查询云服务器：默认广州地域，顶栏下拉切换地域；同时有云服务器和轻量时用 Tab 切换产品。CVM / 轻量均为密表 + 行内更多。实例过多时按设置里的每页条数翻页
 - 实例详情按官方分组展示；开机 / 关机 / 重启在行内更多与详情顶栏完成
 - 对话里查询 CDB：列表为「登录 / 管理」，管理页为官方 11 个页签；SQL 走 DMC 登录，库账号只在进程内存
-- 设置页按厂商 schema 填写 AKSK，密钥只保存在本机。不新增地域、库账号或电源控件；新产品只出现在既有产品模块勾选。证书操作不改设置
+- 设置页按厂商 schema 填写 AKSK，并开关 `tencent.tke`；无必填地域字段。密钥只保存在本机。不新增地域、库账号或电源控件；新产品只出现在既有产品模块勾选。证书操作不改设置
 - 预留阿里云凭证字段，产品模块尚未实现
 
 ## 环境要求
@@ -40,6 +46,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 - 域名 / DNS：`QcloudDNSPodReadOnlyAccess`（或等价读权限）；改记录再加写权限
 - SSL 证书：SSL 读权限；申请 / 上传 / 部署 / 吊销还需写权限
 - 域名注册：域名注册读写（查询、下单、我的域名、自动续费与两锁）
+- TKE：容器服务读写（集群、节点、节点池、组件、授权、策略、审计开关等对应接口）
 - 云服务器：`QcloudCVMReadOnlyAccess` / `QcloudCVMFullAccess`（电源操作需要写）
 - 轻量：`QcloudLighthouseReadOnlyAccess` / `QcloudLighthouseFullAccess`
 - 云数据库：CDB 读权限；登录 DMC 与写操作还需对应写权限与库账号
@@ -56,6 +63,8 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 > 我买了哪些域名
 
+> 查一下广州的 TKE 集群
+
 > 查一下我的服务器
 
 > 列出 CVM
@@ -66,9 +75,18 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 > 还有吗
 
-插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cert`、`cdb`、`lighthouse`、`cvm`、`registrar`、`my-domain`、`auto`。**查证书必须传 `kind=cert`**。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。
+插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cert`、`cluster`、`cdb`、`lighthouse`、`cvm`、`registrar`、`my-domain`、`auto`。**查证书必须传 `kind=cert`**。查 TKE 用 `kind=cluster` 并传入运行时 `region`（如 `ap-guangzhou`）。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。查询、切地域、写操作都不会改 `cloud-infra.json`。
+
+控制台路径对照（TKE）：
+
+1. 列表顶栏选地域 → 筛选 → 点集群 ID
+2. 新建 → 类型卡 → 标准四步（确认页勾 SLA）
+3. 更多 → 关闭删除保护 → 删除向导（清节点 → 资源保留 → 风险勾选）
+4. 详情左侧：基本信息 / 节点 / 节点池 / 命名空间 / 组件 / 授权 / 策略 / 运维功能
 
 查询完成后对话中会显示可翻页列表（默认每页 12 条，与设置里的每页条数一致）：域名点「解析」配置记录；证书点证书 ID 或绑定域名查看完整详情。CVM / 轻量默认广州，可用顶栏下拉看其他地域，同时有两个产品时用 Tab 切换。点实例 ID 看分组详情，或用行内更多开机 / 关机 / 重启。CDB 点「登录」进 DMC 或点「管理」进实例管理页。地域筛选只影响当次对话，不写入设置。不要打印密钥或 PEM。
+
+不做：工作负荷、运维中心、Cloud Shell、CLS 大盘、对话输出 kubeconfig。
 
 ### 对话卡片里的域名注册
 
@@ -95,13 +113,15 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 ## 如何加一个云厂商
 
-不改 `src/host.ts`、`src/core/query.ts` 的厂商名分支（它们本来就不按厂商名切换）。
+Host / Query 仍不按厂商名分支。新增厂商：
 
 1. 新建 `src/providers/<id>/index.ts`：`registerProvider({ id, title, fields, color })`，并实现该云的签名/HTTP 客户端
-2. 新建 `src/providers/<id>/products/<kind>.ts`：实现 `ResourceModule`，把该云 API 映射为统一的 `ResourceCard`
+2. 新建 `src/providers/<id>/products/<kind>.ts`：实现 `ResourceModule`，把该云 API 映射为统一的 `ResourceCard` / 详情分区
 3. 在 [`src/providers/index.ts`](src/providers/index.ts) 增加一行 `import './<id>/index.js'`
 
-设置表单会自动出现新厂商。若新产品需要独立控制台皮肤（例如密表 vs 卡片），在 `src/client.js` 按 **kind** 分支，不要按厂商名分支。可参考 [`src/providers/tencent/`](src/providers/tencent/) 与测试里注册的假厂商。
+新增产品 kind（如 `cluster`）时，可在客户端增加独立视图（TKE 使用 `ClusterConsole`，不要复用域名 `DetailView`）。运行时 `region` 经 query/detail/action 透传，禁止为此改设置 schema。若新产品需要独立控制台皮肤（例如密表 vs 卡片），在 `src/client.js` 按 **kind** 分支，不要按厂商名分支。
+
+设置表单和对话列表会自动出现新厂商。可参考 [`src/providers/tencent/`](src/providers/tencent/) 与测试里注册的假厂商。
 
 ## 开发
 
@@ -118,9 +138,11 @@ pnpm build
 
 - **loader 报 `requires options.key`**：客户端必须用 `key: "cloud-infra"` 注册设置卡，Host 还需 `settings.register('cloud-infra', …)`
 - **提示去设置页**：尚未填写该云的 AccessKey，或未启用对应厂商
-- **CAM 未授权**：给子账号授予 DNSPod / SSL / 域名注册 / CVM / 轻量 / CDB 相关策略后再查。单个地域未授权时其余地域仍会列出
+- **CAM 未授权**：给子账号授予 DNSPod / SSL / 域名注册 / TKE / CVM / 轻量 / CDB 相关策略后再查。单个地域未授权时其余地域仍会列出
 - **没有已实名模板**：到腾讯云控制台「信息模板」完成实名；插件不创建模板
 - **账户余额不足**：核对页或浮层会提示「账户余额不足」；密钥不会出现在报错里
+- **未选地域**：TKE 列表不会暗默写设置；查询集群时默认广州
+- **凭证进对话**：kubeconfig 只出现在集群详情 APIServer 区块，请勿让 Agent 复述
 - **查服务器却只看到域名**：确认对话调用了 `kind=cvm` / `lighthouse` / `auto`，而不是缺省的 `domain`
 
 ## 许可证

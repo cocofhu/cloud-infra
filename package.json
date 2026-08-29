@@ -1,7 +1,7 @@
 {
   "name": "@cocofhu/cloud-infra",
   "version": "0.1.0",
-  "description": "DeepSeek Harness 插件：对话内查询多云资源，支持腾讯云 DNSPod 域名解析与 CDB MySQL",
+  "description": "DeepSeek Harness 插件：对话内查询多云资源，支持腾讯云 DNSPod、TKE 集群、CVM/轻量与 CDB MySQL",
   "homepage": "https://github.com/cocofhu/cloud-infra#readme",
   "bugs": {
     "url": "https://github.com/cocofhu/cloud-infra/issues"
@@ -32,6 +32,8 @@
     "tencent-cloud",
     "dnspod",
     "dns",
+    "tke",
+    "cluster",
     "cdb",
     "mysql"
   ],
