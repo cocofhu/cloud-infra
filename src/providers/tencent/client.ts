@@ -11,6 +11,7 @@ export interface TencentCallOptions {
   timeoutMs: number
   signal?: AbortSignal
   timestamp?: number
+  region?: string
   fetchImpl?: typeof fetch
 }
 
@@ -36,6 +37,7 @@ export async function callTencentApi<T = unknown>(options: TencentCallOptions): 
     payload,
     timestamp,
     version: options.version,
+    region: options.region,
   })
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), options.timeoutMs)
@@ -86,6 +88,30 @@ export function dnspodCall<T>(
     secretKey: creds.secretKey,
     timeoutMs: opts.timeoutMs,
     signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+  })
+}
+
+export const CLS_HOST = 'cls.tencentcloudapi.com'
+export const CLS_VERSION = '2020-10-16'
+
+export function clsCall<T>(
+  action: string,
+  payload: unknown,
+  creds: { secretId: string; secretKey: string },
+  opts: { timeoutMs: number; signal?: AbortSignal; region: string; fetchImpl?: typeof fetch },
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'cls',
+    host: CLS_HOST,
+    version: CLS_VERSION,
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    region: opts.region,
     fetchImpl: opts.fetchImpl,
   })
 }

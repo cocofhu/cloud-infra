@@ -46,10 +46,26 @@ export interface DnsRecord {
   remark?: string
 }
 
+export interface LogHit {
+  timeMs: number
+  timeLabel: string
+  content: string
+  source?: string
+  fileName?: string
+  fields?: Record<string, string>
+}
+
+export interface ClsRegionOption {
+  id: string
+  name: string
+  group: string
+}
+
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
   records?: DnsRecord[]
+  logs?: LogHit[]
 }
 
 export interface ResourceAction {
@@ -64,6 +80,9 @@ export interface ListResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  region?: string
+  regions?: ClsRegionOption[]
+  view?: string
 }
 
 export interface ModuleError {
@@ -79,6 +98,18 @@ export interface QueryResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  view?: string
+  region?: string
+  regions?: ClsRegionOption[]
+  topicId?: string
+  topicName?: string
+  queryString?: string
+  range?: string
+  from?: number
+  to?: number
+  logs?: LogHit[]
+  context?: string
+  fields?: string[]
 }
 
 export interface ModuleContext {
@@ -90,9 +121,36 @@ export interface ModuleContext {
   signal?: AbortSignal
   id?: string
   title?: string
+  region?: string
+  topicId?: string
+  queryString?: string
+  from?: number
+  to?: number
+  range?: string
+  context?: string
+  view?: string
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
+
+export interface SearchResult {
+  card?: ResourceCard
+  items?: ResourceCard[]
+  topicId?: string
+  topicName?: string
+  region: string
+  queryString: string
+  range: string
+  from: number
+  to: number
+  logs: LogHit[]
+  context?: string
+  hasMore?: boolean
+  total?: number
+  fields?: string[]
+  regions?: ClsRegionOption[]
+  error?: string
+}
 
 export interface ResourceModule {
   id: string
@@ -102,6 +160,7 @@ export interface ResourceModule {
   implemented: boolean
   list: (ctx: ModuleContext) => Promise<ListResult>
   detail?: (ctx: ModuleContext) => Promise<ResourceDetail>
+  search?: (ctx: ModuleContext) => Promise<SearchResult>
   execute?: (actionId: string, payload: Record<string, unknown>, ctx: ModuleContext) => Promise<ActionResult>
   actions?: ResourceAction[]
 }

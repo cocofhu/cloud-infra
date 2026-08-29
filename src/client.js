@@ -126,6 +126,26 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-id{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px;overflow:hidden;text-overflow:ellipsis}
+.ci-name-stack{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ci-region{height:32px;max-width:160px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;font-size:13px}
+.ci-query{display:grid;grid-template-columns:1fr 168px;gap:8px;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-cql{width:100%;min-height:58px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;resize:vertical;box-sizing:border-box}
+.ci-cql:focus,.ci-region:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-hist{display:flex;align-items:flex-end;gap:2px;height:56px;padding:8px 12px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-hist i{flex:1;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 42%,transparent);border-radius:2px 2px 0 0;min-height:2px}
+.ci-split{display:grid;grid-template-columns:168px 1fr;min-width:0}
+.ci-fields{border-right:1px solid var(--dsw-alias-border-l1);padding:8px;background:var(--dsw-alias-bg-layer-2);min-width:0}
+.ci-fields button{display:block;width:100%;text-align:left;border:0;background:none;padding:5px 6px;cursor:pointer;border-radius:6px;font:inherit;color:inherit}
+.ci-fields button:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-brand-primary)}
+.ci-log{padding:8px 10px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-log-hd{display:flex;justify-content:space-between;gap:8px;color:var(--dsw-alias-label-tertiary);font-size:12px}
+.ci-kv{display:inline-block;margin:4px 6px 0 0;background:var(--dsw-alias-bg-layer-2);border-radius:6px;padding:1px 6px;font-size:12px}
+.ci-raw{font-family:ui-monospace,Menlo,monospace;font-size:12px;margin-top:4px;word-break:break-all}
+.ci-tiny{font-size:12px;color:var(--dsw-alias-label-tertiary)}
+.ci-table-scroll{overflow:auto;width:100%}
+.ci-foot-note{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;color:var(--dsw-alias-label-tertiary);font-size:12px;border-top:1px solid var(--dsw-alias-border-l1);flex-wrap:wrap}
+@media(max-width:640px){.ci-query,.ci-split{grid-template-columns:1fr}.ci-fields{border-right:0;border-bottom:1px solid var(--dsw-alias-border-l1)}}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -673,6 +693,428 @@ window.__ModuleLoader__.load({
       ];
     }
 
+    const CLS_RANGE_OPTIONS = [
+      ["15m", "近 15 分钟"],
+      ["1h", "近 1 小时"],
+      ["4h", "近 4 小时"],
+      ["1d", "近 1 天"],
+      ["today", "今天"],
+      ["yesterday", "昨天"],
+      ["custom", "自定义"],
+    ];
+
+    const FALLBACK_CLS_REGIONS = [
+      { id: "ap-guangzhou", name: "广州", group: "大陆" },
+      { id: "ap-beijing", name: "北京", group: "大陆" },
+      { id: "ap-shanghai", name: "上海", group: "大陆" },
+      { id: "ap-chengdu", name: "成都", group: "大陆" },
+      { id: "ap-nanjing", name: "南京", group: "大陆" },
+      { id: "ap-chongqing", name: "重庆", group: "大陆" },
+      { id: "ap-zhongwei", name: "中卫", group: "大陆" },
+      { id: "ap-hongkong", name: "中国香港", group: "港澳台" },
+      { id: "ap-taipei", name: "中国台北", group: "港澳台" },
+      { id: "ap-singapore", name: "新加坡", group: "海外" },
+      { id: "ap-bangkok", name: "曼谷", group: "海外" },
+      { id: "ap-tokyo", name: "东京", group: "海外" },
+      { id: "ap-seoul", name: "首尔", group: "海外" },
+      { id: "ap-jakarta", name: "雅加达", group: "海外" },
+      { id: "sa-saopaulo", name: "圣保罗", group: "海外" },
+      { id: "eu-frankfurt", name: "法兰克福", group: "海外" },
+      { id: "na-siliconvalley", name: "硅谷", group: "海外" },
+      { id: "na-ashburn", name: "弗吉尼亚", group: "海外" },
+      { id: "me-riyadh", name: "利雅得", group: "海外" },
+      { id: "ap-shenzhen-fsi", name: "深圳金融", group: "金融" },
+      { id: "ap-shanghai-fsi", name: "上海金融", group: "金融" },
+      { id: "ap-beijing-fsi", name: "北京金融", group: "金融" },
+      { id: "ap-shanghai-adc", name: "上海自动驾驶云", group: "特殊" },
+    ];
+
+    function clsRegionGroups(list) {
+      const order = ["大陆", "港澳台", "海外", "金融", "特殊"];
+      const src = Array.isArray(list) && list.length ? list : FALLBACK_CLS_REGIONS;
+      return order.map((group) => ({ group, items: src.filter((item) => item.group === group) })).filter((row) => row.items.length);
+    }
+
+    function clsTopicId(item) {
+      return cellValue(item, "主题ID") || String((item && item.id) || "").split(":").pop() || "";
+    }
+
+    function histBars(logs) {
+      const rows = Array.isArray(logs) ? logs : [];
+      if (!rows.length) return Array.from({ length: 12 }, () => 8);
+      const times = rows.map((row) => Number(row.timeMs) || 0).filter((n) => n > 0);
+      if (!times.length) return Array.from({ length: 12 }, () => 8);
+      const min = Math.min(...times);
+      const max = Math.max(...times);
+      const span = Math.max(1, max - min);
+      const buckets = Array.from({ length: 12 }, () => 0);
+      for (const t of times) {
+        const i = Math.min(11, Math.floor(((t - min) / span) * 12));
+        buckets[i] += 1;
+      }
+      const peak = Math.max(1, ...buckets);
+      return buckets.map((n) => Math.max(8, Math.round((n / peak) * 100)));
+    }
+
+    function RegionSelect({ value, regions, disabled, onChange }) {
+      return h("select", {
+        className: "ci-region",
+        value: value || "ap-guangzhou",
+        disabled,
+        "aria-label": "地域",
+        onChange: (e) => onChange(e.target.value),
+      }, clsRegionGroups(regions).map((group) => h("optgroup", { key: group.group, label: group.group },
+        group.items.map((item) => h("option", { key: item.id, value: item.id }, item.name)),
+      )));
+    }
+
+    function ClsTopicTable({ items, pendingId, onOpen, emptyHint }) {
+      const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "当前地域没有匹配的日志主题");
+      return h("div", { className: "ci-table-scroll" }, h("table", { className: "ci-table" },
+        h("thead", null, h("tr", null,
+          h("th", null, "日志主题名称/ID"),
+          h("th", null, "日志集"),
+          h("th", null, "存储类型"),
+          h("th", null, "保存时间"),
+          h("th", null, "创建时间"),
+          h("th", null, "操作"),
+        )),
+        h("tbody", null, rows.map((item) => h("tr", { key: item.id },
+          h("td", null, h("div", { className: "ci-name-stack" },
+            h("button", {
+              type: "button",
+              className: "ci-name",
+              disabled: pendingId === item.id,
+              onClick: () => onOpen(item),
+            }, item.title),
+            h("div", { className: "ci-id" }, clsTopicId(item)),
+          )),
+          h("td", null, cellValue(item, "日志集") || "-"),
+          h("td", null, cellValue(item, "存储类型") || "-"),
+          h("td", null, cellValue(item, "保存时间") || "-"),
+          h("td", null, cellValue(item, "创建时间") || "-"),
+          h("td", { className: "ci-ops-cell" }, h("button", {
+            type: "button",
+            className: "ci-link",
+            disabled: pendingId === item.id,
+            onClick: () => onOpen(item),
+          }, pendingId === item.id ? "加载中" : (item.openLabel || "检索分析"))),
+        ))),
+      ));
+    }
+
+    function ClsCard({ payload, args, fromTool, pageSize, initialQuery }) {
+      const provider = String(args.provider || "");
+      const startSearch = payload?.view === "search" || Array.isArray(payload?.logs);
+      const [region, setRegion] = useState(payload?.region || args.region || "ap-guangzhou");
+      const [regions, setRegions] = useState(payload?.regions || FALLBACK_CLS_REGIONS);
+      const [view, setView] = useState(startSearch ? "search" : "list");
+      const [topic, setTopic] = useState(startSearch ? (fromTool && fromTool[0]) || null : null);
+      const [rows, setRows] = useState(fromTool || []);
+      const [total, setTotal] = useState(Number(payload?.total) || (fromTool || []).length);
+      const [offset, setOffset] = useState(Number(payload?.offset) || 0);
+      const [hasMore, setHasMore] = useState(!!payload?.hasMore);
+      const [listBusy, setListBusy] = useState(false);
+      const [listErr, setListErr] = useState((payload?.errors || []).map((e) => e.message).join("；"));
+      const [draftQ, setDraftQ] = useState(initialQuery);
+      const [activeQ, setActiveQ] = useState(initialQuery);
+      const [cql, setCql] = useState(payload?.queryString || "");
+      const [range, setRange] = useState(payload?.range || "1h");
+      const [customFrom, setCustomFrom] = useState("");
+      const [customTo, setCustomTo] = useState("");
+      const [logs, setLogs] = useState(payload?.logs || []);
+      const [logContext, setLogContext] = useState(payload?.context || "");
+      const [logMore, setLogMore] = useState(!!payload?.hasMore && startSearch);
+      const [logBusy, setLogBusy] = useState(false);
+      const [pendingId, setPendingId] = useState("");
+      const seq = useRef(0);
+      const debounce = useRef(0);
+      const toolSig = fromTool
+        ? `${payload?.view}|${payload?.region}|${Number(payload?.offset) || 0}|${fromTool.map((i) => i.id).join(",")}|${(payload?.logs || []).length}|${payload?.queryString || ""}`
+        : "";
+      useEffect(() => {
+        if (!fromTool && !payload) return;
+        setRows(fromTool || []);
+        setTotal(Number(payload?.total) || (fromTool || []).length);
+        setOffset(Number(payload?.offset) || 0);
+        setHasMore(!!payload?.hasMore);
+        setDraftQ(initialQuery);
+        setActiveQ(initialQuery);
+        if (payload?.region) setRegion(payload.region);
+        if (payload?.regions) setRegions(payload.regions);
+        if (payload?.view === "search" || Array.isArray(payload?.logs)) {
+          setView("search");
+          setTopic((fromTool && fromTool[0]) || null);
+          setLogs(payload?.logs || []);
+          setCql(payload?.queryString || "");
+          setRange(payload?.range || "1h");
+          setLogContext(payload?.context || "");
+          setLogMore(!!payload?.hasMore);
+        }
+        setListErr((payload?.errors || []).map((e) => e.message).join("；"));
+      }, [toolSig]);
+      useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
+      const fetchList = async (nextOffset, q, nextRegion) => {
+        const n = ++seq.current;
+        const usedRegion = nextRegion || region;
+        setListBusy(true);
+        setListErr("");
+        try {
+          const result = await api("query", {
+            query: q,
+            kind: "cls",
+            provider,
+            offset: nextOffset,
+            limit: pageSize,
+            region: usedRegion,
+            view: "list",
+          });
+          if (n !== seq.current) return;
+          setRows(result.items || []);
+          setTotal(Number(result.total) || (result.items || []).length);
+          setHasMore(!!result.hasMore);
+          setOffset(Number(result.offset) || nextOffset);
+          setActiveQ(q);
+          if (result.region) setRegion(result.region);
+          if (result.regions) setRegions(result.regions);
+          if (result.errors?.length) setListErr(result.errors.map((e) => e.message).join("；"));
+        } catch (e) {
+          if (n !== seq.current) return;
+          setListErr(publicErrorMessage(e));
+        } finally {
+          if (n === seq.current) setListBusy(false);
+        }
+      };
+      const fetchSearch = async (item, opts) => {
+        const n = ++seq.current;
+        const used = opts || {};
+        const nextCql = used.queryString != null ? used.queryString : cql;
+        const nextRange = used.range || range;
+        setLogBusy(true);
+        setListErr("");
+        try {
+          const body = {
+            kind: "cls",
+            provider,
+            moduleId: item.moduleId,
+            topicId: item.id,
+            id: item.id,
+            title: item.title,
+            region,
+            queryString: nextCql,
+            range: nextRange,
+            context: used.append ? logContext : "",
+            limit: pageSize,
+          };
+          if (nextRange === "custom") {
+            if (customFrom) body.from = new Date(customFrom).getTime();
+            if (customTo) body.to = new Date(customTo).getTime();
+          }
+          const result = await api("search", body);
+          if (n !== seq.current) return;
+          const nextLogs = result.logs || [];
+          setLogs((cur) => used.append ? cur.concat(nextLogs) : nextLogs);
+          setLogContext(result.context || "");
+          setLogMore(!!result.hasMore);
+          setCql(result.queryString != null ? result.queryString : nextCql);
+          setRange(result.range || nextRange);
+          if (result.region) setRegion(result.region);
+          if (result.items?.[0]) setTopic(result.items[0]);
+          if (result.errors?.length) setListErr(result.errors.map((e) => e.message).join("；"));
+        } catch (e) {
+          if (n !== seq.current) return;
+          setListErr(publicErrorMessage(e));
+        } finally {
+          if (n === seq.current) setLogBusy(false);
+        }
+      };
+      const runSearch = (q) => {
+        const next = String(q || "").trim();
+        if (debounce.current) {
+          clearTimeout(debounce.current);
+          debounce.current = 0;
+        }
+        fetchList(0, next);
+      };
+      const onDraft = (value) => {
+        setDraftQ(value);
+        if (debounce.current) clearTimeout(debounce.current);
+        debounce.current = setTimeout(() => runSearch(value), 400);
+      };
+      const onRegion = (next) => {
+        setRegion(next);
+        setView("list");
+        setTopic(null);
+        setLogs([]);
+        fetchList(0, String(activeQ || "").trim(), next);
+      };
+      const openSearch = (item) => {
+        setPendingId(item.id);
+        setTopic(item);
+        setView("search");
+        setCql("");
+        setRange("1h");
+        setLogs([]);
+        fetchSearch(item, { queryString: "", range: "1h" }).finally(() => setPendingId(""));
+      };
+      const counted = Number(total) || rows.length;
+      const pages = Math.max(1, Math.ceil(counted / pageSize) || 1);
+      const extra = hasMore && offset + rows.length >= counted ? 1 : 0;
+      const pageCount = Math.max(pages, Math.floor(offset / pageSize) + 1 + extra);
+      const page = Math.floor(offset / pageSize) + 1;
+      const fieldNames = ["__SOURCE__"].concat(Array.from(new Set(logs.flatMap((row) => Object.keys(row.fields || {})))));
+      const bars = histBars(logs);
+      if (view === "search" && topic) {
+        return h("div", { className: "ci-root ci-tool" }, h("div", { className: "ci-panel" },
+          h("div", { className: "ci-bar" },
+            h("div", { className: "ci-bar-left", style: { alignItems: "center", gap: 8 } },
+              h("button", { type: "button", className: "ci-back", onClick: () => { setView("list"); setTopic(null); } }, "返回主题"),
+              h("div", null,
+                h("div", { className: "ci-bar-title" }, "检索分析"),
+                h("div", { className: "ci-tiny" }, `${topic.title} · ${cellValue(topic, "日志集") || ""} · ${region}`),
+              ),
+            ),
+            h(RegionSelect, { value: region, regions, disabled: logBusy, onChange: onRegion }),
+          ),
+          h("div", { className: "ci-query" },
+            h("div", null,
+              h("div", { className: "ci-tiny" }, "语句模式 · CQL · 空则查全部"),
+              h("textarea", {
+                className: "ci-cql",
+                value: cql,
+                placeholder: "status:500  或  level:ERROR",
+                onChange: (e) => setCql(e.target.value),
+              }),
+            ),
+            h("div", null,
+              h("div", { className: "ci-tiny" }, "日志时间"),
+              h("select", {
+                className: "ci-region",
+                style: { maxWidth: "100%", width: "100%" },
+                value: range,
+                onChange: (e) => setRange(e.target.value),
+              }, CLS_RANGE_OPTIONS.map(([k, n]) => h("option", { key: k, value: k }, n))),
+              range === "custom" ? [
+                h("input", {
+                  key: "from",
+                  type: "datetime-local",
+                  className: "ci-region",
+                  style: { maxWidth: "100%", width: "100%", marginTop: 8 },
+                  value: customFrom,
+                  onChange: (e) => setCustomFrom(e.target.value),
+                }),
+                h("input", {
+                  key: "to",
+                  type: "datetime-local",
+                  className: "ci-region",
+                  style: { maxWidth: "100%", width: "100%", marginTop: 8 },
+                  value: customTo,
+                  onChange: (e) => setCustomTo(e.target.value),
+                }),
+              ] : h("div", { style: { height: 8 } }),
+              h("button", {
+                type: "button",
+                className: "ci-mini primary",
+                disabled: logBusy,
+                style: { width: "100%", marginTop: 8 },
+                onClick: () => fetchSearch(topic, { queryString: cql, range }),
+              }, logBusy ? "检索中" : "检索分析"),
+            ),
+          ),
+          h("div", { className: "ci-hist", "aria-hidden": "true" },
+            bars.map((hgt, idx) => h("i", { key: idx, style: { height: hgt + "%" } })),
+          ),
+          listErr ? h("div", { className: "ci-err" }, listErr) : null,
+          logBusy && !logs.length ? h("div", { className: "ci-load" }, h(Spin), "检索日志…") : h("div", { className: "ci-split" },
+            h("div", { className: "ci-fields" },
+              h("div", { className: "ci-tiny" }, "字段"),
+              fieldNames.map((name) => h("button", {
+                type: "button",
+                key: name,
+                onClick: () => {
+                  if (name[0] === "_") return;
+                  setCql(name + ":");
+                },
+              }, name)),
+            ),
+            h("div", null, logs.length
+              ? logs.map((row, idx) => h("div", { className: "ci-log", key: (row.timeMs || 0) + "-" + idx },
+                h("div", { className: "ci-log-hd" },
+                  h("span", null, row.timeLabel || ""),
+                  h("span", null, row.source || ""),
+                ),
+                Object.entries(row.fields || {}).map(([k, v]) => h("span", { className: "ci-kv", key: k }, k + ": " + v)),
+                h("div", { className: "ci-raw" }, row.content || ""),
+              ))
+              : h("div", { className: "ci-empty" }, "该时间窗没有匹配日志")),
+          ),
+          h("div", { className: "ci-foot-note" },
+            h("span", null, `原始日志倒排 · ${logs.length} 条`),
+            h("span", null, "仅当前对话 · 设置未写"),
+          ),
+          logMore ? h("div", { className: "ci-footbar" }, h("button", {
+            type: "button",
+            className: "ci-mini",
+            disabled: logBusy,
+            onClick: () => fetchSearch(topic, { append: true, queryString: cql, range }),
+          }, logBusy ? "拉取中" : "继续拉取")) : null,
+        ));
+      }
+      return h("div", { className: "ci-root ci-tool" }, h("div", { className: "ci-panel" },
+        h("div", { className: "ci-bar" },
+          h("div", { className: "ci-bar-left" },
+            h("span", { className: "ci-bar-title" }, "日志主题"),
+            h("span", { className: "ci-bar-count" }, `${counted} 条 · ${region}`),
+          ),
+          h("div", { className: "ci-bar-left", style: { flex: "none", alignItems: "center" } },
+            h(RegionSelect, { value: region, regions, disabled: listBusy, onChange: onRegion }),
+            h("div", { className: "ci-search-wrap" },
+              h(SearchIcon),
+              h("input", {
+                className: "ci-search",
+                type: "search",
+                placeholder: "主题名 / ID / 日志集",
+                value: draftQ,
+                onChange: (e) => onDraft(e.target.value),
+                onKeyDown: (e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    runSearch(draftQ);
+                  }
+                },
+              }),
+              draftQ ? h("button", {
+                type: "button",
+                className: "ci-search-x",
+                disabled: listBusy,
+                onClick: () => { setDraftQ(""); runSearch(""); },
+                "aria-label": "清空",
+              }, "×") : null,
+            ),
+          ),
+        ),
+        listErr ? h("div", { className: "ci-err" }, listErr) : null,
+        listBusy ? h("div", { className: "ci-load" }, h(Spin), "加载列表…") : h(ClsTopicTable, {
+          items: rows,
+          pendingId,
+          onOpen: openSearch,
+          emptyHint: (activeQ || draftQ) ? `当前地域没有匹配的日志主题` : "当前地域没有匹配的日志主题",
+        }),
+        h(Pager, {
+          total: counted,
+          page,
+          pages: pageCount,
+          busy: listBusy,
+          onPage: (next) => fetchList((next - 1) * pageSize, String(activeQ || "").trim()),
+        }),
+        h("div", { className: "ci-foot-note" },
+          h("span", null, "对话卡片 · 不写设置"),
+          h("span", null, "点「检索分析」仍在这张卡片里打开"),
+        ),
+      ));
+    }
+
     function SearchToolView(props) {
       useEffect(() => ensureCss(), []);
       const payload = pickPayload(props);
@@ -783,6 +1225,15 @@ window.__ModuleLoader__.load({
         setSession((cur) => cur ? { ...cur, detail, loading: false } : cur);
       };
       if (running) return null;
+      if (kind === "cls") {
+        return h(CiBoundary, null, h(ClsCard, {
+          payload,
+          args,
+          fromTool,
+          pageSize,
+          initialQuery,
+        }));
+      }
       const errors = payload?.errors || [];
       if (!fromTool?.length && !rows.length && !activeQ && !draftQ) {
         const msg = errors.map((e) => e.message).join("；");
@@ -971,7 +1422,7 @@ window.__ModuleLoader__.load({
           h("summary", { className: "ci-cfg-h" },
             h("span", { className: "ci-cfg-t" },
               h("span", { className: "ci-cfg-n" }, "云资源"),
-              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与解析记录。"),
+              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey。对话里查询域名、CLS 日志主题与检索分析；对话操作不改这里的设置。"),
             ),
             dirty ? h("span", { className: "ci-badge" }, "未保存") : null,
             h(ChevronDown, { className: "ci-cfg-ch" + (open ? " ci-cfg-ch-open" : "") }),

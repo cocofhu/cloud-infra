@@ -28,13 +28,20 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书. Pass kind=domain for domains. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List or search cloud resources and show the result as a conversation tool card (same place as the domain table). ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/CLS/日志主题/检索分析/检索日志. kind=domain (default) for domains; kind=cls for CLS log topics or log search. Results appear in the chat card, not a separate console. Do not write settings.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain or auto.' },
+      query: { type: 'string', description: 'Keyword. For domains: example.com. For CLS: topic name / topic ID / logset. Empty lists all.' },
+      kind: { type: 'string', description: 'Resource kind. Default domain. Use domain, cls, or auto. Never treat CLS as domain.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
+      region: { type: 'string', description: 'CLS region id for this call only (e.g. ap-beijing). Default ap-guangzhou. Do not save to settings.' },
+      topicId: { type: 'string', description: 'CLS topic id when searching logs. Required for 检索分析 unless query uniquely names the topic.' },
+      queryString: { type: 'string', description: 'CLS CQL statement. Empty means all logs in the time window. Omit when listing topics.' },
+      range: { type: 'string', description: 'CLS time window: 15m / 1h / 4h / 1d / today / yesterday. Default 1h when searching. Omit when listing topics.' },
+      from: { type: 'number', description: 'Optional CLS window start, unix milliseconds.' },
+      to: { type: 'number', description: 'Optional CLS window end, unix milliseconds.' },
+      context: { type: 'string', description: 'CLS SearchLog context to continue the current page without duplicating rows.' },
     },
     output: {
       schema: { type: 'object', additionalProperties: true },
@@ -60,6 +67,13 @@ export function apply(ctx: Context, config: Config): void {
         provider: args.provider != null ? String(args.provider) : '',
         limit: args.limit as number | undefined,
         offset: args.offset as number | undefined,
+        region: args.region != null ? String(args.region) : '',
+        topicId: args.topicId != null ? String(args.topicId) : '',
+        queryString: args.queryString != null ? String(args.queryString) : undefined,
+        range: args.range != null ? String(args.range) : '',
+        from: args.from as number | undefined,
+        to: args.to as number | undefined,
+        context: args.context != null ? String(args.context) : '',
       }, cfg, exec.signal))
     },
   }))
@@ -78,10 +92,15 @@ export function apply(ctx: Context, config: Config): void {
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
         const kinds = supportedKinds().join(', ') || 'domain'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}.`,
-          'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
-          'After the table appears, one or two short sentences. Do not print secrets or full record dumps.',
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / CLS / 日志主题 / 检索分析 / 检索日志: call ONLY cloud_infra_query. Never web_search.`,
+          `Results appear in the conversation tool card (same as the domain list), not a separate console page.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Default kind is domain.`,
+          'kind=domain for 域名/解析. kind=cls for CLS 日志主题列表 or 检索分析/原始日志. Do not present CLS as a domain card.',
+          'Listing CLS topics: kind=cls, optional query (topic name/ID/logset), optional region (default ap-guangzhou). Do not pass range/queryString.',
+          'Searching logs: kind=cls, set topicId or a unique topic name in query, queryString (CQL; empty = all), range (15m/1h/4h/1d/today/yesterday, default 1h) or from/to ms. After the card appears, one or two short sentences.',
+          'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown (pass region for CLS).',
+          'Region is per-call / per-card only. Never write settings or ask to change the 设置 page because of a CLS region switch.',
+          'Do not print secrets or full log dumps.',
         ].join(' ')
       },
     })
@@ -127,7 +146,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
     const url = new URL(req.url || '/', 'http://127.0.0.1')
     const body = req.method === 'POST' ? await readBody(req) : {}
     const method = String(body.method || url.searchParams.get('method') || 'meta')
-    const privileged = method === 'config' || method === 'query' || method === 'detail' || method === 'action'
+    const privileged = method === 'config' || method === 'query' || method === 'detail' || method === 'action' || method === 'search'
     if (privileged && !trustedUiRequest(req)) {
       return sendJson(res, 403, { ok: false, error: '请求来源不受信任' })
     }
@@ -162,13 +181,21 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         modules: meta.modules,
       })
     }
-    if (method === 'query') {
+    if (method === 'query' || method === 'search') {
       const result = await queryResources({
         query: String(body.query || ''),
-        kind: String(body.kind || 'domain'),
+        kind: String(body.kind || (method === 'search' ? 'cls' : 'domain')),
         provider: String(body.provider || ''),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
+        region: String(body.region || ''),
+        topicId: String(body.topicId || body.id || ''),
+        queryString: body.queryString != null ? String(body.queryString) : (method === 'search' ? '' : undefined),
+        range: String(body.range || ''),
+        from: body.from as number | undefined,
+        to: body.to as number | undefined,
+        context: String(body.context || ''),
+        view: method === 'search' ? 'search' : String(body.view || ''),
       }, cfg)
       return sendJson(res, 200, { ok: true, ...result })
     }
@@ -178,6 +205,14 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         String(body.moduleId || ''),
         String(body.id || ''),
         String(body.title || ''),
+        {
+          region: String(body.region || ''),
+          queryString: body.queryString != null ? String(body.queryString) : '',
+          range: String(body.range || '1h'),
+          from: body.from as number | undefined,
+          to: body.to as number | undefined,
+          context: String(body.context || ''),
+        },
       )
       return sendJson(res, 200, { ok: true, ...detail })
     }
@@ -200,17 +235,31 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
   }
 }
 
-async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title = '') {
+async function runDetail(
+  cfg: PluginConfig,
+  moduleId: string,
+  id: string,
+  title = '',
+  extra: { region?: string; queryString?: string; range?: string; from?: number; to?: number; context?: string } = {},
+) {
   const { module, creds } = readyModule(cfg, moduleId, id)
   if (!module.detail) throw new Error(`${module.title} 不支持详情`)
   return module.detail({
     creds,
-    query: '',
+    query: title,
     offset: 0,
     limit: cfg.maxResults,
     timeoutMs: cfg.timeoutMs,
     id,
     title: title || undefined,
+    region: extra.region,
+    topicId: id,
+    queryString: extra.queryString,
+    range: extra.range,
+    from: extra.from,
+    to: extra.to,
+    context: extra.context,
+    view: 'search',
   })
 }
 

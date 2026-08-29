@@ -9,6 +9,7 @@ const SAFE_SNIPPETS = [
   '未配置',
   '未注册',
   'unknown method',
+  '日志主题',
 ]
 
 const CODE_HINTS: Record<string, string> = {
@@ -43,6 +44,7 @@ function errorCode(err: unknown): string {
 
 function hintForCode(code: string): string {
   if (!code) return '云厂商请求失败'
+  if (/TopicNotExist|TopicNotFound/i.test(code)) return '没有找到该日志主题'
   if (CODE_HINTS[code]) return CODE_HINTS[code]
   const head = code.split('.')[0] || ''
   return CODE_HINTS[head] || '云厂商请求失败'
