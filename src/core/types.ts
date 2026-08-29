@@ -33,7 +33,7 @@ export interface ResourceCard {
   openLabel?: string
   expiresAt?: string
   extras?: Record<string, string | number | boolean | null | undefined>
-  meta?: Record<string, string>
+  meta?: Record<string, string | number | boolean | null | undefined>
   region?: string
   regionName?: string
   stateLabel?: string
@@ -52,6 +52,14 @@ export interface DnsRecord {
   mx?: number
   status?: string
   remark?: string
+}
+
+export interface DetailSection {
+  id: string
+  title: string
+  fields?: Array<{ label: string; value: string }>
+  rows?: Array<{ label: string; value: string }>
+  empty?: string
 }
 
 export interface FieldGroup {
@@ -85,6 +93,7 @@ export interface ResourceDetail {
   fields: Array<{ label: string; value: string }>
   groups?: FieldGroup[]
   records?: DnsRecord[]
+  sections?: DetailSection[]
   extra?: Record<string, unknown>
   pages?: DetailPage[]
   blocks?: DetailBlock[]
@@ -135,6 +144,7 @@ export interface ModuleContext {
   signal?: AbortSignal
   id?: string
   title?: string
+  group?: string
   region?: string
   tab?: string
   filters?: Record<string, string>

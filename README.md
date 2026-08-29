@@ -1,13 +1,15 @@
 # cloud-infra
 
-DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、TKE 集群、云服务器与云数据库，以对齐各产品控制台的列表展示；在设置页配置各云 AccessKey。
+DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、证书、TKE 集群、云服务器与云数据库，以对齐各产品控制台的列表展示；在设置页配置各云 AccessKey。
 
-已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录，对话卡片内的 [腾讯云域名注册](https://cloud.tencent.com/document/product/242/9595)（查询、立即加购、购物车、提交订单、核对信息、账户余额支付、我的域名），[腾讯云 TKE](https://cloud.tencent.com/document/product/457/31824) 控制台「集群」配置树，[CVM](https://cloud.tencent.com.cn/document/product/213/16533) 与 [轻量应用服务器](https://cloud.tencent.com/document/product/1207/44574)，以及 [腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦；Host / Query 不按厂商名分支。地域只在对话参数或资源 UI 会话中传递，不写回设置。
+已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录，[腾讯云 SSL「我的证书」](https://cloud.tencent.com/document/product/400/55741)（列表、完整详情、申请/上传/部署/下载/更多），对话卡片内的 [腾讯云域名注册](https://cloud.tencent.com/document/product/242/9595)（查询、立即加购、购物车、提交订单、核对信息、账户余额支付、我的域名），[腾讯云 TKE](https://cloud.tencent.com/document/product/457/31824) 控制台「集群」配置树，[CVM](https://cloud.tencent.com.cn/document/product/213/16533) 与 [轻量应用服务器](https://cloud.tencent.com/document/product/1207/44574)，以及 [腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦；Host / Query 不按厂商名分支。地域只在对话参数或资源 UI 会话中传递，不写回设置。
 
 ## 功能
 
 - 对话里查询域名解析，按控制台列表展示状态、套餐、记录数，可翻页
 - 点击域名或「解析」配置解析记录：添加、修改、启停、删除（删除始终确认）
+- 对话里查询证书（`kind=cert`）：复刻「我的证书」表，点击证书 ID / 绑定域名看完整分块详情
+- 顶栏申请免费证书、上传证书；行内部署（勾选匹配实例）、下载、更多（吊销/重颁发/删除）
 - 对话工具卡内查询可注册性、立即加购并走完余额支付（不改设置）
 - 对话工具卡内查看我的域名，筛选、自动续费、基本信息 / 域名安全
 - 对话里查询 TKE 集群（`kind=cluster` + 运行时 `region`），打开控制台风格集群列表
@@ -19,7 +21,7 @@ DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、
 - 对话里查询云服务器：默认广州地域，顶栏下拉切换地域；同时有云服务器和轻量时用 Tab 切换产品。CVM / 轻量均为密表 + 行内更多。实例过多时按设置里的每页条数翻页
 - 实例详情按官方分组展示；开机 / 关机 / 重启在行内更多与详情顶栏完成
 - 对话里查询 CDB：列表为「登录 / 管理」，管理页为官方 11 个页签；SQL 走 DMC 登录，库账号只在进程内存
-- 设置页按厂商 schema 填写 AKSK，并开关 `tencent.tke`；无必填地域字段。密钥只保存在本机。不新增地域、库账号或电源控件
+- 设置页按厂商 schema 填写 AKSK，并开关 `tencent.tke`；无必填地域字段。密钥只保存在本机。不新增地域、库账号或电源控件；新产品只出现在既有产品模块勾选。证书操作不改设置
 - 预留阿里云凭证字段，产品模块尚未实现
 
 ## 环境要求
@@ -39,9 +41,10 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 ## 使用
 
-打开 **设置 → 插件 → 插件配置 → 云资源**，填写腾讯云 SecretId / SecretKey。CAM 需包含对应产品的读权限；改记录、开关机或管库还需写权限。域名注册还需域名注册读写（查询、下单、我的域名、自动续费与两锁）。插件不新增设置项，复用同一套 AKSK。设置页不填写地域或库账号。
+打开 **设置 → 插件 → 插件配置 → 云资源**，填写腾讯云 SecretId / SecretKey。CAM 需包含对应产品的读权限；改记录、开关机或管库还需写权限。域名注册还需域名注册读写（查询、下单、我的域名、自动续费与两锁）。插件不新增设置项，复用同一套 AKSK。设置页不填写地域或库账号。已有腾讯云凭证即可用证书，不必再改设置。
 
 - 域名 / DNS：`QcloudDNSPodReadOnlyAccess`（或等价读权限）；改记录再加写权限
+- SSL 证书：SSL 读权限；申请 / 上传 / 部署 / 吊销还需写权限
 - 域名注册：域名注册读写（查询、下单、我的域名、自动续费与两锁）
 - TKE：容器服务读写（集群、节点、节点池、组件、授权、策略、审计开关等对应接口）
 - 云服务器：`QcloudCVMReadOnlyAccess` / `QcloudCVMFullAccess`（电源操作需要写）
@@ -53,6 +56,8 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 > 查一下 dnspod 域名
 
 > 列出我的解析域名
+
+> 查一下腾讯云证书
 
 > 查一下 example 能不能注册
 
@@ -70,7 +75,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 > 还有吗
 
-插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cluster`、`cdb`、`lighthouse`、`cvm`、`auto`。查 TKE 用 `kind=cluster` 并传入运行时 `region`（如 `ap-guangzhou`）。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。查询、切地域、写操作都不会改 `cloud-infra.json`。
+插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cert`、`cluster`、`cdb`、`lighthouse`、`cvm`、`registrar`、`my-domain`、`auto`。**查证书必须传 `kind=cert`**。查 TKE 用 `kind=cluster` 并传入运行时 `region`（如 `ap-guangzhou`）。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。查询、切地域、写操作都不会改 `cloud-infra.json`。
 
 控制台路径对照（TKE）：
 
@@ -79,7 +84,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 3. 更多 → 关闭删除保护 → 删除向导（清节点 → 资源保留 → 风险勾选）
 4. 详情左侧：基本信息 / 节点 / 节点池 / 命名空间 / 组件 / 授权 / 策略 / 运维功能
 
-查询完成后对话中会显示可翻页列表（默认每页 12 条，与设置里的每页条数一致）：域名点「解析」配置记录；CVM / 轻量默认广州，可用顶栏下拉看其他地域，同时有两个产品时用 Tab 切换。点实例 ID 看分组详情，或用行内更多开机 / 关机 / 重启。CDB 点「登录」进 DMC 或点「管理」进实例管理页。地域筛选只影响当次对话，不写入设置。
+查询完成后对话中会显示可翻页列表（默认每页 12 条，与设置里的每页条数一致）：域名点「解析」配置记录；证书点证书 ID 或绑定域名查看完整详情。CVM / 轻量默认广州，可用顶栏下拉看其他地域，同时有两个产品时用 Tab 切换。点实例 ID 看分组详情，或用行内更多开机 / 关机 / 重启。CDB 点「登录」进 DMC 或点「管理」进实例管理页。地域筛选只影响当次对话，不写入设置。不要打印密钥或 PEM。
 
 不做：工作负荷、运维中心、Cloud Shell、CLS 大盘、对话输出 kubeconfig。
 
@@ -133,7 +138,7 @@ pnpm build
 
 - **loader 报 `requires options.key`**：客户端必须用 `key: "cloud-infra"` 注册设置卡，Host 还需 `settings.register('cloud-infra', …)`
 - **提示去设置页**：尚未填写该云的 AccessKey，或未启用对应厂商
-- **CAM 未授权**：给子账号授予 DNSPod / 域名注册 / TKE / CVM / 轻量 / CDB 相关策略后再查。单个地域未授权时其余地域仍会列出
+- **CAM 未授权**：给子账号授予 DNSPod / SSL / 域名注册 / TKE / CVM / 轻量 / CDB 相关策略后再查。单个地域未授权时其余地域仍会列出
 - **没有已实名模板**：到腾讯云控制台「信息模板」完成实名；插件不创建模板
 - **账户余额不足**：核对页或浮层会提示「账户余额不足」；密钥不会出现在报错里
 - **未选地域**：TKE 列表不会暗默写设置；查询集群时默认广州

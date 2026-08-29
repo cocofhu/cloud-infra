@@ -12,25 +12,29 @@ window.__ModuleLoader__.load({
 .ci-bar-left{display:flex;align-items:center;gap:8px;flex:none;min-width:0}
 .ci-bar-title{font-size:14px;font-weight:650;line-height:22px;color:var(--dsw-alias-label-primary)}
 .ci-bar-count{color:var(--dsw-alias-label-tertiary);font-size:12px}
-.ci-search-wrap{position:relative;width:min(220px,100%);flex:none}
+.ci-search-wrap{position:relative;flex:1 1 160px;min-width:128px;max-width:220px;width:auto}
 .ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption);pointer-events:none}
 .ci-search{width:100%;height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 28px 0 32px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none}
 .ci-search::-webkit-search-cancel-button,.ci-search::-webkit-search-decoration{appearance:none;-webkit-appearance:none;display:none}
 .ci-search:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-search-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;line-height:1}
 .ci-search-x:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
-.ci-list{border-top:1px solid var(--dsw-alias-border-l1);overflow:auto;width:100%;min-width:0}
-.ci-row{display:grid;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);min-width:0;box-sizing:border-box}
+.ci-list{border-top:1px solid var(--dsw-alias-border-l1);overflow:auto;width:100%;max-width:100%;min-width:0}
+.ci-row{display:grid;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);min-width:0;width:100%;box-sizing:border-box}
+.ci-cert-list .ci-row{min-width:860px}
 .ci-row.head{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:500;padding:8px 14px}
 .ci-row:last-child{border-bottom:0}
-.ci-row:not(.head):hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-row:not(.head):hover,.ci-row:not(.head).open{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-row:not(.head).open{position:relative;z-index:4}
 .ci-cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary)}
+.ci-cell.ci-ops-cell{overflow:visible;min-width:0;background:inherit}
 .ci-row.head .ci-cell{color:var(--dsw-alias-label-tertiary)}
 .ci-cell.num{font-variant-numeric:tabular-nums}
 .ci-name{font-weight:550;color:var(--dsw-alias-label-primary);background:none;border:0;padding:0;cursor:pointer;font:inherit;font-size:13px;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ci-name:hover{color:var(--dsw-alias-brand-primary)}
-.ci-ops{display:flex;align-items:center;gap:10px;white-space:nowrap}
-.ci-link{background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-brand-primary)}
+.ci-ops{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap;background:inherit}
+.ci-ops > *{flex-shrink:0}
+.ci-link{appearance:none;-webkit-appearance:none;background:transparent;border:0;padding:0;margin:0;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-brand-primary)}
 .ci-link:hover{text-decoration:underline}
 .ci-link:disabled{opacity:.45;cursor:wait;text-decoration:none}
 .ci-link.danger{color:var(--dsw-alias-state-error-primary)}
@@ -66,6 +70,7 @@ window.__ModuleLoader__.load({
 .ci-chip b{color:var(--dsw-alias-label-primary);margin-left:4px;font-weight:600}
 .ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
 .ci-sec-t{font-size:13px;font-weight:650}
+.ci-sec-empty{display:flex;align-items:center;gap:8px;padding:0 14px 14px;font-size:13px;color:var(--dsw-alias-label-secondary);line-height:22px}
 .ci-table-wrap{width:100%;overflow:auto}
 .ci-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
 .ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle}
@@ -74,7 +79,7 @@ window.__ModuleLoader__.load({
 .ci-table td.ci-ops-cell{white-space:nowrap;word-break:normal}
 .ci-table tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-rec-page{margin:0}
-.ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+.ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px;white-space:nowrap;flex-shrink:0}
 .ci-mini.primary{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border-color:transparent}
 .ci-mini.danger{color:var(--dsw-alias-state-error-primary)}
 .ci-mini:disabled{opacity:.4;cursor:default}
@@ -131,6 +136,24 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-groups{display:flex;gap:16px;padding:0 14px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-groups .ci-group{background:none;border:0;border-bottom:2px solid transparent;padding:8px 0;margin-bottom:-1px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-tertiary)}
+.ci-groups .ci-group.active{color:var(--dsw-alias-brand-primary);border-bottom-color:var(--dsw-alias-brand-primary);font-weight:600}
+.ci-bar-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0;flex:1;justify-content:flex-end}
+.ci-dl{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;padding:0 14px 14px;font-size:13px}
+.ci-dl span{color:var(--dsw-alias-label-tertiary)}
+.ci-dl b{font-weight:600;color:var(--dsw-alias-label-primary);word-break:break-all}
+.ci-more{position:relative;display:inline-flex;background:inherit}
+.ci-more-menu{position:fixed;z-index:60;min-width:128px;padding:6px 0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background-color:Canvas;box-shadow:0 8px 24px rgba(0,0,0,.16);overflow:hidden;isolation:isolate}
+.ci-more-menu::before{content:"";position:absolute;inset:0;background:var(--dsw-alias-button-elevated-fill,var(--dsw-alias-bg-layer-1));pointer-events:none;border-radius:inherit}
+.ci-more-item{display:block;width:100%;text-align:left;background:transparent;border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-primary);position:relative;z-index:1}
+.ci-more-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-more-item.danger{color:var(--dsw-alias-state-error-primary)}
+.ci-field textarea{min-height:88px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:8px 10px;font:inherit;resize:vertical}
+.ci-field textarea:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:13px;line-height:1.4}
+.ci-modal.wide{width:min(560px,100%)}
+.ci-renew{margin-left:6px}
 .ci-select{height:32px;width:auto;max-width:180px;flex:none;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box}
 .ci-select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-ghost{height:30px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:8px;padding:0 10px;cursor:pointer;font:inherit;color:inherit}
@@ -173,7 +196,7 @@ window.__ModuleLoader__.load({
 .ci-hint-inline{color:var(--dsw-alias-label-caption);font-size:12px;padding:8px 14px 12px}
 .ci-cart-list{margin:0 0 12px;padding:0;list-style:none}
 .ci-cart-list li{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--dsw-alias-border-l1);font-size:13px}
-.ci-modal.wide{width:min(480px,100%)}
+.ci-modal.wide{width:min(560px,100%)}
 .ci-modal.wizard{width:min(720px,100%);max-height:80vh;min-height:480px;padding:0;display:flex;flex-direction:column;overflow:hidden}
 .ci-wiz-head{padding:18px 24px 12px;border-bottom:1px solid var(--dsw-alias-border-l1);flex:none}
 .ci-wiz-head h3{margin:0 0 14px;font-size:18px}
@@ -349,6 +372,16 @@ window.__ModuleLoader__.load({
       try { return JSON.parse(raw); } catch { return {}; }
     }
 
+    function isCloudInfraPayload(node) {
+      if (!node || typeof node !== "object" || Array.isArray(node)) return false;
+      if (!Array.isArray(node.items)) return false;
+      if (node.kind === "cloud-infra-query") return true;
+      if (node.resourceKind === "cert" || node.resourceKind === "domain" || node.resourceKind === "auto") return true;
+      if (node.items[0] && node.items[0].moduleId) return true;
+      if (Array.isArray(node.errors) && (node.kind === "cert" || node.kind === "domain" || node.kind === "auto")) return true;
+      return false;
+    }
+
     function pickPayload(props) {
       const found = [];
       const visit = (node, depth) => {
@@ -358,8 +391,7 @@ window.__ModuleLoader__.load({
           for (const x of node) visit(x, depth + 1);
           return;
         }
-        if (node.kind === "cloud-infra-query" && Array.isArray(node.items)) found.push(node);
-        else if (Array.isArray(node.items) && node.items[0] && node.items[0].moduleId) found.push(node);
+        if (isCloudInfraPayload(node)) found.push(node);
         for (const key of ["meta", "presentationMeta", "result", "content", "block", "call", "output"]) {
           if (node[key]) visit(node[key], depth + 1);
         }
@@ -803,7 +835,540 @@ window.__ModuleLoader__.load({
       return createPortal(node, document.body);
     }
 
-    function DetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
+    function certMeta(item) {
+      return (item && item.meta) || {};
+    }
+
+    function certCol(item, label) {
+      const col = (item.columns || []).find((c) => c && c.label === label);
+      if (col && col.value != null) return String(col.value);
+      return String(certMeta(item)[label] || "");
+    }
+
+    function triggerDownload(filename, content, contentType) {
+      const raw = String(content || "");
+      if (!raw) throw new Error("没有可下载的内容");
+      if (/-----BEGIN /i.test(raw)) throw new Error("下载内容含 PEM，不支持明文下发，请使用 zip 包下载");
+      const binary = atob(raw);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: contentType || "application/zip" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename || "certificate.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function FieldInput({ label, value, onChange, placeholder, type, disabled }) {
+      return h("div", { className: "ci-field" },
+        h("label", null, label),
+        type === "textarea"
+          ? h("textarea", { value: value || "", placeholder: placeholder || "", disabled, onChange: (e) => onChange(e.target.value) })
+          : type === "select"
+            ? h("select", { value: value || "", disabled, onChange: (e) => onChange(e.target.value) }, (placeholder || []).map((opt) => h("option", { key: opt.value, value: opt.value }, opt.label)))
+            : h("input", { type: type || "text", value: value || "", placeholder: placeholder || "", disabled, onChange: (e) => onChange(e.target.value) }),
+      );
+    }
+
+    function MoreMenu({ item, open, onToggle, onClose, onAction }) {
+      const meta = certMeta(item);
+      const status = Number(meta.status);
+      const items = [];
+      if (status === 1) items.push({ id: "cert.replace", label: "重颁发" }, { id: "cert.revoke", label: "吊销", danger: true });
+      if (meta.cancelable) {
+        items.push({ id: "cert.verify", label: "查看验证状态" });
+        items.push({ id: "cert.cancel", label: "取消审核" });
+      } else {
+        items.push({ id: "cert.delete", label: "删除", danger: true });
+      }
+      const btn = useRef(null);
+      const menuRef = useRef(null);
+      const [pos, setPos] = useState(null);
+      useEffect(() => {
+        if (!open) {
+          setPos(null);
+          return;
+        }
+        const place = () => {
+          const el = btn.current;
+          if (!el || typeof el.getBoundingClientRect !== "function") return;
+          const r = el.getBoundingClientRect();
+          const width = 140;
+          const vw = typeof window !== "undefined" ? window.innerWidth : r.right;
+          const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+          const left = Math.max(8, Math.min(r.right - width, vw - width - 8));
+          const height = items.length * 32 + 12;
+          const top = r.bottom + 4 + height > vh - 8 ? Math.max(8, r.top - height - 4) : r.bottom + 4;
+          setPos({ top, left, width });
+        };
+        place();
+        const onDoc = (e) => {
+          const t = e.target;
+          if (btn.current && btn.current.contains(t)) return;
+          if (menuRef.current && menuRef.current.contains(t)) return;
+          onClose();
+        };
+        const onKey = (e) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("mousedown", onDoc);
+        document.addEventListener("keydown", onKey);
+        window.addEventListener("resize", place);
+        window.addEventListener("scroll", place, true);
+        return () => {
+          document.removeEventListener("mousedown", onDoc);
+          document.removeEventListener("keydown", onKey);
+          window.removeEventListener("resize", place);
+          window.removeEventListener("scroll", place, true);
+        };
+      }, [open, items.length, onClose]);
+      const menu = open && pos
+        ? createPortal(h("div", {
+          className: "ci-more-menu",
+          role: "menu",
+          ref: menuRef,
+          style: { top: pos.top + "px", left: pos.left + "px", minWidth: pos.width + "px" },
+        }, items.map((row) => h("button", {
+          key: row.id,
+          type: "button",
+          role: "menuitem",
+          className: "ci-more-item" + (row.danger ? " danger" : ""),
+          onMouseDown: (e) => e.stopPropagation(),
+          onClick: (e) => { e.stopPropagation(); onAction(row); },
+        }, row.label))), document.body)
+        : null;
+      return h("span", { className: "ci-more" },
+        h("button", {
+          type: "button",
+          className: "ci-link",
+          ref: btn,
+          "aria-haspopup": "menu",
+          "aria-expanded": open ? "true" : "false",
+          onMouseDown: (e) => e.stopPropagation(),
+          onClick: (e) => { e.preventDefault(); e.stopPropagation(); onToggle(); },
+        }, "更多"),
+        menu,
+      );
+    }
+
+    function CertOps({ item, pendingId, moreId, setMoreId, onDeploy, onDownload, onMore }) {
+      const meta = certMeta(item);
+      const busy = pendingId === item.id;
+      return h("div", { className: "ci-ops" },
+        meta.deployable ? h("button", { type: "button", className: "ci-link", disabled: busy, onClick: () => onDeploy(item) }, "部署") : null,
+        meta.downloadable ? h("button", { type: "button", className: "ci-link", disabled: busy, onClick: () => onDownload(item) }, busy ? "下载中" : "下载") : null,
+        h(MoreMenu, {
+          item,
+          open: moreId === item.id,
+          onToggle: () => setMoreId(moreId === item.id ? "" : item.id),
+          onClose: () => setMoreId(""),
+          onAction: (row) => { setMoreId(""); onMore(item, row); },
+        }),
+      );
+    }
+
+    function CertTable({ items, pendingId, moreId, setMoreId, onOpen, emptyHint, onDeploy, onDownload, onMore }) {
+      const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "没有证书");
+      const template = "minmax(110px,1.1fr) minmax(140px,1.3fr) minmax(72px,0.8fr) minmax(110px,1fr) minmax(88px,0.9fr) minmax(130px,1fr) 128px";
+      const head = ["证书 ID", "绑定域名", "备注", "类型/品牌", "状态", "有效期", "操作"];
+      return h("div", { className: "ci-list ci-cert-list" },
+        h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
+          head.map((label) => h("div", { key: label, className: "ci-cell" }, label)),
+        ),
+        rows.map((item) => {
+          const meta = certMeta(item);
+          return h("div", { key: item.id, className: "ci-row" + (moreId === item.id ? " open" : ""), style: { gridTemplateColumns: template } },
+            h("div", { className: "ci-cell" }, h("button", {
+              type: "button",
+              className: "ci-name",
+              title: item.title,
+              disabled: pendingId === item.id,
+              onClick: () => onOpen(item),
+            }, item.title)),
+            h("div", { className: "ci-cell" }, h("button", {
+              type: "button",
+              className: "ci-name",
+              title: meta.domain || certCol(item, "绑定域名"),
+              disabled: pendingId === item.id,
+              onClick: () => onOpen(item),
+            }, meta.domain || certCol(item, "绑定域名") || "—")),
+            h("div", { className: "ci-cell" }, meta.alias || certCol(item, "备注") || "—"),
+            h("div", { className: "ci-cell" }, meta.productName ? `${certCol(item, "类型/品牌")}` : certCol(item, "类型/品牌") || "—"),
+            h("div", { className: "ci-cell" },
+              meta.statusName || certCol(item, "状态") || "—",
+              meta.renewable ? h("button", { type: "button", className: "ci-link ci-renew", onClick: () => onMore(item, { id: "cert.renew", label: "快速续期" }) }, "快速续期") : null,
+            ),
+            h("div", { className: "ci-cell" }, meta.validTo || certCol(item, "有效期") || "—"),
+            h("div", { className: "ci-cell ci-ops-cell" }, h(CertOps, { item, pendingId, moreId, setMoreId, onDeploy, onDownload, onMore })),
+          );
+        }),
+      );
+    }
+
+    const CERT_SECTION_TITLES = {
+      basic: "基本信息",
+      domains: "域名信息",
+      validation: "域名验证",
+      chain: "证书链摘要",
+      bound: "关联云资源",
+    };
+
+    function CertSection({ section, onRetry }) {
+      const fields = section.fields || [];
+      const rows = section.rows || [];
+      const empty = !fields.length && !rows.length;
+      const title = CERT_SECTION_TITLES[section.id] || section.title;
+      return [
+        h("div", { key: section.id + "-t", className: "ci-sec" }, h("span", { className: "ci-sec-t" }, title)),
+        empty
+          ? h("div", { key: section.id + "-e", className: "ci-sec-empty" },
+            h("span", null, section.empty || "暂无"),
+            onRetry ? h("button", { type: "button", className: "ci-link", onClick: onRetry }, "重试") : null,
+          )
+          : h("div", { key: section.id + "-d", className: "ci-dl" },
+            fields.flatMap((row) => [h("span", { key: section.id + row.label }, row.label), h("b", { key: section.id + row.label + "v" }, row.value || "—")]),
+            rows.flatMap((row, idx) => [h("span", { key: section.id + "r" + idx }, row.label), h("b", { key: section.id + "rv" + idx }, row.value || "—")]),
+          ),
+      ];
+    }
+
+    function ApplyCertDialog({ busy, err, onCancel, onSubmit }) {
+      const [draft, setDraft] = useState({ domain: "", verifyType: "DNS_AUTO", algorithm: "RSA", alias: "" });
+      const box = useOverlayKeys(true, busy, onCancel, false);
+      const set = (key) => (value) => setDraft({ ...draft, [key]: value });
+      return createPortal(h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "申请免费证书"),
+          h("p", null, "仅支持单域名，不支持 IP 与泛域名。提交后进入验证域名。"),
+          h(FieldInput, { label: "绑定域名", value: draft.domain, onChange: set("domain"), placeholder: "www.example.com", disabled: busy }),
+          h(FieldInput, {
+            label: "验证方式",
+            type: "select",
+            value: draft.verifyType,
+            onChange: set("verifyType"),
+            placeholder: [
+              { value: "DNS_AUTO", label: "自动 DNS" },
+              { value: "DNS", label: "手动 DNS" },
+              { value: "FILE", label: "文件验证" },
+            ],
+            disabled: busy,
+          }),
+          h(FieldInput, {
+            label: "算法",
+            type: "select",
+            value: draft.algorithm,
+            onChange: set("algorithm"),
+            placeholder: [
+              { value: "RSA", label: "RSA（默认）" },
+              { value: "ECC", label: "ECC" },
+            ],
+            disabled: busy,
+          }),
+          h(FieldInput, { label: "备注名", value: draft.alias, onChange: set("alias"), placeholder: "最多 200 字", disabled: busy }),
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
+            h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: () => onSubmit(draft) }, busy ? "提交中" : "下一步：验证域名"),
+          ),
+        ),
+      ), document.body);
+    }
+
+    function VerifyCertDialog({ item, verifyType, busy, err, status, onCancel, onCheck, onComplete, onOpenDetail }) {
+      const auto = String(verifyType || "").toUpperCase() === "DNS_AUTO";
+      const box = useOverlayKeys(true, busy, onCancel, false);
+      return createPortal(h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "验证域名"),
+          h("p", null, auto
+            ? "已提交自动 DNS。请确认域名在 DNSPod 托管；可查看验证状态，签发后即可部署。"
+            : "请按详情中的主机记录或文件完成验证，然后查看验证状态。校验通过后将提交完成审核。"),
+          status ? h("p", { className: "ci-hint" }, status) : null,
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "关闭"),
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: () => onOpenDetail(item) }, "查看详情"),
+            h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: onCheck }, busy ? "检查中" : "查看验证状态"),
+            !auto ? h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: onComplete }, "完成审核") : null,
+          ),
+        ),
+      ), document.body);
+    }
+
+    function ReplaceCertDialog({ item, verifyType, busy, err, onCancel, onSubmit }) {
+      const initial = String(verifyType || certMeta(item).verifyType || "DNS").toUpperCase();
+      const [draft, setDraft] = useState({
+        verifyType: initial === "FILE" || initial === "DNS" || initial === "DNS_AUTO" ? initial : "DNS",
+      });
+      const box = useOverlayKeys(true, busy, onCancel, false);
+      return createPortal(h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "重颁发证书"),
+          h("p", null, "请确认验证方式。默认沿用当前证书的验证方式，不要在无提示时改用自动 DNS。"),
+          h(FieldInput, {
+            label: "验证方式",
+            type: "select",
+            value: draft.verifyType,
+            onChange: (value) => setDraft({ ...draft, verifyType: value }),
+            placeholder: [
+              { value: "DNS_AUTO", label: "自动 DNS" },
+              { value: "DNS", label: "手动 DNS" },
+              { value: "FILE", label: "文件验证" },
+            ],
+            disabled: busy,
+          }),
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
+            h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: () => onSubmit(draft) }, busy ? "提交中" : "确定重颁发"),
+          ),
+        ),
+      ), document.body);
+    }
+
+    function UploadCertDialog({ busy, err, onCancel, onSubmit }) {
+      const [draft, setDraft] = useState({
+        standard: "intl",
+        certificateType: "SVR",
+        alias: "",
+        publicKey: "",
+        privateKey: "",
+        encryptPublicKey: "",
+        encryptPrivateKey: "",
+      });
+      const box = useOverlayKeys(true, busy, onCancel, false);
+      const set = (key) => (value) => setDraft({ ...draft, [key]: value });
+      return createPortal(h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal wide", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "上传证书"),
+          h(FieldInput, {
+            label: "证书标准",
+            type: "select",
+            value: draft.standard,
+            onChange: set("standard"),
+            placeholder: [
+              { value: "intl", label: "国际标准" },
+              { value: "sm2", label: "国密 SM2" },
+            ],
+            disabled: busy,
+          }),
+          h(FieldInput, {
+            label: "证书类型",
+            type: "select",
+            value: draft.certificateType,
+            onChange: set("certificateType"),
+            placeholder: [
+              { value: "SVR", label: "服务端" },
+              { value: "CA", label: "CA" },
+            ],
+            disabled: busy,
+          }),
+          h(FieldInput, { label: "备注名", value: draft.alias, onChange: set("alias"), disabled: busy }),
+          h(FieldInput, { label: "签名证书", type: "textarea", value: draft.publicKey, onChange: set("publicKey"), placeholder: "粘贴证书 PEM", disabled: busy }),
+          h(FieldInput, { label: "签名私钥", type: "textarea", value: draft.privateKey, onChange: set("privateKey"), placeholder: draft.certificateType === "CA" ? "CA 可不填私钥" : "服务端必填", disabled: busy }),
+          draft.standard === "sm2" ? [
+            h(FieldInput, { key: "ec", label: "加密证书", type: "textarea", value: draft.encryptPublicKey, onChange: set("encryptPublicKey"), disabled: busy }),
+            h(FieldInput, { key: "ek", label: "加密私钥", type: "textarea", value: draft.encryptPrivateKey, onChange: set("encryptPrivateKey"), disabled: busy }),
+          ] : null,
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
+            h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: () => onSubmit(draft) }, busy ? "上传中" : "上传"),
+          ),
+        ),
+      ), document.body);
+    }
+
+    function DeployDialog({ item, busy, err, onCancel, onLoadHosts, onSubmit, onLoadRecords, onRetry }) {
+      const products = [
+        { id: "clb", label: "CLB" }, { id: "cdn", label: "CDN" }, { id: "waf", label: "WAF" },
+        { id: "teo", label: "EdgeOne" }, { id: "cos", label: "COS" }, { id: "tke", label: "TKE" },
+        { id: "live", label: "LIVE" }, { id: "vod", label: "VOD" }, { id: "ddos", label: "DDoS" },
+        { id: "lighthouse", label: "Lighthouse" }, { id: "tcb", label: "TCB" }, { id: "apigateway", label: "API 网关" },
+      ];
+      const [resourceType, setResourceType] = useState("cdn");
+      const [instances, setInstances] = useState([]);
+      const [picked, setPicked] = useState({});
+      const [records, setRecords] = useState([]);
+      const [stepErr, setStepErr] = useState("");
+      const box = useOverlayKeys(true, busy, onCancel, false);
+      const load = async (type) => {
+        setStepErr("");
+        try {
+          const data = await onLoadHosts(item, type);
+          setInstances(data.instances || []);
+          setPicked({});
+        } catch (e) {
+          setInstances([]);
+          setStepErr(publicErrorMessage(e));
+        }
+      };
+      useEffect(() => { load(resourceType); }, [resourceType]);
+      useEffect(() => {
+        onLoadRecords(item).then((data) => setRecords(data.records || [])).catch(() => setRecords([]));
+      }, [item.id]);
+      const selected = instances.filter((row) => picked[row.instanceId]);
+      return createPortal(h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal wide", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "部署证书"),
+          h("p", null, "选择云产品后勾选与证书域名匹配的实例，无需手填实例 ID。"),
+          h(FieldInput, {
+            label: "云产品",
+            type: "select",
+            value: resourceType,
+            onChange: setResourceType,
+            placeholder: products,
+            disabled: busy,
+          }),
+          stepErr || err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, stepErr || err) : null,
+          instances.length
+            ? instances.map((row) => h("label", { key: row.instanceId, className: "ci-check" },
+              h("input", {
+                type: "checkbox",
+                checked: !!picked[row.instanceId],
+                disabled: busy,
+                onChange: () => setPicked({ ...picked, [row.instanceId]: !picked[row.instanceId] }),
+              }),
+              h("span", null, [row.name, row.domain, row.instanceId].filter(Boolean).join(" · ")),
+            ))
+            : h("div", { className: "ci-empty", style: { border: 0 } }, busy ? "加载匹配实例…" : "暂无匹配实例"),
+          records.length ? [
+            h("div", { key: "rt", className: "ci-sec", style: { padding: "8px 0" } }, h("span", { className: "ci-sec-t" }, "部署记录")),
+            records.map((row, idx) => h("div", { key: idx, className: "ci-check" },
+              h("span", null, [row.resourceType, row.instanceId, row.statusName || row.status, row.createTime].filter(Boolean).join(" · ")),
+              row.deployRecordId ? h("button", {
+                type: "button",
+                className: "ci-link",
+                disabled: busy,
+                onClick: () => onRetry(item, row),
+              }, "重试") : null,
+            )),
+          ] : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
+            h("button", {
+              type: "button",
+              className: "ci-mini primary",
+              disabled: busy || !selected.length,
+              onClick: () => onSubmit(item, resourceType, selected.map((row) => row.instanceId)),
+            }, busy ? "部署中" : `部署已选 ${selected.length} 台`),
+          ),
+        ),
+      ), document.body);
+    }
+
+    function CertDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm, onCertAction }) {
+      const [confirm, setConfirm] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const [verifyMsg, setVerifyMsg] = useState("");
+      const sections = (detail && detail.sections) || [];
+      const meta = (detail && detail.card && detail.card.meta) || certMeta(item);
+      const applying = !!meta.cancelable;
+      const verifyType = String(meta.verifyType || "");
+      const autoDns = verifyType.toUpperCase() === "DNS_AUTO";
+      const run = async (action, payload) => {
+        setBusy(true);
+        setErr("");
+        try {
+          const result = await onCertAction(item, action, payload);
+          setConfirm(null);
+          if (action.id !== "cert.download") await onReload();
+          return result;
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+          throw e;
+        } finally {
+          setBusy(false);
+        }
+      };
+      const checkVerify = async () => {
+        try {
+          const result = await run({ id: "cert.verify", label: "查看验证状态", confirm: "default" }, {
+            verifyType,
+            completeIfManual: true,
+          });
+          const data = (result && result.data) || {};
+          if (data.completed) setVerifyMsg("验证已通过，已提交完成审核。");
+          else if (data.passed) setVerifyMsg("域名验证已通过，等待签发。");
+          else setVerifyMsg("尚未通过验证，请确认 DNS/文件记录后重试。");
+        } catch { /* run already setErr */ }
+      };
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h("span", { className: "ci-head-t", title: item.title }, "证书详情 · " + item.title),
+        ),
+        loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
+        !loading && detail ? [
+          err ? h("p", { key: "err", className: "ci-err" }, err) : null,
+          sections.length
+            ? sections.map((section) => h(CertSection, {
+              key: section.id,
+              section,
+              onRetry: section.id === "bound" && /可重试/.test(section.empty || "") ? onReload : undefined,
+            }))
+            : h("div", { key: "empty", className: "ci-empty" }, "没有详情字段"),
+          applying ? h("div", { key: "va", className: "ci-actions", style: { padding: "4px 14px 8px" } },
+            h("button", {
+              type: "button",
+              className: "ci-mini primary",
+              disabled: busy || loading,
+              onClick: checkVerify,
+            }, busy ? "检查中" : "查看验证状态"),
+            !autoDns ? h("button", {
+              type: "button",
+              className: "ci-mini",
+              disabled: busy || loading,
+              onClick: () => run({ id: "cert.complete", label: "完成审核", confirm: "default" }, {}),
+            }, "完成审核") : null,
+          ) : null,
+          applying && autoDns ? h("p", { key: "auto-hint", className: "ci-hint", style: { padding: "0 14px 8px" } }, "自动 DNS 将等待签发，无需手动完成审核。") : null,
+          verifyMsg ? h("p", { key: "vmsg", className: "ci-hint", style: { padding: "0 14px 10px" } }, verifyMsg) : null,
+        ] : null,
+        h(ConfirmDialog, {
+          key: "confirm",
+          open: !!confirm,
+          title: confirm?.action?.label,
+          text: confirm?.text,
+          busy,
+          danger: !!confirm?.danger,
+          onCancel: () => { if (!busy) setConfirm(null); },
+          onConfirm: () => confirm && run(confirm.action, confirm.payload),
+        }),
+      ];
+    }
+
+    function DetailView(props) {
+      if (props.item && props.item.kind === "cert") return h(CertDetailView, props);
+      return h(DomainDetailView, props);
+    }
+
+    function DomainDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
       const [form, setForm] = useState(null);
       const [confirm, setConfirm] = useState(null);
       const [busy, setBusy] = useState(false);
@@ -1887,6 +2452,7 @@ window.__ModuleLoader__.load({
     }
 
     function barTitleOf(kind) {
+      if (kind === "cert") return "我的证书";
       if (kind === "registrar") return "域名注册";
       if (kind === "my-domain") return "我的域名";
       if (kind === "domain") return "域名解析";
@@ -1894,6 +2460,7 @@ window.__ModuleLoader__.load({
     }
 
     function searchPlaceholderOf(kind) {
+      if (kind === "cert") return "搜索证书 ID / 备注 / 域名";
       if (kind === "registrar") return "请输入域名或后缀";
       if (kind === "my-domain" || kind === "domain") return "请输入域名关键字";
       return "搜索";
@@ -3295,7 +3862,10 @@ window.__ModuleLoader__.load({
       const args = parseToolArgs(props);
       const fromTool = Array.isArray(payload?.items) ? payload.items : null;
       const running = !!(props?.block && !("kind" in props.block));
-      const kind = payload?.kind || args.kind || "domain";
+      const kind = payload?.resourceKind
+        || (payload?.kind && payload.kind !== "cloud-infra-query" ? payload.kind : "")
+        || args.kind
+        || "domain";
       const provider = String(args.provider || "");
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");
@@ -3310,6 +3880,11 @@ window.__ModuleLoader__.load({
       const [listErr, setListErr] = useState("");
       const [draftQ, setDraftQ] = useState(initialQuery);
       const [activeQ, setActiveQ] = useState(initialQuery);
+      const [group, setGroup] = useState("");
+      const [wizard, setWizard] = useState(null);
+      const [wizardBusy, setWizardBusy] = useState(false);
+      const [wizardErr, setWizardErr] = useState("");
+      const [confirm, setConfirm] = useState(null);
       const [listRegion, setListRegion] = useState("华南地区（广州）");
       const [regionOptions, setRegionOptions] = useState(Array.isArray(payload?.regions) ? payload.regions : []);
       const [kindTab, setKindTab] = useState(kind === "lighthouse" ? "lighthouse" : "cvm");
@@ -3329,6 +3904,8 @@ window.__ModuleLoader__.load({
       const seq = useRef(0);
       const detailSeq = useRef(0);
       const debounce = useRef(0);
+      const groupRef = useRef("");
+      const isCert = kind === "cert";
       const refreshSkip = () => {
         api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
       };
@@ -3386,6 +3963,7 @@ window.__ModuleLoader__.load({
             provider,
             offset: nextOffset,
             limit: pageSize,
+            group: isCert ? (groupRef.current || group || "") : "",
             region: useRegion || undefined,
           });
           let result = await run(useKind);
@@ -3546,6 +4124,64 @@ window.__ModuleLoader__.load({
           text: `确认${actionLabel(actionId)} ${item.title}？`,
         });
       };
+      const certPayload = (item, extra) => ({
+        certificateId: certMeta(item).certificateId || String(item.id || "").split(":").pop(),
+        domain: certMeta(item).domain || item.description,
+        ...extra,
+      });
+      const runCertAction = async (item, action, extra) => {
+        const result = await api("action", {
+          moduleId: item.moduleId,
+          id: item.id,
+          action: action.id || action,
+          payload: certPayload(item, extra),
+        });
+        if ((action.id || action) === "cert.download") {
+          const data = result.data || {};
+          triggerDownload(data.filename, data.content, data.contentType);
+        }
+        return result;
+      };
+      const changeGroup = (next) => {
+        groupRef.current = next;
+        setGroup(next);
+        fetchList(0, String(activeQ || "").trim());
+      };
+      const askConfirm = (item, row, text) => {
+        setConfirm({
+          item,
+          action: { id: row.id, label: row.label, confirm: "always" },
+          payload: {},
+          text,
+          danger: row.id === "cert.delete" || row.id === "cert.revoke",
+        });
+      };
+      const onMore = (item, row) => {
+        if (row.id === "cert.delete") {
+          return askConfirm(item, row, "温馨提示：删除后不可恢复。已关联云资源或待验证证书可能无法删除。确定删除该证书？");
+        }
+        if (row.id === "cert.revoke") return askConfirm(item, row, "确定吊销该证书？吊销后不可继续部署。");
+        if (row.id === "cert.replace") {
+          return setWizard({ type: "replace", item, verifyType: certMeta(item).verifyType || "DNS" });
+        }
+        if (row.id === "cert.cancel") return askConfirm(item, row, "确定取消审核？取消后可删除该申请。");
+        if (row.id === "cert.renew") return askConfirm(item, row, "确定对免费证书执行快速续期？");
+        if (row.id === "cert.verify") {
+          return setWizard({ type: "verify", item, verifyType: certMeta(item).verifyType, status: "" });
+        }
+        setWizard({ type: row.id, item });
+      };
+      const onDownload = async (item) => {
+        setPendingId(item.id);
+        setListErr("");
+        try {
+          await runCertAction(item, { id: "cert.download" }, {});
+        } catch (e) {
+          setListErr(publicErrorMessage(e));
+        } finally {
+          setPendingId("");
+        }
+      };
       if (running) return null;
       if (kind === "cluster") {
         return h(CiBoundary, null, h(ClusterConsole, {
@@ -3557,9 +4193,10 @@ window.__ModuleLoader__.load({
         }));
       }
       const errors = payload?.errors || [];
+      const payloadErr = errors.map((e) => e && e.message).filter(Boolean).join("；");
       const keepCard = kind === "registrar" || kind === "my-domain";
-      if (!keepCard && !fromTool?.length && !rows.length && !activeQ && !draftQ) {
-        const msg = errors.map((e) => e.message).join("；");
+      if (!isCert && !fromTool?.length && !rows.length && !activeQ && !draftQ && !keepCard) {
+        const msg = payloadErr;
         return msg ? h("div", { className: "ci-err" }, msg) : null;
       }
       const extraCols = columnLabels(rows);
@@ -3715,8 +4352,9 @@ window.__ModuleLoader__.load({
         || seed.some((row) => row && row.kind === "lighthouse")
         || rows.some((row) => row && row.kind === "lighthouse"));
       const showCdb = !registrarView && kind === "cdb";
+      const showCert = kind === "cert";
       const showDomain = kind === "domain" || registrarView
-        || (kind !== "cvm" && kind !== "lighthouse" && kind !== "auto" && kind !== "cdb" && kind !== "cluster" && !showCvm && !showLh && !showCdb);
+        || (kind !== "cvm" && kind !== "lighthouse" && kind !== "auto" && kind !== "cdb" && kind !== "cert" && kind !== "cluster" && !showCvm && !showLh && !showCdb && !showCert);
       const cvmRows = rows.filter((row) => row && row.kind === "cvm");
       const lhRows = rows.filter((row) => row && row.kind === "lighthouse");
       const domainRows = rows.filter((row) => row && !isInstanceKind(row.kind));
@@ -3773,8 +4411,277 @@ window.__ModuleLoader__.load({
               onBack: () => setSession(null),
               onReload: reload,
               onSkipConfirm: setSkipConfirm,
+              onCertAction: runCertAction,
             }))
         : null;
+      const certList = !session && showCert ? [
+
+            h("div", { key: "bar", className: "ci-bar" },
+              h("div", { className: "ci-bar-left" },
+                h("span", { className: "ci-bar-title" }, isCert ? "我的证书" : (kind === "domain" ? "域名解析" : "云资源")),
+                h("span", { className: "ci-bar-count" }, `${counted} 条`),
+              ),
+              h("div", { className: "ci-bar-actions" },
+                isCert ? [
+                  h("button", { key: "apply", type: "button", className: "ci-mini", onClick: () => { setWizardErr(""); setWizard({ type: "apply" }); } }, "申请免费证书"),
+                  h("button", { key: "upload", type: "button", className: "ci-mini", onClick: () => { setWizardErr(""); setWizard({ type: "upload" }); } }, "上传证书"),
+                ] : null,
+                h("div", { key: "search", className: "ci-search-wrap" },
+                  h(SearchIcon),
+                  h("input", {
+                    className: "ci-search",
+                    type: "search",
+                    placeholder: isCert ? "搜索证书 ID / 备注 / 域名" : (kind === "domain" ? "请输入域名关键字" : "搜索"),
+                    value: draftQ,
+                    onChange: (e) => onDraft(e.target.value),
+                    onKeyDown: (e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        runSearch(draftQ);
+                      }
+                    },
+                  }),
+                  draftQ ? h("button", {
+                    type: "button",
+                    className: "ci-search-x",
+                    disabled: listBusy,
+                    onClick: () => { setDraftQ(""); runSearch(""); },
+                    "aria-label": "清空",
+                  }, "×") : null,
+                ),
+              ),
+            ),
+            isCert ? h("div", { key: "groups", className: "ci-groups" },
+              [
+                { id: "", label: "全部" },
+                { id: "applying", label: "申请中" },
+                { id: "issued", label: "已签发" },
+                { id: "expired", label: "已过期" },
+              ].map((tab) => h("button", {
+                key: tab.id || "all",
+                type: "button",
+                className: "ci-group" + (group === tab.id ? " active" : ""),
+                onClick: () => changeGroup(tab.id),
+              }, tab.label)),
+            ) : null,
+            listErr || payloadErr ? h("div", { key: "lerr", className: "ci-err" }, listErr || payloadErr) : null,
+            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : (
+              isCert
+                ? h(CertTable, {
+                  key: "table",
+                  items: rows,
+                  pendingId,
+                  moreId,
+                  setMoreId,
+                  onOpen: openItem,
+                  onDeploy: (item) => { setWizardErr(""); setWizard({ type: "deploy", item }); },
+                  onDownload,
+                  onMore,
+                  emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的证书` : "没有证书",
+                })
+                : h(ResourceTable, {
+                  key: "table",
+                  items: rows,
+                  pendingId,
+                  onOpen: openItem,
+                  extraCols,
+                  showProvider,
+                  emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
+                })
+            ),
+            h(Pager, {
+              key: "pager",
+              total: counted,
+              page,
+              pages: pageCount,
+              busy: listBusy,
+              onPage: goPage,
+            }),
+      ] : null;
+      const certDialogs = [
+          wizard && wizard.type === "apply" ? h(ApplyCertDialog, {
+            key: "apply",
+            busy: wizardBusy,
+            err: wizardErr,
+            onCancel: () => { if (!wizardBusy) setWizard(null); },
+            onSubmit: async (draft) => {
+              setWizardBusy(true);
+              setWizardErr("");
+              try {
+                const result = await api("action", {
+                  moduleId: rows[0]?.moduleId || "tencent.cert",
+                  id: rows[0]?.id || "tencent.cert:",
+                  action: "cert.apply",
+                  payload: draft,
+                });
+                await fetchList(0, String(activeQ || "").trim());
+                const id = result.data && result.data.certificateId;
+                const item = id
+                  ? { id: `tencent.cert:${id}`, moduleId: "tencent.cert", kind: "cert", title: id, meta: { certificateId: id, verifyType: draft.verifyType, cancelable: true } }
+                  : null;
+                if (item) setWizard({ type: "verify", item, verifyType: draft.verifyType, status: "" });
+                else setWizard(null);
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+          }) : null,
+          wizard && wizard.type === "verify" && wizard.item ? h(VerifyCertDialog, {
+            key: "verify",
+            item: wizard.item,
+            verifyType: wizard.verifyType || certMeta(wizard.item).verifyType,
+            busy: wizardBusy,
+            err: wizardErr,
+            status: wizard.status,
+            onCancel: () => { if (!wizardBusy) setWizard(null); },
+            onOpenDetail: (item) => {
+              setWizard(null);
+              openItem(item);
+            },
+            onCheck: async () => {
+              setWizardBusy(true);
+              setWizardErr("");
+              try {
+                const result = await runCertAction(wizard.item, { id: "cert.verify" }, {
+                  verifyType: wizard.verifyType || certMeta(wizard.item).verifyType,
+                  completeIfManual: true,
+                });
+                const data = (result && result.data) || {};
+                let status = "尚未通过验证，请确认 DNS/文件记录后重试。";
+                if (data.completed) status = "验证已通过，已提交完成审核。";
+                else if (data.passed) status = "域名验证已通过，等待签发。";
+                setWizard({ ...wizard, status });
+                await fetchList(0, String(activeQ || "").trim());
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+            onComplete: async () => {
+              setWizardBusy(true);
+              setWizardErr("");
+              try {
+                await runCertAction(wizard.item, { id: "cert.complete" }, {});
+                setWizard({ ...wizard, status: "已提交完成审核。" });
+                await fetchList(0, String(activeQ || "").trim());
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+          }) : null,
+          wizard && wizard.type === "replace" && wizard.item ? h(ReplaceCertDialog, {
+            key: "replace",
+            item: wizard.item,
+            verifyType: wizard.verifyType || certMeta(wizard.item).verifyType,
+            busy: wizardBusy,
+            err: wizardErr,
+            onCancel: () => { if (!wizardBusy) setWizard(null); },
+            onSubmit: async (draft) => {
+              setWizardBusy(true);
+              setWizardErr("");
+              try {
+                await runCertAction(wizard.item, { id: "cert.replace" }, { verifyType: draft.verifyType });
+                setWizard(null);
+                await fetchList(offset, String(activeQ || "").trim());
+                if (session?.item) await reload();
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+          }) : null,
+          wizard && wizard.type === "upload" ? h(UploadCertDialog, {
+            key: "upload",
+            busy: wizardBusy,
+            err: wizardErr,
+            onCancel: () => { if (!wizardBusy) setWizard(null); },
+            onSubmit: async (draft) => {
+              setWizardBusy(true);
+              setWizardErr("");
+              try {
+                await api("action", {
+                  moduleId: rows[0]?.moduleId || "tencent.cert",
+                  id: rows[0]?.id || "tencent.cert:",
+                  action: "cert.upload",
+                  payload: draft,
+                });
+                setWizard(null);
+                await fetchList(0, String(activeQ || "").trim());
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+          }) : null,
+          wizard && wizard.type === "deploy" && wizard.item ? h(DeployDialog, {
+            key: "deploy",
+            item: wizard.item,
+            busy: wizardBusy,
+            err: wizardErr,
+            onCancel: () => { if (!wizardBusy) setWizard(null); },
+            onLoadHosts: async (item, resourceType) => {
+              const result = await runCertAction(item, { id: "cert.hosts" }, { resourceType });
+              return result.data || { instances: [] };
+            },
+            onLoadRecords: async (item) => {
+              const result = await runCertAction(item, { id: "cert.deploy.records" }, {});
+              return result.data || { records: [] };
+            },
+            onRetry: async (item, row) => {
+              setWizardBusy(true);
+              try {
+                await runCertAction(item, { id: "cert.deploy.retry" }, { deployRecordId: row.deployRecordId });
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+            onSubmit: async (item, resourceType, instanceIds) => {
+              setWizardBusy(true);
+              setWizardErr("");
+              try {
+                await runCertAction(item, { id: "cert.deploy" }, { resourceType, instanceIds });
+                const rec = await runCertAction(item, { id: "cert.deploy.records" }, { resourceType });
+                return rec;
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+          }) : null,
+          h(ConfirmDialog, {
+            key: "confirm",
+            open: !!confirm,
+            title: confirm?.action?.label,
+            text: confirm?.text,
+            busy: wizardBusy,
+            danger: !!confirm?.danger,
+            onCancel: () => { if (!wizardBusy) setConfirm(null); },
+            onConfirm: async () => {
+              if (!confirm) return;
+              setWizardBusy(true);
+              try {
+                await runCertAction(confirm.item, confirm.action, confirm.payload);
+                setConfirm(null);
+                await fetchList(offset, String(activeQ || "").trim());
+                if (session?.item) await reload();
+              } catch (e) {
+                setListErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+          })
+      ];
       const cdbMore = [
         { id: "protect", label: (item) => destroyProtectOn(item) ? "关闭实例销毁保护" : "开启实例销毁保护", onClick: (item) => {
           const on = destroyProtectOn(item);
@@ -3993,8 +4900,9 @@ window.__ModuleLoader__.load({
       ] : null;
       return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
         h("div", { className: "ci-panel" },
-          detailNode || cdbList || instanceList || domainList,
+          detailNode || cdbList || instanceList || certList || domainList,
         ),
+        ...(certDialogs || []),
         h(CheckoutWizard, {
           flow,
           items: cart,
