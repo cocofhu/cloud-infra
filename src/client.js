@@ -756,6 +756,12 @@ window.__ModuleLoader__.load({
       return region ? `${region.label}（${region.id}）` : "";
     }
 
+    const DEFAULT_COS_REGION_ID = "ap-guangzhou";
+
+    function defaultCosRegion(regions) {
+      return (regions || []).find((region) => region.id === DEFAULT_COS_REGION_ID) || null;
+    }
+
     function formatFileTime(raw) {
       if (!raw) return "-";
       const date = new Date(raw);
@@ -806,7 +812,8 @@ window.__ModuleLoader__.load({
     }
 
     function CosRegionCombo({ regions, input, selected, open, highlight, onInput, onPick, onOpen, onHighlight }) {
-      const items = (regions || []).filter((region) => matchCosRegion(region, input));
+      const comboNeedle = selected && input === displayRegion(selected) ? "" : input;
+      const items = (regions || []).filter((region) => matchCosRegion(region, comboNeedle));
       return h("div", { className: "ci-regionbar" },
         h("label", { htmlFor: "ci-cos-region" }, "地域"),
         h("div", { className: "ci-combo" },
@@ -817,7 +824,12 @@ window.__ModuleLoader__.load({
             autoComplete: "off",
             value: selected && !open ? displayRegion(selected) : input,
             onChange: (e) => onInput(e.target.value),
-            onFocus: () => onOpen(true),
+            onFocus: (e) => {
+              const idx = selected ? items.findIndex((region) => region.id === selected.id) : 0;
+              onHighlight(Math.max(0, idx));
+              onOpen(true);
+              if (e.target && e.target.select) e.target.select();
+            },
             onBlur: () => setTimeout(() => onOpen(false), 150),
             onKeyDown: (e) => {
               if (e.key === "ArrowDown") {
@@ -921,8 +933,8 @@ window.__ModuleLoader__.load({
     function CosConsoleView({ payload, args, skipConfirm, onSkipConfirm }) {
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const [regions, setRegions] = useState(COS_REGION_FALLBACK);
-      const [input, setInput] = useState("");
-      const [selected, setSelected] = useState(null);
+      const [input, setInput] = useState(() => displayRegion(defaultCosRegion(COS_REGION_FALLBACK)));
+      const [selected, setSelected] = useState(() => defaultCosRegion(COS_REGION_FALLBACK));
       const [open, setOpen] = useState(false);
       const [highlight, setHighlight] = useState(0);
       const [rows, setRows] = useState([]);
@@ -957,6 +969,13 @@ window.__ModuleLoader__.load({
       }, []);
       const seedSig = `${payload?.kind || ""}|${args.region || ""}|${(payload?.items || []).map((i) => i.id).join(",")}`;
       const payloadErrSig = (Array.isArray(payload?.errors) ? payload.errors : []).map((e) => e && e.message).join("；");
+      const booted = useRef(false);
+      useEffect(() => {
+        setSelected((cur) => {
+          if (!cur) return cur;
+          return (regions || []).find((region) => region.id === cur.id) || cur;
+        });
+      }, [regions]);
       useEffect(() => {
         const hinted = resolveCosRegion(args.region, regions);
         if (hinted) {
@@ -1009,6 +1028,13 @@ window.__ModuleLoader__.load({
           if (n === seq.current) setListBusy(false);
         }
       };
+      useEffect(() => {
+        if (booted.current) return;
+        if (resolveCosRegion(args.region, regions)) return;
+        if (!selected) return;
+        booted.current = true;
+        fetchBuckets(selected, 0, "");
+      }, [selected, regions]);
       const pickRegion = (region) => {
         fileSeq.current += 1;
         setSelected(region);

@@ -28,12 +28,12 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates / COS buckets as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/COS/对象存储/存储桶. Pass kind=domain for domains, kind=cos for COS. For COS: if the user did not already name an official region id, still call kind=cos and OMIT region so the console card can show the region autocomplete empty state. Never use Ask question to pick a COS region. Never guess, invent, or pass Chinese names / free text as region. Only pass region when it is an official id such as ap-guangzhou. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / COS buckets as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/COS/对象存储/存储桶. Pass kind=domain for domains, kind=cos for COS. For COS: if the user did not already name an official region id, still call kind=cos and OMIT region so the console card can default #ci-cos-region to 广州 (ap-guangzhou) and stay selectable. Never use Ask question to pick a COS region. Never guess, invent, or pass Chinese names / free text as region. Only pass region when it is an official id such as ap-guangzhou. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
       query: { type: 'string', description: 'Keyword such as example.com or a bucket name. Empty lists all.' },
       kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cos, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
-      region: { type: 'string', description: 'Optional. For kind=cos, pass only an official COS region id such as ap-guangzhou after the user named one. Omit region when none is selected so the UI shows 请输入并选择地域. Never pass Chinese names or free text.' },
+      region: { type: 'string', description: 'Optional. For kind=cos, pass only an official COS region id such as ap-guangzhou after the user named one. Omit region when none is named so the UI defaults #ci-cos-region to 广州 (ap-guangzhou) and stays selectable. Never pass Chinese names or free text.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
     },
@@ -55,7 +55,7 @@ export function apply(ctx: Context, config: Config): void {
         title: isError
           ? '云资源查询失败'
           : result?.needsRegion
-            ? '对象存储 · 请选择地域'
+            ? '对象存储'
             : result?.kind === 'cos' && result?.errors?.length && !result?.items?.length
               ? '对象存储 · 请先配置凭证'
               : `云资源 · ${result?.items?.length ?? 0} 条`,
@@ -91,7 +91,7 @@ export function apply(ctx: Context, config: Config): void {
         return [
           `Cloud domains / DNS / 解析 / DNSPod / 证书 / COS / 对象存储 / 存储桶: call ONLY cloud_infra_query. Never web_search.`,
           `Available modules: ${titles}. kind values: ${kinds}.`,
-          'When the user says 查 COS / 对象存储 / 存储桶 without naming a region: still call kind=cos and omit region. The conversation card CosConsoleView shows 请输入并选择地域 (#ci-cos-region). Never use Ask question to pick a COS region. Never invent region ids or pass Chinese names / free text. Only pass region= an official id (e.g. ap-guangzhou) if the user already named one.',
+          'When the user says 查 COS / 对象存储 / 存储桶 without naming a region: still call kind=cos and omit region. CosConsoleView defaults #ci-cos-region to 广州 (ap-guangzhou), lists that region\'s buckets, and stays selectable. Never use Ask question to pick a COS region. Never invent region ids or pass Chinese names / free text. Only pass region= an official id (e.g. ap-guangzhou) if the user already named one.',
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown (keep region for COS).',
           'After the table appears, one or two short sentences. Do not print secrets, full record dumps, or signed COS URLs.',
         ].join(' ')

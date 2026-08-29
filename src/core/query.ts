@@ -120,7 +120,7 @@ function clamp(n: number, min: number, max: number): number {
 export function renderQuery(result: QueryResult): string {
   if (!result.items.length) {
     if (result.kind === 'cos' && result.needsRegion) {
-      return '尚未选择地域。对话卡已展示控制台空态（地域补全 #ci-cos-region / 请输入并选择地域）。请用户在卡片内输入并点选官方地域后再列桶。不要用 Ask question 代替选地域，不要编造 region id，也不要把中文名或自由文本当作 region。'
+      return '对话卡默认选中广州（ap-guangzhou，#ci-cos-region 可输入补全并改选其它官方地域）并自动列出该地域存储桶。不要用 Ask question 代替选地域，不要编造 region id，也不要把中文名或自由文本当作 region。'
     }
     const err = result.errors.map((item) => item.message).join('；')
     return err || '没有找到相关资源。'
