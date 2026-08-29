@@ -1,7 +1,7 @@
 {
   "name": "@cocofhu/cloud-infra",
   "version": "0.1.0",
-  "description": "DeepSeek Harness 插件：对话内查询多云资源，首期支持腾讯云 DNSPod 域名与解析记录",
+  "description": "DeepSeek Harness 插件：对话内查询多云资源，支持腾讯云 DNSPod 域名与 TKE 集群管理",
   "homepage": "https://github.com/cocofhu/cloud-infra#readme",
   "bugs": {
     "url": "https://github.com/cocofhu/cloud-infra/issues"

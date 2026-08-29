@@ -1,0 +1,21 @@
+{
+  "TotalCount": 2,
+  "InstanceSet": [
+    {
+      "InstanceId": "ins-node1",
+      "InstanceRole": "WORKER",
+      "InstanceState": "running",
+      "LanIP": "10.0.0.8",
+      "Unschedulable": false,
+      "NodePoolId": "np-regular1"
+    },
+    {
+      "InstanceId": "ins-node2",
+      "InstanceRole": "WORKER",
+      "InstanceState": "running",
+      "LanIP": "10.0.0.9",
+      "Unschedulable": true,
+      "NodePoolId": "np-regular1"
+    }
+  ]
+}

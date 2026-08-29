@@ -28,11 +28,12 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书. Pass kind=domain for domains. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / TKE clusters as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/TKE/集群/容器服务. Pass kind=domain for domains, kind=cluster for TKE clusters. For clusters, pass region (e.g. ap-guangzhou); region is runtime-only and must not be saved to settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain or auto.' },
+      query: { type: 'string', description: 'Keyword such as example.com or a cluster name. Empty lists all.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cluster, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
+      region: { type: 'string', description: 'Runtime region for regional products such as TKE, e.g. ap-guangzhou. Do not write this to settings.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
     },
@@ -58,6 +59,7 @@ export function apply(ctx: Context, config: Config): void {
         query: args.query != null ? String(args.query) : '',
         kind: args.kind != null ? String(args.kind) : 'domain',
         provider: args.provider != null ? String(args.provider) : '',
+        region: args.region != null ? String(args.region) : '',
         limit: args.limit as number | undefined,
         offset: args.offset as number | undefined,
       }, cfg, exec.signal))
@@ -78,10 +80,10 @@ export function apply(ctx: Context, config: Config): void {
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
         const kinds = supportedKinds().join(', ') || 'domain'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / TKE / 集群 / 容器服务: call ONLY cloud_infra_query. Never web_search.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Use kind=cluster for TKE clusters and pass region at runtime.`,
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
-          'After the table appears, one or two short sentences. Do not print secrets or full record dumps.',
+          'After the table appears, one or two short sentences. Do not print secrets, cluster credentials, or full record dumps. Never save region or credentials via this tool.',
         ].join(' ')
       },
     })
@@ -167,6 +169,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         query: String(body.query || ''),
         kind: String(body.kind || 'domain'),
         provider: String(body.provider || ''),
+        region: String(body.region || ''),
+        filters: readFilters(body.filters),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
       }, cfg)
@@ -178,6 +182,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         String(body.moduleId || ''),
         String(body.id || ''),
         String(body.title || ''),
+        String(body.region || ''),
       )
       return sendJson(res, 200, { ok: true, ...detail })
     }
@@ -190,6 +195,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         (body.payload && typeof body.payload === 'object' && !Array.isArray(body.payload))
           ? body.payload as Record<string, unknown>
           : {},
+        String(body.region || ''),
       )
       if (!result.ok) return sendJson(res, 400, { ok: false, error: publicErrorMessage(result.error) })
       return sendJson(res, 200, result)
@@ -200,7 +206,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
   }
 }
 
-async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title = '') {
+async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title = '', region = '') {
   const { module, creds } = readyModule(cfg, moduleId, id)
   if (!module.detail) throw new Error(`${module.title} 不支持详情`)
   return module.detail({
@@ -211,6 +217,7 @@ async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title 
     timeoutMs: cfg.timeoutMs,
     id,
     title: title || undefined,
+    region: region || undefined,
   })
 }
 
@@ -220,6 +227,7 @@ async function runAction(
   actionId: string,
   id: string,
   payload: Record<string, unknown>,
+  region = '',
 ) {
   const { module, creds } = readyModule(cfg, moduleId, id)
   if (!module.execute) return { ok: false, error: `${module.title} 不支持写操作` }
@@ -230,7 +238,20 @@ async function runAction(
     limit: cfg.maxResults,
     timeoutMs: cfg.timeoutMs,
     id,
+    region: region || (typeof payload.region === 'string' ? payload.region : undefined),
   })
+}
+
+function readFilters(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const name = String(key || '').trim()
+    const text = String(value ?? '').trim()
+    if (!name || !text) continue
+    out[name] = text
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 function readyModule(cfg: PluginConfig, moduleId: string, id: string) {

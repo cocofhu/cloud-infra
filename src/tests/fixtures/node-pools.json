@@ -1,0 +1,20 @@
+{
+  "NodePoolSet": [
+    {
+      "NodePoolId": "np-regular1",
+      "Name": "default-pool",
+      "LifeState": "normal",
+      "NodePoolType": "Regular",
+      "DesiredNodesNum": 2,
+      "MinNodesNum": 0,
+      "MaxNodesNum": 10,
+      "InstanceTypes": ["S5.MEDIUM2"],
+      "DeletionProtection": false,
+      "AutoscalingGroupStatus": "ENABLED",
+      "NodeCountSummary": {
+        "AutoscalingAdded": { "Total": 2, "Ready": 2 },
+        "ManuallyAdded": { "Total": 0, "Ready": 0 }
+      }
+    }
+  ]
+}
