@@ -90,6 +90,9 @@ export async function queryResources(
       if (result.total != null) total += result.total
       else total += result.items?.length || 0
       if (result.hasMore) hasMore = true
+      for (const message of result.warnings || []) {
+        errors.push({ moduleId: module.id, message })
+      }
       for (const name of result.regions || []) {
         if (name && !regions.includes(name)) regions.push(name)
       }
@@ -159,10 +162,13 @@ export function renderQuery(result: QueryResult): string {
   if (result.kind === 'my-domain') {
     return `我的域名已显示为对话卡片。请用户在卡片顶部搜索框筛选，点「管理」查看基本信息与域名安全。不要引导去设置页或独立页。不要打印密钥。\n\n${lines.join('\n')}${err}`
   }
+  const cdb = result.kind === 'cdb' || result.items.some((item) => item.kind === 'cdb')
   const instance = result.kind === 'cvm' || result.kind === 'lighthouse'
     || result.items.some((item) => item.kind === 'cvm' || item.kind === 'lighthouse')
-  const hint = instance
-    ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
-    : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
+  const hint = cdb
+    ? '用一两句话概括即可，请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。不要打印密钥。'
+    : instance
+      ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
+      : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
   return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
 }
