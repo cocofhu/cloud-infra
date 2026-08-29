@@ -54,11 +54,13 @@ window.__ModuleLoader__.load({
 .ci-st.enable{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
 .ci-st.pause{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
 .ci-st.error{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-label-primary-foreground)}
-.ci-crumb{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.ci-back{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;cursor:pointer;color:var(--dsw-alias-label-primary);flex:none}
-.ci-back:hover{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-interactive-bg-hover)}
-.ci-crumb-split{width:1px;height:14px;background:var(--dsw-alias-border-l2);flex:none}
-.ci-head-t{font-weight:650;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-crumb{display:flex;align-items:center;gap:8px;padding:8px 12px 8px 8px;border-bottom:1px solid var(--dsw-alias-border-l1);min-width:0}
+.ci-back{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;background:transparent;border-radius:8px;cursor:pointer;color:var(--dsw-alias-label-secondary);flex:none}
+.ci-back:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
+.ci-back:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
+.ci-crumb-meta{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.ci-head-t{font-weight:650;font-size:14px;line-height:22px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-crumb .ci-status{flex:none;height:22px;padding:0 8px;border-radius:999px;background:var(--dsw-alias-bg-layer-2)}
 .ci-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 4px}
 .ci-chip{font-size:12px;padding:4px 8px;border-radius:7px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-caption)}
 .ci-chip b{color:var(--dsw-alias-label-primary);margin-left:4px;font-weight:600}
@@ -286,9 +288,9 @@ window.__ModuleLoader__.load({
         "aria-hidden": "true",
       },
         h("path", {
-          d: "M10.25 3.5L5.75 8l4.5 4.5",
+          d: "M10 3.25 5.25 8 10 12.75",
           stroke: "currentColor",
-          strokeWidth: "1.6",
+          strokeWidth: "1.5",
           strokeLinecap: "round",
           strokeLinejoin: "round",
         }),
@@ -702,7 +704,6 @@ window.__ModuleLoader__.load({
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
           h("button", { type: "button", className: "ci-back", onClick: onBack, title: "返回", "aria-label": "返回" }, h(ChevronLeft)),
-          h("span", { className: "ci-crumb-split", "aria-hidden": "true" }),
           h("span", { className: "ci-head-t", title: item.title }, item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -999,9 +1000,10 @@ window.__ModuleLoader__.load({
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
           h("button", { type: "button", className: "ci-back", onClick: onBack, title: "返回", "aria-label": "返回" }, h(ChevronLeft)),
-          h("span", { className: "ci-crumb-split", "aria-hidden": "true" }),
-          h("span", { className: "ci-head-t", title: card.title }, card.title),
-          h(StatusCell, { status: card.status, label: card.stateLabel }),
+          h("div", { className: "ci-crumb-meta" },
+            h("span", { className: "ci-head-t", title: card.title }, card.title),
+            h(StatusCell, { status: card.status, label: card.stateLabel }),
+          ),
           h("div", { className: "ci-power" },
             h("button", {
               type: "button",
