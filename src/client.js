@@ -3,7 +3,7 @@ window.__ModuleLoader__.load({
   factory: (require) => {
     const React = require("react");
     const h = React.createElement;
-    const { useEffect, useState, useRef } = React;
+    const { useEffect, useMemo, useState, useRef } = React;
 
     const CSS = `
 .ci-root,.ci-tool{font-family:inherit;color:var(--dsw-alias-label-primary);width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:2px 0 6px}
@@ -156,7 +156,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-modal.wide{width:min(560px,100%)}
 .ci-renew{margin-left:6px}
 .ci-select{height:32px;width:auto;max-width:180px;flex:none;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box}
-.ci-select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-bar-left .ci-select{display:none}
+.ci-select:focus,.ci-cls-filter .ci-combo input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-ghost{height:30px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:8px;padding:0 10px;cursor:pointer;font:inherit;color:inherit}
 .ci-ghost.on{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}
 .ci-id{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
@@ -298,10 +299,13 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-combo{position:relative;width:240px;flex:none}
 .ci-combo input{height:32px;width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;font:inherit;font-size:13px;line-height:32px;background:var(--dsw-alias-bg-layer-1);color:inherit;box-sizing:border-box}
 .ci-combo input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
-.ci-combo-list{position:absolute;left:0;right:0;top:36px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;max-height:200px;overflow:auto;z-index:3;margin:0;padding:4px 0;list-style:none}
+.ci-combo-list{position:absolute;left:0;right:0;top:36px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;max-height:200px;overflow:auto;z-index:6;margin:0;padding:4px 0;list-style:none}
 .ci-combo-list li{padding:6px 10px;cursor:pointer;font-size:13px}
+.ci-combo-list li.ci-combo-group{padding:4px 10px;cursor:default;font-size:12px;font-weight:600;color:var(--dsw-alias-label-tertiary)}
+.ci-combo-list li.ci-combo-group:hover,.ci-combo-list li.ci-combo-group.on{background:transparent;color:var(--dsw-alias-label-tertiary)}
 .ci-combo-list li.on,.ci-combo-list li:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-brand-primary)}
 .ci-combo-id{color:var(--dsw-alias-label-tertiary);margin-left:8px;font-size:12px}
+.ci-combo input{border-radius:inherit}
 .ci-tool-left{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:none}
 .ci-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:8px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);font-size:13px;color:var(--dsw-alias-label-secondary)}
 .ci-crumbs button{background:none;border:0;padding:0;font:inherit;color:var(--dsw-alias-brand-primary);cursor:pointer}
@@ -320,7 +324,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-query-side{display:flex;flex-direction:column;gap:6px;min-width:0}
 .ci-query .ci-tiny{margin:0 0 6px}
 .ci-cql{width:100%;min-height:72px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;resize:vertical;box-sizing:border-box}
-.ci-cql:focus,.ci-cls .ci-region:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-cql:focus,.ci-cls .ci-region:focus,.ci-cls-filter .ci-combo input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-hist{display:flex;align-items:flex-end;gap:2px;height:56px;padding:8px 12px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l1)}
 .ci-hist i{flex:1;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 42%,transparent);border-radius:2px 2px 0 0;min-height:2px}
 .ci-split{display:grid;grid-template-columns:minmax(108px,140px) minmax(0,1fr);min-width:0}
@@ -345,7 +349,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-cls .ci-mini.primary{background:var(--cls-blue);color:var(--dsw-alias-label-primary-foreground);border-radius:3px;height:32px;padding:0 16px;font-size:14px;border:0}
 .ci-cls .ci-mini.primary:hover:not(:disabled){background:var(--cls-blue-h)}
 .ci-cls .ci-back{border-radius:3px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1);height:32px}
-.ci-cls .ci-region,.ci-cls .ci-search{border-radius:3px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1)}
+.ci-cls .ci-region,.ci-cls-filter .ci-combo,.ci-cls .ci-search{border-radius:8px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1)}
 .ci-cls .ci-cql{border-radius:3px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1);min-height:64px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
 .ci-cls-mode{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
 .ci-cls-tag{height:22px;padding:0 8px;border:1px solid var(--cls-line);border-radius:3px;font-size:12px;line-height:20px;color:#111;background:var(--dsw-alias-bg-layer-1)}
@@ -376,6 +380,10 @@ html[data-theme=dark] .ci-image,.ci-image[data-theme=dark]{--ci-title:#f7f8fb;co
 .ci-image-sub{margin:4px 0 12px;color:var(--ci-muted);font-size:12px}
 .ci-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .ci-chip-sel{height:32px;padding:0 10px 0 12px;border-radius:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--ci-title);font:inherit;display:flex;align-items:center;gap:8px}
+.ci-chip-sel .ci-combo{position:relative;width:200px;flex:1;min-width:0}
+.ci-chip-sel .ci-combo input{height:30px;border:0;background:transparent;box-shadow:none;padding:0;color:var(--ci-title)}
+.ci-chip-sel .ci-combo input:focus{border:0;box-shadow:none;outline:none}
+.ci-chip-sel:focus-within{border-color:var(--dsw-alias-brand-primary)}
 .ci-chip-sel span{color:var(--ci-muted);font-size:12px}
 .ci-chip-sel select{border:0;background:transparent;color:var(--ci-title);font:inherit;outline:none;max-width:200px;color-scheme:inherit}
 .ci-chip-sel select option,.ci-field select option,.ci-root select option{background-color:Field;color:FieldText}
@@ -727,17 +735,148 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return list.find((name) => /广州/.test(name) || name === "ap-guangzhou") || list[0] || "华南地区（广州）";
     }
 
+    const REGION_ALL_ID = "__all__";
+
+    // 统一地域组合框:聚焦展开完整列表、输入按名称/ID 即时过滤、↑↓ 高亮、Enter 选中、
+    // Esc 关闭、失焦延时收起、支持分组标题与『全部地域』首项,供全部 5 处地域选择点复用。
+    function RegionCombo({ items, groups, value, display, onDisplay, placeholder, allowAll, disabled, style, inputId, chosenText, onChange }) {
+      const [open, setOpen] = useState(false);
+      const [highlight, setHighlight] = useState(0);
+      const visibleGroups = useMemo(() => {
+        const all = allowAll ? [{ id: REGION_ALL_ID, label: "全部地域", aliases: ["all"] }] : [];
+        const source = Array.isArray(groups) && groups.length
+          ? groups.map((group) => ({ title: group.title, items: (Array.isArray(group.items) ? group.items : []).filter(Boolean) }))
+          : [{ title: "", items: (Array.isArray(items) ? items : []).filter(Boolean) }];
+        // 输入恰为已选项展示文本时视为未输入,展示全量(沿用旧 comboNeedle 语义)
+        let comboNeedle = String(display || "");
+        if (value && value.id !== REGION_ALL_ID) {
+          const chosen = source.flatMap((group) => group.items).find((item) => item.id === value.id);
+          if (chosen && (comboNeedle === `${chosen.label}（${chosen.id}）` || comboNeedle === chosen.label)) comboNeedle = "";
+        }
+        const hitGroups = source.map((group) => ({
+          title: group.title,
+          items: matchRegionItems(group.items, comboNeedle),
+        })).filter((group) => group.items.length);
+        if (allowAll && matchRegionItems(all, comboNeedle).length) hitGroups.unshift({ title: "", items: all });
+        return hitGroups;
+      }, [items, groups, display, value, allowAll]);
+      const flat = useMemo(() => visibleGroups.flatMap((group) => group.items), [visibleGroups]);
+      const placeholderText = placeholder || (allowAll ? "全部地域" : "输入地域名称或 ID 补全");
+      // 选中项回显格式:默认 label（id)(COS 视觉),ById 薄封装传 label-only,保证失焦/Esc 与 pick 后一致
+      const formatChosen = (item) => {
+        if (!item) return "";
+        if (typeof chosenText === "function") return chosenText(item);
+        return item.id === REGION_ALL_ID ? item.label : `${item.label}（${item.id}）`;
+      };
+      const pick = (item) => {
+        if (!item) return;
+        const next = item.id === REGION_ALL_ID ? { id: item.id, label: item.label } : item;
+        onDisplay(formatChosen(item));
+        setOpen(false);
+        onChange && onChange(next);
+      };
+      const close = () => {
+        setOpen(false);
+        onDisplay(value ? formatChosen(value) : String(display || ""));
+      };
+      return h("div", { className: "ci-combo", style },
+        h("input", {
+          type: "text",
+          placeholder: placeholderText,
+          autoComplete: "off",
+          disabled,
+          "aria-label": "地域",
+          value: display,
+          id: inputId || undefined,
+          key: inputId ? `${inputId}:root` : undefined,
+          onChange: (e) => { onDisplay(e.target.value); setHighlight(0); if (!open) setOpen(true); },
+          onFocus: (e) => {
+            if (disabled) return;
+            const idx = value ? flat.findIndex((item) => item.id === value.id) : 0;
+            setHighlight(Math.max(0, idx));
+            setOpen(true);
+            if (e.target && e.target.select) e.target.select();
+          },
+          onBlur: () => setTimeout(close, 150),
+          onKeyDown: (e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              if (!open) setOpen(true);
+              setHighlight(Math.min(flat.length - 1, highlight + 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setHighlight(Math.max(0, highlight - 1));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              const hit = flat[highlight] || flat[0];
+              if (hit) pick(hit);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setOpen(false);
+              onDisplay(value ? formatChosen(value) : "");
+            }
+          },
+        }),
+        open && flat.length ? h("ul", { className: "ci-combo-list", role: "listbox" },
+          visibleGroups.map((group) => [
+            group.title ? h("li", { key: "g:" + group.title, className: "ci-combo-group" }, group.title) : null,
+            group.items.map((item) => {
+              const idx = flat.indexOf(item);
+              return h("li", {
+                key: item.id,
+                className: idx === highlight ? "on" : "",
+                onMouseDown: (e) => { e.preventDefault(); pick(item); },
+              }, item.label, item.id === REGION_ALL_ID ? null : h("span", { className: "ci-combo-id" }, item.id));
+            }),
+          ]),
+        ) : null,
+      );
+    }
+
+    // 旧地域 select 的薄封装:仅靠 id 解析选项;内部自持文本状态,输入仅更新文本与过滤、不清空选中,
+    // 仅在选中新项/清空时经 onChange 回调,供服务器/TCR/CLS/CDB 等 Caller 复用。
+    function RegionComboById({ options, groups, value, text, onText, placeholder, allowAll, disabled, style, onChange }) {
+      const list = Array.isArray(groups) && groups.length
+        ? groups.flatMap((group) => (Array.isArray(group.items) ? group.items : []).filter(Boolean))
+        : (Array.isArray(options) ? options : []).filter(Boolean);
+      const hit = list.find((item) => item.id === value) || null;
+      const isAll = allowAll && value === REGION_ALL_ID;
+      const allItem = isAll ? { id: REGION_ALL_ID, label: "全部地域" } : null;
+      // null 表示跟随外部 value;输入时接管,选中/外部 value 变化时复位
+      const [inner, setInner] = useState(null);
+      const derived = hit ? hit.label : (allItem ? allItem.label : (value ? String(value) : ""));
+      const shown = text !== undefined ? text : (inner !== null ? inner : derived);
+      const setShown = (next) => {
+        if (onText) onText(next);
+        else setInner(next);
+      };
+      useEffect(() => { setInner(null); }, [value]);
+      return h(RegionCombo, {
+        items: list,
+        groups,
+        value: hit || allItem,
+        display: shown,
+        onDisplay: setShown,
+        placeholder,
+        allowAll,
+        disabled,
+        style,
+        chosenText: (item) => (item && item.label) || "",
+        onChange: (item) => { setShown(item.label); onChange && onChange(item.id); },
+      });
+    }
+
+    // 服务器 CVM/轻量地域选择:统一改用 RegionCombo,保留『全部地域』首项与默认地域。
     function RegionSelect({ regions, value, onChange }) {
       const names = Array.from(new Set((Array.isArray(regions) ? regions : []).filter(Boolean)));
+      const items = names.map((name) => ({ id: name, label: name }));
       const current = value || defaultRegionName(names);
-      return h("select", {
-        className: "ci-select",
-        value: current,
-        onChange: (e) => onChange && onChange(e.target.value),
-      },
-        h("option", { value: "all" }, "全部地域"),
-        names.map((name) => h("option", { key: name, value: name }, name)),
-      );
+      return h(RegionComboById, {
+        options: items,
+        value: current === "all" ? REGION_ALL_ID : current,
+        allowAll: true,
+        onChange: (next) => onChange && onChange(next === REGION_ALL_ID ? "all" : next),
+      });
     }
 
     function KindTabs({ showCvm, showLh, value, onChange }) {
@@ -1712,6 +1851,14 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         .filter(Boolean);
     }
 
+    // 统一过滤:RegionCombo 依据名称/ID/别名即时补全,空串返回全量。
+    function matchRegionItems(items, needle) {
+      const q = normRegion(needle);
+      const list = (Array.isArray(items) ? items : []).filter(Boolean);
+      if (!q) return list;
+      return list.filter((item) => regionTokens(item).some((token) => token.includes(q)));
+    }
+
     function isPresignStat(stat) {
       return !!(stat && (stat.copied === true || (stat.copied === false && stat.expiresSec)));
     }
@@ -1798,48 +1945,20 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       });
     }
 
-    function CosRegionCombo({ regions, input, selected, open, highlight, onInput, onPick, onOpen, onHighlight }) {
-      const comboNeedle = selected && input === displayRegion(selected) ? "" : input;
-      const items = (regions || []).filter((region) => matchCosRegion(region, comboNeedle));
+    // COS 地域选择:收敛复用统一 RegionCombo,保留默认地域与 region 提示解析。
+    function CosRegionCombo({ regions, input, selected, onInput, onPick }) {
       return h("div", { className: "ci-regionbar" },
         h("label", { htmlFor: "ci-cos-region" }, "地域"),
-        h("div", { className: "ci-combo" },
-          h("input", {
-            id: "ci-cos-region",
-            type: "text",
-            placeholder: "输入地域名称或 ID 补全",
-            autoComplete: "off",
-            value: selected && !open ? displayRegion(selected) : input,
-            onChange: (e) => onInput(e.target.value),
-            onFocus: (e) => {
-              const idx = selected ? items.findIndex((region) => region.id === selected.id) : 0;
-              onHighlight(Math.max(0, idx));
-              onOpen(true);
-              if (e.target && e.target.select) e.target.select();
-            },
-            onBlur: () => setTimeout(() => onOpen(false), 150),
-            onKeyDown: (e) => {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                onHighlight(Math.min(items.length - 1, highlight + 1));
-              } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                onHighlight(Math.max(0, highlight - 1));
-              } else if (e.key === "Enter") {
-                e.preventDefault();
-                const hit = items[highlight] || items[0];
-                if (hit) onPick(hit);
-              } else if (e.key === "Escape") onOpen(false);
-            },
-          }),
-          open && items.length ? h("ul", { className: "ci-combo-list", role: "listbox" },
-            items.map((region, idx) => h("li", {
-              key: region.id,
-              className: idx === highlight ? "on" : "",
-              onMouseDown: (e) => { e.preventDefault(); onPick(region); },
-            }, region.label, h("span", { className: "ci-combo-id" }, region.id))),
-          ) : null,
-        ),
+        h(RegionCombo, {
+          id: "ci-cos-region",
+          inputId: "ci-cos-region",
+          items: regions,
+          value: selected,
+          display: input,
+          onDisplay: onInput,
+          placeholder: "输入地域名称或 ID 补全",
+          onChange: onPick,
+        }),
       );
     }
 
@@ -1922,8 +2041,6 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [regions, setRegions] = useState(COS_REGION_FALLBACK);
       const [input, setInput] = useState(() => displayRegion(defaultCosRegion(COS_REGION_FALLBACK)));
       const [selected, setSelected] = useState(() => defaultCosRegion(COS_REGION_FALLBACK));
-      const [open, setOpen] = useState(false);
-      const [highlight, setHighlight] = useState(0);
       const [rows, setRows] = useState([]);
       const [total, setTotal] = useState(0);
       const [offset, setOffset] = useState(0);
@@ -2026,19 +2143,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         fileSeq.current += 1;
         setSelected(region);
         setInput(displayRegion(region));
-        setOpen(false);
         setSession(null);
         fetchBuckets(region, 0, "");
       };
       const onRegionInput = (value) => {
         fileSeq.current += 1;
         setInput(value);
-        setSelected(null);
         setRows([]);
         setTotal(0);
         setSession(null);
-        setOpen(true);
-        setHighlight(0);
       };
       const loadFiles = async (item, prefix, opts) => {
         const n = ++fileSeq.current;
@@ -2182,12 +2295,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             regions,
             input,
             selected,
-            open,
-            highlight,
             onInput: onRegionInput,
             onPick: pickRegion,
-            onOpen: setOpen,
-            onHighlight: setHighlight,
           }),
           h("div", { className: "ci-tool-left" },
             session ? [
@@ -4857,16 +4966,19 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return buckets.map((n) => Math.max(8, Math.round((n / peak) * 100)));
     }
 
+    // CLS 地域选择:统一改用 RegionCombo,沿用 clsRegionGroups 的分组(原 optgroup 语义)。
     function ClsRegionSelect({ value, regions, disabled, onChange }) {
-      return h("select", {
-        className: "ci-region",
+      const groups = clsRegionGroups(regions).map((group) => ({
+        title: group.group,
+        items: group.items.map((item) => ({ id: item.id, label: item.name })),
+      }));
+      return h(RegionComboById, {
+        groups,
         value: value || "ap-guangzhou",
         disabled,
-        "aria-label": "地域",
-        onChange: (e) => onChange(e.target.value),
-      }, clsRegionGroups(regions).map((group) => h("optgroup", { key: group.group, label: group.group },
-        group.items.map((item) => h("option", { key: item.id, value: item.id }, item.name)),
-      )));
+        placeholder: "输入地域名称或 ID 补全",
+        onChange: (next) => onChange(next),
+      });
     }
 
     function ClsTopicTable({ items, pendingId, onOpen, emptyHint }) {
@@ -5668,9 +5780,13 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("div", { className: "ci-filters" },
               h("label", { className: "ci-chip-sel" },
                 h("span", null, "地域"),
-                h("select", { value: region, onChange: (e) => changeRegion(e.target.value) },
-                  (regions.some((item) => item.id === region) ? regions : [{ id: region, label: region }, ...regions]).map((item) => h("option", { key: item.id, value: item.id }, item.label)),
-                ),
+                h(RegionComboById, {
+                  options: regions.some((item) => item.id === region) ? regions : [{ id: region, label: region }, ...regions],
+                  value: region,
+                  placeholder: "输入地域名称或 ID 补全",
+                  style: { width: 200 },
+                  onChange: (next) => changeRegion(next),
+                }),
               ),
               h("label", { className: "ci-chip-sel" },
                 h("span", null, "实例"),
@@ -7124,18 +7240,17 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("span", { className: "ci-bar-count" }, `${counted} 条`),
           ),
           h("div", { className: "ci-tools" },
-            h("select", {
-              className: "ci-sel",
+            h(RegionComboById, {
+              options: CDB_REGIONS.map((row) => ({ id: row.id, label: row.name })),
               value: region,
-              onChange: (e) => {
-                const next = e.target.value;
-                setRegion(next);
-                fetchList(0, String(activeQ || draftQ || "").trim(), next);
+              allowAll: true,
+              style: { width: 180 },
+              onChange: (next) => {
+                const used = next === REGION_ALL_ID ? "" : next;
+                setRegion(used);
+                fetchList(0, String(activeQ || draftQ || "").trim(), used);
               },
-            },
-              h("option", { value: "" }, "全部地域"),
-              CDB_REGIONS.map((row) => h("option", { key: row.id, value: row.id }, row.name)),
-            ),
+            }),
             h("button", { key: "reb", type: "button", className: "ci-mini", onClick: () => {
               const target = selectedItems[0];
               if (!target) return setNotice("请先选择实例");
