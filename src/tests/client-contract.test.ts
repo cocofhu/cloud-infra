@@ -197,4 +197,5 @@ test('cdb review fixes: WAN DMC, destroy protect toggle, project form, destructi
   assert.doesNotMatch(client, /if \(skip && action !== "dmc\.row\.write"\)/)
   assert.match(client, /onClick: \(\) => onReload\(tab\) \}, "重新检查"\)/)
   assert.match(client, /tabData\.slowLogError/)
+  assert.match(client, /const body = !detail \? null : \(\(\) =>/)
 })

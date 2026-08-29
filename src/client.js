@@ -880,7 +880,7 @@ window.__ModuleLoader__.load({
         setConfirm({ action, payload, text, danger: action.confirm === "always" });
       };
       const region = cdbMeta(item).region || extra.region || "";
-      const body = (() => {
+      const body = !detail ? null : (() => {
         if (tab === "实例详情") {
           return [
             h("div", { key: "kv", className: "ci-kv" }, (detail.fields || []).map((row) => [
