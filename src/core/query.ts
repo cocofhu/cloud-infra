@@ -29,7 +29,7 @@ export interface QueryInput {
   view?: string
   title?: string
   instanceId?: string
-  /** 见 ModuleContext.clientLocalFilter；host 工具调用缺省按服务端过滤（false），客户端卡片传 true。 */
+  /** 见 ModuleContext.clientLocalFilter；host 工具调用缺省 undefined（模块不过滤 → 直达判定），客户端卡片搜索框应显式传 false 让模块过滤。 */
   clientLocalFilter?: boolean
 }
 

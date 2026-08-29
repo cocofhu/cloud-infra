@@ -2033,7 +2033,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             query: q || "",
             offset: nextOffset,
             limit: pageSize,
-            clientLocalFilter: true,
+            clientLocalFilter: false,
           });
           if (n !== seq.current) return;
           const errs = Array.isArray(result.errors) ? result.errors.map((e) => e && e.message).filter(Boolean) : [];
@@ -4646,7 +4646,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             filters: nextFilters || filters,
             offset: nextOffset,
             limit: pageSize,
-            clientLocalFilter: true,
+            clientLocalFilter: false,
           });
           if (n !== seq.current) return;
           setRows(result.items || []);
@@ -5962,7 +5962,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             limit: pageSize,
             group: isCert ? (groupRef.current || group || "") : "",
             region: useRegion || undefined,
-            clientLocalFilter: true,
+            clientLocalFilter: false,
           });
           let result = await run(useKind);
           if (n !== seq.current) return;

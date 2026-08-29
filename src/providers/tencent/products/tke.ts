@@ -1314,8 +1314,8 @@ function applyClientFilters(items: ResourceCard[], ctx: ModuleContext): Resource
   const keyword = ctx.clientLocalFilter === false ? String(ctx.query || '').trim().toLowerCase() : String(ctx.filters?.keyword || ctx.filters?.name || '').trim().toLowerCase()
   const vpc = String(ctx.filters?.vpcId || ctx.filters?.vpc || '').trim()
   const tag = String(ctx.filters?.tag || '').trim()
-  const type = ctx.clientLocalFilter === false ? '' : String(ctx.filters?.clusterType || ctx.filters?.type || '').trim()
-  const status = ctx.clientLocalFilter === false ? '' : String(ctx.filters?.status || '').trim()
+  const type = String(ctx.filters?.clusterType || ctx.filters?.type || '').trim()
+  const status = String(ctx.filters?.status || '').trim()
   return items.filter((item) => {
     if (keyword) {
       const id = columnValue(item, '集群ID').toLowerCase()
