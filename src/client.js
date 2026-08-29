@@ -122,6 +122,11 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-field-group{font-size:12px;font-weight:650;margin:10px 0 6px;color:var(--dsw-alias-label-primary)}
+.ci-sec-block{padding:4px 14px 12px;border-top:1px solid var(--dsw-alias-border-l1)}
+.ci-sec-hint{margin:0 14px 10px;color:var(--dsw-alias-label-caption);font-size:12px;line-height:1.5}
+.ci-toolbar{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 10px}
+.ci-check{width:15px;height:15px;accent-color:var(--dsw-alias-brand-primary)}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -240,7 +245,38 @@ window.__ModuleLoader__.load({
       }));
     }
 
-    function statusText(status) {
+    function isCatKind(kind) {
+      return String(kind || "").startsWith("cat");
+    }
+
+    function parseCatRefId(id) {
+      const parts = String(id || "").split(":");
+      return parts.length ? parts[parts.length - 1] : "";
+    }
+
+    function listTitle(kind) {
+      if (kind === "domain") return "域名解析";
+      if (kind === "cat.instant" || kind === "instant") return "即时拨测";
+      if (kind === "cat.alarm" || kind === "alarm") return "告警配置";
+      if (kind === "cat" || kind === "cat.task" || kind === "probe") return "任务列表";
+      return "云资源";
+    }
+
+    function searchPlaceholder(kind) {
+      if (kind === "domain") return "请输入域名关键字";
+      if (kind === "cat.instant" || kind === "instant") return "搜索即时拨测";
+      if (kind === "cat.alarm" || kind === "alarm") return "搜索告警策略";
+      if (isCatKind(kind)) return "请输入任务名称或拨测地址";
+      return "搜索";
+    }
+
+    function statusText(status, kind) {
+      if (isCatKind(kind)) {
+        if (status === "enable") return "运行中";
+        if (status === "pause") return "已暂停";
+        if (status === "error") return "异常";
+        return status === "unknown" ? "处理中" : (status || "");
+      }
       if (status === "enable") return "已启用";
       if (status === "pause") return "已暂停";
       if (status === "error") return "异常";
@@ -323,11 +359,11 @@ window.__ModuleLoader__.load({
       return out;
     }
 
-    function StatusCell({ status }) {
+    function StatusCell({ status, kind }) {
       if (!status) return h("span", null, "-");
       return h("span", { className: "ci-status" },
         h("span", { className: "ci-dot " + status }),
-        statusText(status),
+        statusText(status, kind),
       );
     }
 
@@ -379,19 +415,30 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function ResourceTable({ items, pendingId, onOpen, extraCols, showProvider, emptyHint }) {
+    function listNameLabel(rows) {
+      if (rows.every((row) => row.kind === "domain")) return "域名";
+      if (rows.every((row) => row.kind === "cat.instant")) return "即时拨测";
+      if (rows.every((row) => row.kind === "cat.alarm")) return "告警策略";
+      if (rows.every((row) => isCatKind(row.kind))) return "任务名称";
+      return "名称";
+    }
+
+    function ResourceTable({ items, pendingId, onOpen, extraCols, showProvider, emptyHint, selectable, selected, onToggle }) {
       extraCols = Array.isArray(extraCols) ? extraCols : [];
       const rows = Array.isArray(items) ? items.filter(Boolean) : [];
       if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "没有资源");
-      const nameLabel = rows.every((row) => row.kind === "domain") ? "域名" : "名称";
+      const nameLabel = listNameLabel(rows);
+      const selectedSet = selected instanceof Set ? selected : new Set();
       const template = [
+        selectable ? "28px" : null,
         "minmax(120px,1.7fr)",
         showProvider ? "64px" : null,
         "84px",
         ...extraCols.map((label) => label === "记录数" ? "64px" : "minmax(72px,0.8fr)"),
-        "52px",
+        "72px",
       ].filter(Boolean).join(" ");
       const head = [
+        selectable ? h("div", { key: "c", className: "ci-cell" }, "") : null,
         h("div", { key: "n", className: "ci-cell" }, nameLabel),
         showProvider ? h("div", { key: "p", className: "ci-cell" }, "云厂商") : null,
         h("div", { key: "s", className: "ci-cell" }, "状态"),
@@ -405,6 +452,12 @@ window.__ModuleLoader__.load({
           className: "ci-row",
           style: { gridTemplateColumns: template },
         },
+          selectable ? h("div", { className: "ci-cell" }, h("input", {
+            type: "checkbox",
+            className: "ci-check",
+            checked: selectedSet.has(item.id),
+            onChange: () => onToggle && onToggle(item.id),
+          })) : null,
           h("div", { className: "ci-cell" }, h("button", {
             type: "button",
             className: "ci-name",
@@ -413,7 +466,7 @@ window.__ModuleLoader__.load({
             onClick: () => onOpen(item),
           }, item.title)),
           showProvider ? h("div", { className: "ci-cell" }, item.provider) : null,
-          h("div", { className: "ci-cell" }, h(StatusCell, { status: item.status })),
+          h("div", { className: "ci-cell" }, h(StatusCell, { status: item.status, kind: item.kind })),
           extraCols.map((label) => h("div", {
             key: label,
             className: "ci-cell" + (label === "记录数" ? " num" : ""),
@@ -492,18 +545,28 @@ window.__ModuleLoader__.load({
         role: "presentation",
         onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
       },
-        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box, style: { width: "min(520px,100%)", maxHeight: "80vh", overflow: "auto" } },
           h("h3", null, action.label),
-          fields.map((field) => h("div", { className: "ci-field", key: field.key },
-            h("label", null, field.label),
-            h("input", {
-              type: "text",
-              placeholder: field.placeholder || "",
-              value: draft[field.key] || "",
-              disabled: busy,
-              onChange: (e) => setDraft({ ...draft, [field.key]: e.target.value }),
-            }),
-          )),
+          fields.map((field, idx) => {
+            const prev = idx > 0 ? fields[idx - 1] : null;
+            const group = field.group && field.group !== (prev && prev.group)
+              ? h("div", { className: "ci-field-group", key: field.group + "-g" }, field.group)
+              : null;
+            const input = Array.isArray(field.options) && field.options.length
+              ? h("select", {
+                value: draft[field.key] || field.options[0].value,
+                disabled: busy,
+                onChange: (e) => setDraft({ ...draft, [field.key]: e.target.value }),
+              }, field.options.map((opt) => h("option", { key: opt.value, value: opt.value }, opt.label)))
+              : h("input", {
+                type: "text",
+                placeholder: field.placeholder || "",
+                value: draft[field.key] || "",
+                disabled: busy,
+                onChange: (e) => setDraft({ ...draft, [field.key]: e.target.value }),
+              });
+            return [group, h("div", { className: "ci-field", key: field.key }, h("label", null, field.label), input)];
+          }),
           err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
           h("div", { className: "ci-modal-actions" },
             h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
@@ -525,7 +588,9 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState("");
       const [recPage, setRecPage] = useState(1);
-      const records = detail?.records || [];
+      const isDomain = item.kind === "domain";
+      const records = isDomain ? (detail?.records || []) : [];
+      const sections = !isDomain ? (detail?.sections || []) : [];
       const recSize = 20;
       const recPages = Math.max(1, Math.ceil(records.length / recSize));
       const recSlice = records.slice((recPage - 1) * recSize, recPage * recSize);
@@ -544,6 +609,7 @@ window.__ModuleLoader__.load({
             payload: {
               domain: item.title,
               domainId: String(item.id).split(":").pop(),
+              taskId: parseCatRefId(item.id),
               ...payload,
             },
           });
@@ -581,16 +647,45 @@ window.__ModuleLoader__.load({
               h("b", null, row.value),
             )),
           ),
-          h("div", { key: "sec", className: "ci-sec" },
+          isDomain ? h("div", { key: "sec", className: "ci-sec" },
             h("span", { className: "ci-sec-t" }, "解析记录"),
             h("button", {
               type: "button",
               className: "ci-mini primary",
               onClick: () => setForm({ action: createAction, initial: { host: "", type: "A", value: "", line: "默认", ttl: "600" } }),
             }, createAction.label),
+          ) : h("div", { key: "sec", className: "ci-sec" },
+            h("span", { className: "ci-sec-t" }, item.kind === "cat.instant" ? "历史诊断" : item.kind === "cat.alarm" ? "告警配置" : "任务配置"),
+            h("div", { className: "ci-actions", style: { margin: 0 } },
+              actions.filter((it) => it.id !== "record.create" && it.id !== "task.batchSuspend" && it.id !== "task.create").map((it) => h("button", {
+                key: it.id,
+                type: "button",
+                className: "ci-mini" + (it.id === "task.delete" ? " danger" : it.id === "task.update" || it.id === "instant.create" || it.id === "alarm.create" ? " primary" : ""),
+                onClick: () => {
+                  if (it.fields && it.fields.length) {
+                    setForm({ action: it, initial: { taskId: parseCatRefId(item.id), name: item.title } });
+                    return;
+                  }
+                  request(it, { taskId: parseCatRefId(item.id), taskIds: [parseCatRefId(item.id)] }, `确认${it.label}？`);
+                },
+              }, it.label)),
+            ),
           ),
           err ? h("p", { key: "err", className: "ci-err" }, err) : null,
-          records.length ? [
+          !isDomain ? sections.map((sec) => h("div", { key: sec.title, className: "ci-sec-block" },
+            h("div", { className: "ci-sec" }, h("span", { className: "ci-sec-t" }, sec.title)),
+            (sec.fields || []).length ? h("div", { className: "ci-chips" },
+              sec.fields.map((row) => h("span", { key: row.label, className: "ci-chip" }, row.label, h("b", null, row.value))),
+            ) : null,
+            (sec.rows || []).length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null, (sec.rows[0].cells || []).map((cell) => h("th", { key: cell.label }, cell.label)))),
+              h("tbody", null, sec.rows.map((row, idx) => h("tr", { key: row.id || idx },
+                (row.cells || []).map((cell) => h("td", { key: cell.label }, cell.value)),
+              ))),
+            )) : null,
+            sec.hint ? h("p", { className: "ci-sec-hint" }, sec.hint) : null,
+          )) : null,
+          isDomain && records.length ? [
             h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
               h("thead", null, h("tr", null,
                 h("th", null, "主机记录"),
@@ -645,7 +740,7 @@ window.__ModuleLoader__.load({
               busy: false,
               onPage: setRecPage,
             })),
-          ] : h("div", { key: "empty", className: "ci-empty" }, "没有解析记录"),
+          ] : (isDomain ? h("div", { key: "empty", className: "ci-empty" }, "没有解析记录") : null),
         ] : null,
         form ? h(RecordForm, {
           key: "form",
@@ -680,8 +775,14 @@ window.__ModuleLoader__.load({
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");
       const [skipConfirm, setSkipConfirm] = useState(false);
+      const [modActions, setModActions] = useState([]);
       const [session, setSession] = useState(null);
       const [pendingId, setPendingId] = useState("");
+      const [selected, setSelected] = useState(() => new Set());
+      const [listForm, setListForm] = useState(null);
+      const [listConfirm, setListConfirm] = useState(null);
+      const [listActBusy, setListActBusy] = useState(false);
+      const [listActErr, setListActErr] = useState("");
       const [rows, setRows] = useState(fromTool || []);
       const [total, setTotal] = useState(Number(payload?.total) || (fromTool || []).length);
       const [offset, setOffset] = useState(Number(payload?.offset) || 0);
@@ -693,7 +794,12 @@ window.__ModuleLoader__.load({
       const seq = useRef(0);
       const debounce = useRef(0);
       const refreshSkip = () => {
-        api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
+        api("meta", {}).then((d) => {
+          setSkipConfirm(!!d.skipConfirm);
+          const mods = Array.isArray(d.modules) ? d.modules : [];
+          const match = mods.find((m) => m.kind === kind || (kind.startsWith("cat") && m.kind === "cat") || m.id === "tencent.cat");
+          setModActions((match && match.actions) || []);
+        }).catch(() => {});
       };
       useEffect(() => {
         refreshSkip();
@@ -800,7 +906,7 @@ window.__ModuleLoader__.load({
           }) : [
             h("div", { key: "bar", className: "ci-bar" },
               h("div", { className: "ci-bar-left" },
-                h("span", { className: "ci-bar-title" }, kind === "domain" ? "域名解析" : "云资源"),
+                h("span", { className: "ci-bar-title" }, listTitle(kind)),
                 h("span", { className: "ci-bar-count" }, `${counted} 条`),
               ),
               h("div", { className: "ci-search-wrap" },
@@ -808,7 +914,7 @@ window.__ModuleLoader__.load({
                 h("input", {
                   className: "ci-search",
                   type: "search",
-                  placeholder: kind === "domain" ? "请输入域名关键字" : "搜索",
+                  placeholder: searchPlaceholder(kind),
                   value: draftQ,
                   onChange: (e) => onDraft(e.target.value),
                   onKeyDown: (e) => {
@@ -827,6 +933,35 @@ window.__ModuleLoader__.load({
                 }, "×") : null,
               ),
             ),
+            isCatKind(kind) ? h("div", { key: "tb", className: "ci-toolbar" },
+              (kind === "cat.instant" || kind === "instant"
+                ? [{ id: "instant.create", label: "开始测试", confirm: "default" }]
+                : kind === "cat.alarm" || kind === "alarm"
+                  ? [{ id: "alarm.create", label: "新建告警", confirm: "default" }]
+                  : [{ id: "task.create", label: "新建任务", confirm: "default" }, { id: "task.batchSuspend", label: "批量暂停", confirm: "always" }]
+              ).map((it) => {
+                const full = modActions.find((a) => a.id === it.id) || it;
+                return h("button", {
+                  key: it.id,
+                  type: "button",
+                  className: "ci-mini" + (it.id === "task.create" || it.id === "instant.create" || it.id === "alarm.create" ? " primary" : ""),
+                  disabled: listActBusy,
+                  onClick: () => {
+                    if (it.id === "task.batchSuspend") {
+                      const ids = [...selected].map(parseCatRefId).filter(Boolean);
+                      if (!ids.length) {
+                        setListActErr("请先勾选要暂停的任务");
+                        return;
+                      }
+                      setListConfirm({ action: full, payload: { taskIds: ids }, text: `确认批量暂停 ${ids.length} 个任务？`, danger: true });
+                      return;
+                    }
+                    setListForm({ action: full, initial: {} });
+                  },
+                }, full.label || it.label);
+              }),
+            ) : null,
+            listActErr ? h("div", { key: "aerr", className: "ci-err" }, listActErr) : null,
             listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
             listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ResourceTable, {
               key: "table",
@@ -835,6 +970,14 @@ window.__ModuleLoader__.load({
               onOpen: openItem,
               extraCols,
               showProvider,
+              selectable: kind === "cat" || kind === "cat.task",
+              selected,
+              onToggle: (id) => setSelected((cur) => {
+                const next = new Set(cur);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+              }),
               emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
             }),
             h(Pager, {
@@ -844,6 +987,63 @@ window.__ModuleLoader__.load({
               pages: pageCount,
               busy: listBusy,
               onPage: goPage,
+            }),
+            listForm ? h(RecordForm, {
+              key: "lform",
+              action: listForm.action,
+              initial: listForm.initial,
+              busy: listActBusy,
+              err: listActErr,
+              onCancel: () => { if (!listActBusy) setListForm(null); },
+              onSubmit: async (draft) => {
+                setListActBusy(true);
+                setListActErr("");
+                try {
+                  const first = rows[0];
+                  await api("action", {
+                    moduleId: first?.moduleId || "tencent.cat",
+                    id: first?.id || "tencent.cat:task:",
+                    action: listForm.action.id,
+                    payload: draft,
+                  });
+                  setListForm(null);
+                  await fetchList(offset, String(activeQ || "").trim());
+                } catch (e) {
+                  setListActErr(publicErrorMessage(e));
+                } finally {
+                  setListActBusy(false);
+                }
+              },
+            }) : null,
+            h(ConfirmDialog, {
+              key: "lconfirm",
+              open: !!listConfirm,
+              title: listConfirm?.action?.label,
+              text: listConfirm?.text,
+              busy: listActBusy,
+              danger: !!listConfirm?.danger,
+              onCancel: () => { if (!listActBusy) setListConfirm(null); },
+              onConfirm: async () => {
+                if (!listConfirm) return;
+                setListActBusy(true);
+                setListActErr("");
+                try {
+                  const first = rows[0];
+                  await api("action", {
+                    moduleId: first?.moduleId || "tencent.cat",
+                    id: first?.id || "tencent.cat:task:",
+                    action: listConfirm.action.id,
+                    payload: listConfirm.payload,
+                  });
+                  setListConfirm(null);
+                  setSelected(new Set());
+                  await fetchList(offset, String(activeQ || "").trim());
+                } catch (e) {
+                  setListActErr(publicErrorMessage(e));
+                } finally {
+                  setListActBusy(false);
+                }
+              },
             }),
           ],
         ),

@@ -11,6 +11,7 @@ export interface TencentCallOptions {
   timeoutMs: number
   signal?: AbortSignal
   timestamp?: number
+  region?: string
   fetchImpl?: typeof fetch
 }
 
@@ -36,6 +37,7 @@ export async function callTencentApi<T = unknown>(options: TencentCallOptions): 
     payload,
     timestamp,
     version: options.version,
+    region: options.region,
   })
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), options.timeoutMs)
@@ -80,6 +82,47 @@ export function dnspodCall<T>(
     service: 'dnspod',
     host: 'dnspod.tencentcloudapi.com',
     version: '2021-03-23',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+  })
+}
+
+export function catCall<T>(
+  action: string,
+  payload: unknown,
+  creds: { secretId: string; secretKey: string },
+  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch },
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'cat',
+    host: 'cat.tencentcloudapi.com',
+    version: '2018-04-09',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+  })
+}
+
+export function monitorCall<T>(
+  action: string,
+  payload: unknown,
+  creds: { secretId: string; secretKey: string },
+  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch; region?: string },
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'monitor',
+    host: 'monitor.tencentcloudapi.com',
+    version: '2018-07-24',
+    region: opts.region || 'ap-guangzhou',
     action,
     payload,
     secretId: creds.secretId,

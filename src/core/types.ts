@@ -3,6 +3,8 @@ export interface CredentialField {
   label: string
   secret?: boolean
   placeholder?: string
+  options?: Array<{ value: string; label: string }>
+  group?: string
 }
 
 export interface CloudProvider {
@@ -32,6 +34,7 @@ export interface ResourceCard {
   columns?: ResourceColumn[]
   openLabel?: string
   expiresAt?: string
+  actions?: ResourceAction[]
 }
 
 export interface DnsRecord {
@@ -46,10 +49,18 @@ export interface DnsRecord {
   remark?: string
 }
 
+export interface DetailSection {
+  title: string
+  fields?: Array<{ label: string; value: string }>
+  rows?: Array<{ id?: string; cells: Array<{ label: string; value: string }> }>
+  hint?: string
+}
+
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
   records?: DnsRecord[]
+  sections?: DetailSection[]
 }
 
 export interface ResourceAction {
@@ -90,6 +101,7 @@ export interface ModuleContext {
   signal?: AbortSignal
   id?: string
   title?: string
+  kind?: string
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string }

@@ -28,10 +28,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书. Pass kind=domain for domains. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / 云拨测 as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/云拨测/拨测任务/即时拨测/多维分析/告警. Pass kind=domain for domains; kind=cat for 任务列表; kind=cat.instant for 即时拨测; kind=cat.alarm for 告警配置. The UI paginates itself; only re-call with offset if the user asks in chat for more. Never use this tool to save plugin settings.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain or auto.' },
+      query: { type: 'string', description: 'Keyword such as example.com or a probe task name. Empty lists all. For 即时拨测/告警 you may also pass kind instead of putting those words in query.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cat, cat.instant, cat.alarm, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
@@ -78,10 +78,11 @@ export function apply(ctx: Context, config: Config): void {
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
         const kinds = supportedKinds().join(', ') || 'domain'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / 云拨测 / 即时拨测 / 告警: call ONLY cloud_infra_query. Never web_search.`,
+          `Available modules: ${titles}. kind values: ${kinds}, plus cat.instant and cat.alarm.`,
+          'kind=domain 域名; kind=cat 任务列表; kind=cat.instant 即时拨测; kind=cat.alarm 告警. 查看分析在任务详情内，不要为分析另开设置项。',
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
-          'After the table appears, one or two short sentences. Do not print secrets or full record dumps.',
+          'After the table appears, one or two short sentences. Do not print secrets or full record dumps. Never call config save from conversation actions.',
         ].join(' ')
       },
     })
@@ -234,7 +235,7 @@ async function runAction(
 }
 
 function readyModule(cfg: PluginConfig, moduleId: string, id: string) {
-  const resolvedId = moduleId || (id.includes(':') ? id.slice(0, id.lastIndexOf(':')) : '')
+  const resolvedId = resolveModuleId(moduleId, id)
   const module = registry.getModule(resolvedId)
   if (!module) throw new Error('未知模块')
   const provider = registry.getProvider(module.provider)
@@ -242,4 +243,14 @@ function readyModule(cfg: PluginConfig, moduleId: string, id: string) {
   const missing = missingCredentialKeys(provider, cfg.providers[module.provider])
   if (missing.length) throw new Error(`${provider.title} 未配置 ${missing.join('、')}。${SETTINGS_HINT}`)
   return { module, creds: credentialMap(provider, cfg.providers[module.provider]) }
+}
+
+function resolveModuleId(moduleId: string, id: string): string {
+  if (moduleId) return moduleId
+  if (!id.includes(':')) return ''
+  const known = registry.listModules().map((item) => item.id).sort((a, b) => b.length - a.length)
+  for (const mid of known) {
+    if (id === mid || id.startsWith(`${mid}:`)) return mid
+  }
+  return id.slice(0, id.lastIndexOf(':'))
 }

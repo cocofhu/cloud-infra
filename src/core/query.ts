@@ -81,6 +81,7 @@ export async function queryResources(
         limit,
         timeoutMs: config.timeoutMs,
         signal,
+        kind,
       })
       lists.push(result.items || [])
       if (result.total != null) total += result.total
@@ -99,7 +100,7 @@ export async function queryResources(
 function selectModules(kind: string, provider: string, config: PluginConfig, source: Registry): ResourceModule[] {
   const wantedKind = kind === 'auto' || !kind ? '' : kind
   return source.listModules().filter((module) => {
-    if (wantedKind && module.kind !== wantedKind) return false
+    if (wantedKind && !kindMatches(module.kind, wantedKind)) return false
     if (provider && module.provider !== provider) return false
     if (!isProviderEnabled(module.provider, config, source.getProvider(module.provider))) return false
     if (config.modules[module.id] === false) return false
@@ -107,6 +108,11 @@ function selectModules(kind: string, provider: string, config: PluginConfig, sou
     if (!provider && !isModuleEnabled(module, config)) return false
     return true
   })
+}
+
+function kindMatches(moduleKind: string, wanted: string): boolean {
+  if (moduleKind === wanted) return true
+  return wanted.startsWith(`${moduleKind}.`)
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -129,5 +135,10 @@ export function renderQuery(result: QueryResult): string {
     ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}，offset=${shown}。`
     : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
-  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} 用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。\n\n${lines.join('\n')}${err}`
+  const openHint = result.kind === 'domain'
+    ? '请用户点击「解析」或域名进行配置。'
+    : result.kind.startsWith('cat')
+      ? '请用户点击「配置」「诊断」或「历史」进入任务、即时拨测或告警详情。'
+      : '请用户点击列表中的名称或操作进入详情。'
+  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} 用一两句话概括即可，${openHint}不要打印密钥。\n\n${lines.join('\n')}${err}`
 }
