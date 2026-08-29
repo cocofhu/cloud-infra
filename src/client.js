@@ -98,6 +98,33 @@ window.__ModuleLoader__.load({
 .ci-modal h3{margin:0 0 8px;font-size:16px}
 .ci-modal p{margin:0 0 12px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.55}
 .ci-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.ci-modal.wizard{width:min(720px,100%);max-height:80vh;min-height:480px;padding:0;display:flex;flex-direction:column;overflow:hidden}
+.ci-wiz-head{padding:18px 24px 12px;border-bottom:1px solid var(--dsw-alias-border-l1);flex:none}
+.ci-wiz-head h3{margin:0 0 14px;font-size:18px}
+.ci-wiz-steps{display:flex;align-items:center;gap:0}
+.ci-wiz-step{display:flex;align-items:center;gap:8px;color:var(--dsw-alias-label-tertiary);font-size:13px;white-space:nowrap}
+.ci-wiz-step.on,.ci-wiz-step.done{color:var(--dsw-alias-label-primary)}
+.ci-wiz-step.on{font-weight:650}
+.ci-wiz-n{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:650;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary)}
+.ci-wiz-step.on .ci-wiz-n{background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary-foreground)}
+.ci-wiz-step.done .ci-wiz-n{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
+.ci-wiz-line{flex:1;height:1px;background:var(--dsw-alias-border-l1);margin:0 10px;min-width:12px}
+.ci-wiz-body{padding:18px 24px;overflow:auto;flex:1;min-height:280px}
+.ci-wiz-foot{padding:12px 24px 18px;border-top:1px solid var(--dsw-alias-border-l1);display:flex;justify-content:flex-end;gap:8px;flex:none}
+.ci-wiz-foot .ci-mini{height:34px;padding:0 16px}
+.ci-wiz-sec{font-size:13px;font-weight:650;margin:16px 0 8px;color:var(--dsw-alias-label-primary)}
+.ci-wiz-sec:first-child{margin-top:0}
+.ci-opt{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-top:1px solid var(--dsw-alias-border-l1);cursor:pointer}
+.ci-opt:first-of-type{border-top:0}
+.ci-opt input{margin-top:2px;flex:none}
+.ci-opt-t{font-size:13px;font-weight:550;color:var(--dsw-alias-label-primary)}
+.ci-opt-d{margin:2px 0 0;font-size:12px;color:var(--dsw-alias-label-caption);line-height:18px}
+.ci-cart-table{width:100%;border-collapse:collapse;font-size:13px}
+.ci-cart-table th,.ci-cart-table td{padding:10px 8px 10px 0;border-bottom:1px solid var(--dsw-alias-border-l1);text-align:left;vertical-align:middle}
+.ci-cart-table th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px}
+.ci-cart-table td.num,.ci-cart-table .sum{font-variant-numeric:tabular-nums}
+.ci-cart-table .sum{font-weight:650;font-size:14px;border-bottom:0}
+.ci-kv.review{padding:0;gap:10px 16px}
 .ci-cfg-item{list-style:none;margin:0;padding:0;min-width:0}
 .ci-cfg{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:12px;overflow:hidden;box-sizing:border-box;width:100%;min-width:0}
 .ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:14px 16px;box-sizing:border-box;min-width:0}
@@ -645,52 +672,66 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function CartModal({ open, items, busy, err, onClose, onRemove, onBuy }) {
+    function CheckoutWizard({
+      flow, items, draft, setDraft, cart, result, busy, err, maxPeriod,
+      onClose, onRemove, onBuy, onBackCart, onNext, onBackSubmit, onPay, onRefresh,
+    }) {
+      const open = flow === "cart" || flow === "submit" || flow === "review" || flow === "status";
       const box = useOverlayKeys(open, busy, onClose, false);
       if (!open) return null;
-      const node = h("div", {
-        className: "ci-modal-mask",
-        role: "presentation",
-        onClick: (e) => { if (!busy && e.target === e.currentTarget) onClose(); },
-      },
-        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
-          h("h3", null, "域名购物车"),
-          items.length
-            ? h("ul", { className: "ci-cart-list" }, items.map((row) => h("li", { key: row.title },
-              h("span", null, row.title),
-              h("span", null,
-                row.price ? `¥${row.price}/年 ` : "",
-                h("button", { type: "button", className: "ci-link", disabled: busy, onClick: () => onRemove(row.title) }, "移除"),
+      const steps = [
+        { id: "cart", label: "购物车" },
+        { id: "submit", label: "提交订单" },
+        { id: "review", label: "核对信息" },
+        { id: "status", label: "完成" },
+      ];
+      const idx = Math.max(0, steps.findIndex((step) => step.id === flow));
+      const years = Array.from({ length: maxPeriod || 10 }, (_, i) => i + 1);
+      const preview = draft?.preview || {};
+      const domains = preview.domains || (cart || []).map((row) => row.title);
+      const period = preview.period || draft?.period;
+      const total = preview.total != null
+        ? preview.total
+        : (cart || []).reduce((sum, row) => sum + Number(row.price || 0), 0) * Number(period || 1);
+      const cartSum = (items || []).reduce((sum, row) => sum + Number(row.price || 0), 0);
+      const titles = { cart: "域名购物车", submit: "提交订单", review: "核对信息", status: "操作状态" };
+      let body = null;
+      let foot = null;
+      if (flow === "cart") {
+        body = items.length
+          ? h("table", { className: "ci-cart-table" },
+            h("thead", null, h("tr", null,
+              h("th", null, "域名"),
+              h("th", null, "价格"),
+              h("th", null, "操作"),
+            )),
+            h("tbody", null,
+              items.map((row) => h("tr", { key: row.title },
+                h("td", null, row.title),
+                h("td", { className: "num" }, row.price ? `¥${row.price}/年` : "-"),
+                h("td", null, h("button", { type: "button", className: "ci-link", disabled: busy, onClick: () => onRemove(row.title) }, "移除")),
+              )),
+              h("tr", null,
+                h("td", { className: "sum" }, "合计"),
+                h("td", { className: "sum num" }, `¥${cartSum}/年`),
+                h("td", { className: "sum" }, ""),
               ),
-            )))
-            : h("p", null, "购物车为空，不能买"),
-          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
-          h("div", { className: "ci-modal-actions" },
-            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onClose }, "关闭"),
-            h("button", {
-              type: "button",
-              className: "ci-mini primary",
-              disabled: busy || !items.length,
-              onClick: onBuy,
-            }, busy ? "处理中" : "立即购买"),
-          ),
-        ),
-      );
-      return createPortal(node, document.body);
-    }
-
-    function SubmitOrderModal({ open, draft, setDraft, busy, err, maxPeriod, onClose, onNext }) {
-      const box = useOverlayKeys(open, busy, onClose, false);
-      if (!open || !draft) return null;
-      const years = Array.from({ length: maxPeriod }, (_, i) => i + 1);
-      const node = h("div", {
-        className: "ci-modal-mask",
-        role: "presentation",
-        onClick: (e) => { if (!busy && e.target === e.currentTarget) onClose(); },
-      },
-        h("div", { className: "ci-modal wide", role: "dialog", "aria-modal": "true", ref: box },
-          h("h3", null, "提交订单"),
-          h("div", { className: "ci-field" },
+            ),
+          )
+          : h("p", null, "购物车为空，不能买");
+        foot = [
+          h("button", { key: "close", type: "button", className: "ci-mini", disabled: busy, onClick: onClose }, "关闭"),
+          h("button", {
+            key: "buy",
+            type: "button",
+            className: "ci-mini primary",
+            disabled: busy || !items.length,
+            onClick: onBuy,
+          }, busy ? "处理中" : "立即购买"),
+        ];
+      } else if (flow === "submit" && draft) {
+        body = [
+          h("div", { key: "period", className: "ci-field" },
             h("label", null, "时长"),
             h("select", {
               value: draft.period,
@@ -698,7 +739,7 @@ window.__ModuleLoader__.load({
               onChange: (e) => setDraft({ ...draft, period: Number(e.target.value) || 1 }),
             }, years.map((n) => h("option", { key: n, value: n }, `${n} 年`))),
           ),
-          h("div", { className: "ci-field" },
+          h("div", { key: "tpl", className: "ci-field" },
             h("label", null, "已实名信息模板"),
             (draft.templates || []).length
               ? h("select", {
@@ -708,34 +749,44 @@ window.__ModuleLoader__.load({
               }, (draft.templates || []).map((item) => h("option", { key: item.templateId, value: item.templateId }, item.label)))
               : h("p", { className: "ci-hint" }, "没有已实名信息模板。请先到腾讯云控制台「信息模板」完成实名。"),
           ),
-          h("label", { className: "ci-cfg-src", style: { marginBottom: 8 } },
+          h("div", { key: "sec", className: "ci-wiz-sec" }, "状态设置"),
+          h("label", { key: "renew", className: "ci-opt" },
             h("input", {
               type: "checkbox",
               checked: !!draft.autoRenew,
               disabled: busy,
               onChange: () => setDraft({ ...draft, autoRenew: !draft.autoRenew }),
             }),
-            "开启自动续费",
+            h("span", null,
+              h("div", { className: "ci-opt-t" }, "开启自动续费"),
+              h("p", { className: "ci-opt-d" }, "到期前按续费价格从账户余额扣费。可随时在我的域名列表关闭。"),
+            ),
           ),
-          h("label", { className: "ci-cfg-src", style: { marginBottom: 8 } },
+          h("label", { key: "ulock", className: "ci-opt" },
             h("input", {
               type: "checkbox",
               checked: !!draft.updateLock,
               disabled: busy,
               onChange: () => setDraft({ ...draft, updateLock: !draft.updateLock }),
             }),
-            "禁止更新锁",
+            h("span", null,
+              h("div", { className: "ci-opt-t" }, "禁止更新锁"),
+              h("p", { className: "ci-opt-d" }, "开启后将禁止修改域名信息、设置及 DNS 服务器。"),
+            ),
           ),
-          h("label", { className: "ci-cfg-src", style: { marginBottom: 8 } },
+          h("label", { key: "tlock", className: "ci-opt" },
             h("input", {
               type: "checkbox",
               checked: !!draft.transferLock,
               disabled: busy,
               onChange: () => setDraft({ ...draft, transferLock: !draft.transferLock }),
             }),
-            "禁止转移锁",
+            h("span", null,
+              h("div", { className: "ci-opt-t" }, "禁止转移锁"),
+              h("p", { className: "ci-opt-d" }, "开启后将禁止该域名从腾讯云转出到其他注册商。下单时两锁可同时开。"),
+            ),
           ),
-          h("label", { className: "ci-agree" },
+          h("label", { key: "agree", className: "ci-agree", style: { marginTop: 12 } },
             h("input", {
               type: "checkbox",
               checked: !!draft.agree,
@@ -748,73 +799,79 @@ window.__ModuleLoader__.load({
               rel: "noreferrer",
             }, "《腾讯云域名注册协议》")),
           ),
-          err ? h("p", { className: "ci-err", style: { margin: "8px 0 0" } }, err) : null,
-          h("div", { className: "ci-modal-actions" },
-            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onClose }, "返回购物车"),
-            h("button", {
-              type: "button",
-              className: "ci-mini primary",
-              disabled: busy || !(draft.templates || []).length,
-              onClick: onNext,
-            }, busy ? "处理中" : "核对信息"),
-          ),
-        ),
-      );
-      return createPortal(node, document.body);
-    }
-
-    function ReviewModal({ open, draft, cart, busy, err, onClose, onPay }) {
-      const box = useOverlayKeys(open, busy, onClose, false);
-      if (!open || !draft) return null;
-      const preview = draft.preview || {};
-      const domains = preview.domains || cart.map((row) => row.title);
-      const period = preview.period || draft.period;
-      const total = preview.total != null ? preview.total : cart.reduce((sum, row) => sum + Number(row.price || 0), 0) * Number(period || 1);
+        ];
+        foot = [
+          h("button", { key: "back", type: "button", className: "ci-mini", disabled: busy, onClick: onBackCart }, "返回购物车"),
+          h("button", {
+            key: "next",
+            type: "button",
+            className: "ci-mini primary",
+            disabled: busy || !(draft.templates || []).length,
+            onClick: onNext,
+          }, busy ? "处理中" : "核对信息"),
+        ];
+      } else if (flow === "review" && draft) {
+        body = h("div", { className: "ci-kv review" },
+          h("div", { className: "ci-kv-k" }, "域名"),
+          h("div", { className: "ci-kv-v" }, domains.join("、") || "-"),
+          h("div", { className: "ci-kv-k" }, "时长"),
+          h("div", { className: "ci-kv-v" }, `${period} 年`),
+          h("div", { className: "ci-kv-k" }, "模板"),
+          h("div", { className: "ci-kv-v" }, preview.templateLabel || draft.templateId || "-"),
+          h("div", { className: "ci-kv-k" }, "自动续费"),
+          h("div", { className: "ci-kv-v" }, draft.autoRenew ? "开" : "关"),
+          h("div", { className: "ci-kv-k" }, "禁止更新锁"),
+          h("div", { className: "ci-kv-v" }, draft.updateLock ? "开" : "关"),
+          h("div", { className: "ci-kv-k" }, "禁止转移锁"),
+          h("div", { className: "ci-kv-v" }, draft.transferLock ? "开" : "关"),
+          h("div", { className: "ci-kv-k" }, "费用"),
+          h("div", { className: "ci-kv-v sum" }, `¥${total}`),
+          h("div", { className: "ci-kv-k" }, "支付"),
+          h("div", { className: "ci-kv-v" }, "将从账户余额扣费。不支持微信 / QQ 钱包 / 网银。"),
+        );
+        foot = [
+          h("button", { key: "back", type: "button", className: "ci-mini", disabled: busy, onClick: onBackSubmit }, "返回"),
+          h("button", {
+            key: "pay",
+            type: "button",
+            className: "ci-mini primary",
+            disabled: busy,
+            onClick: onPay,
+          }, busy ? "支付中" : "账户余额支付"),
+        ];
+      } else {
+        body = [
+          h("p", { key: "st", style: { fontSize: 16, fontWeight: 650, color: "var(--dsw-alias-label-primary)" } }, result?.statusLabel || "已提交"),
+          result?.reason ? h("p", { key: "rs" }, result.reason) : null,
+          h("p", { key: "hint" }, result?.hint || "可到我的域名卡片刷新查看。注册不是瞬时生效。"),
+        ];
+        foot = [
+          result?.logId ? h("button", { key: "rf", type: "button", className: "ci-mini", disabled: busy, onClick: onRefresh }, busy ? "刷新中" : "刷新状态") : null,
+          h("button", { key: "done", type: "button", className: "ci-mini primary", disabled: busy, onClick: onClose }, "完成"),
+        ];
+      }
       const node = h("div", {
-        className: "ci-modal-mask stacked",
+        className: "ci-modal-mask",
         role: "presentation",
         onClick: (e) => { if (!busy && e.target === e.currentTarget) onClose(); },
       },
-        h("div", { className: "ci-modal wide", role: "dialog", "aria-modal": "true", ref: box },
-          h("h3", null, "核对信息"),
-          h("p", null, `域名：${domains.join("、")}`),
-          h("p", null, `时长：${period} 年`),
-          h("p", null, `模板：${preview.templateLabel || draft.templateId || "-"}`),
-          h("p", null, `费用：¥${total}`),
-          h("p", null, "将从账户余额扣费。不支持微信 / QQ 钱包 / 网银。"),
-          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
-          h("div", { className: "ci-modal-actions" },
-            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onClose }, "返回"),
-            h("button", {
-              type: "button",
-              className: "ci-mini primary",
-              disabled: busy,
-              onClick: onPay,
-            }, busy ? "支付中" : "账户余额支付"),
+        h("div", { className: "ci-modal wizard", role: "dialog", "aria-modal": "true", ref: box },
+          h("div", { className: "ci-wiz-head" },
+            h("h3", null, titles[flow] || "域名购物车"),
+            h("div", { className: "ci-wiz-steps" }, steps.flatMap((step, i) => {
+              const state = i < idx ? "done" : (i === idx ? "on" : "");
+              const n = h("div", { key: step.id, className: "ci-wiz-step" + (state ? ` ${state}` : "") },
+                h("span", { className: "ci-wiz-n" }, i + 1),
+                step.label,
+              );
+              return i === 0 ? [n] : [h("span", { key: `l${i}`, className: "ci-wiz-line" }), n];
+            })),
           ),
-        ),
-      );
-      return createPortal(node, document.body);
-    }
-
-    function StatusModal({ open, result, busy, err, onClose, onRefresh }) {
-      const box = useOverlayKeys(open, busy, onClose, false);
-      if (!open) return null;
-      const node = h("div", {
-        className: "ci-modal-mask stacked",
-        role: "presentation",
-        onClick: (e) => { if (!busy && e.target === e.currentTarget) onClose(); },
-      },
-        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
-          h("h3", null, "操作状态"),
-          h("p", null, result?.statusLabel || "已提交"),
-          result?.reason ? h("p", null, result.reason) : null,
-          h("p", null, result?.hint || "可到我的域名卡片刷新查看。注册不是瞬时生效。"),
-          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
-          h("div", { className: "ci-modal-actions" },
-            result?.logId ? h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onRefresh }, busy ? "刷新中" : "刷新状态") : null,
-            h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: onClose }, "完成"),
+          h("div", { className: "ci-wiz-body" },
+            body,
+            err ? h("p", { className: "ci-err", style: { margin: "12px 0 0" } }, err) : null,
           ),
+          h("div", { className: "ci-wiz-foot" }, foot),
         ),
       );
       return createPortal(node, document.body);
@@ -1463,40 +1520,23 @@ window.__ModuleLoader__.load({
             }),
           ],
         ),
-        h(CartModal, {
-          open: flow === "cart",
+        h(CheckoutWizard, {
+          flow,
           items: cart,
-          busy: orderBusy,
-          err: orderErr,
-          onClose: () => { if (!orderBusy) setFlow(""); },
-          onRemove: removeCart,
-          onBuy: openSubmit,
-        }),
-        h(SubmitOrderModal, {
-          open: flow === "submit",
           draft: orderDraft,
           setDraft: setOrderDraft,
-          busy: orderBusy,
-          err: orderErr,
-          maxPeriod,
-          onClose: () => { if (!orderBusy) { setFlow("cart"); setOrderErr(""); } },
-          onNext: goReview,
-        }),
-        h(ReviewModal, {
-          open: flow === "review",
-          draft: orderDraft,
           cart,
-          busy: orderBusy,
-          err: orderErr,
-          onClose: () => { if (!orderBusy) { setFlow("submit"); setOrderErr(""); } },
-          onPay: pay,
-        }),
-        h(StatusModal, {
-          open: flow === "status",
           result: orderResult,
           busy: orderBusy,
           err: orderErr,
+          maxPeriod,
           onClose: () => { if (!orderBusy) setFlow(""); },
+          onRemove: removeCart,
+          onBuy: openSubmit,
+          onBackCart: () => { if (!orderBusy) { setFlow("cart"); setOrderErr(""); } },
+          onNext: goReview,
+          onBackSubmit: () => { if (!orderBusy) { setFlow("submit"); setOrderErr(""); } },
+          onPay: pay,
           onRefresh: refreshStatus,
         }),
         h(ConfirmDialog, {
