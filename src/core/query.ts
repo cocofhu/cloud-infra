@@ -30,7 +30,7 @@ export async function queryResources(
   const kind = String(input.kind || 'domain').trim() || 'domain'
   const provider = String(input.provider || '').trim()
   const query = String(input.query || '').trim()
-  const region = String(input.region || '').trim()
+  const region = String(input.region || '').trim() || (kind === 'cluster' ? 'ap-guangzhou' : '')
   const filters = sanitizeFilters(input.filters)
   const offset = Math.max(0, Math.floor(Number(input.offset) || 0))
   const explicit = Number(input.limit)
@@ -137,7 +137,7 @@ export function renderQuery(result: QueryResult): string {
     : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
   const hint = result.kind === 'cluster'
-    ? '用一两句话概括即可，请用户在列表中选择地域并点击集群 ID 进入配置。不要打印密钥或集群凭证，不要套用域名解析页。'
+    ? '用一两句话概括即可，列表默认广州，用户可在顶栏切换地域并点击集群 ID 进入配置。不要询问地域、不要打印密钥或集群凭证，不要套用域名解析页。'
     : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
   return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
 }

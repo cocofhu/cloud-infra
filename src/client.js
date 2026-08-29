@@ -1388,7 +1388,7 @@ window.__ModuleLoader__.load({
       const provider = String(args.provider || "");
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");
-      const [region, setRegion] = useState(String(payload?.region || args.region || ""));
+      const [region, setRegion] = useState(String(payload?.region || args.region || "ap-guangzhou"));
       const [filters, setFilters] = useState({ clusterType: "", status: "", vpcId: "", tag: "" });
       const [rows, setRows] = useState(fromTool || []);
       const [total, setTotal] = useState(Number(payload?.total) || (fromTool || []).length);
@@ -1917,7 +1917,7 @@ window.__ModuleLoader__.load({
           h("summary", { className: "ci-cfg-h" },
             h("span", { className: "ci-cfg-t" },
               h("span", { className: "ci-cfg-n" }, "云资源"),
-              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与 TKE 集群。地域在资源列表中选择，不写入设置。"),
+              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与 TKE 集群。地域在资源列表中选择，不写入设置。TKE 列表默认广州。"),
             ),
             dirty ? h("span", { className: "ci-badge" }, "未保存") : null,
             h(ChevronDown, { className: "ci-cfg-ch" + (open ? " ci-cfg-ch-open" : "") }),

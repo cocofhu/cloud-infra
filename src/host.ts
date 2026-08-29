@@ -28,7 +28,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates / TKE clusters as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/TKE/集群/容器服务. Pass kind=domain for domains, kind=cluster for TKE clusters. For clusters, pass region (e.g. ap-guangzhou); region is runtime-only and must not be saved to settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / TKE clusters as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/TKE/集群/容器服务. Pass kind=domain for domains, kind=cluster for TKE clusters. For clusters, pass region if the user names one; if omitted, default to ap-guangzhou and do not ask which region. Region is runtime-only and must not be saved to settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
       query: { type: 'string', description: 'Keyword such as example.com or a cluster name. Empty lists all.' },
       kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cluster, or auto.' },
@@ -81,7 +81,7 @@ export function apply(ctx: Context, config: Config): void {
         const kinds = supportedKinds().join(', ') || 'domain'
         return [
           `Cloud domains / DNS / 解析 / DNSPod / 证书 / TKE / 集群 / 容器服务: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}. Use kind=cluster for TKE clusters and pass region at runtime.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Use kind=cluster for TKE clusters. Default region ap-guangzhou when unspecified; do not ask which region.`,
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
           'After the table appears, one or two short sentences. Do not print secrets, cluster credentials, or full record dumps. Never save region or credentials via this tool.',
         ].join(' ')
