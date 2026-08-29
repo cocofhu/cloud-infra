@@ -8,11 +8,11 @@ window.__ModuleLoader__.load({
     const CSS = `
 .ci-root,.ci-tool{font-family:inherit;color:var(--dsw-alias-label-primary);width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:2px 0 6px}
 .ci-panel{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);overflow:hidden;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
-.ci-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;min-width:0;flex-wrap:wrap}
+.ci-bar{display:flex;align-items:center;gap:12px;padding:10px 14px;min-width:0;flex-wrap:nowrap;overflow-x:auto}
 .ci-bar-left{display:flex;align-items:baseline;gap:8px;min-width:0}
 .ci-bar-title{font-size:14px;font-weight:650;line-height:22px;color:var(--dsw-alias-label-primary)}
 .ci-bar-count{color:var(--dsw-alias-label-tertiary);font-size:12px}
-.ci-search-wrap{position:relative;width:min(220px,100%);flex:none}
+.ci-search-wrap{position:relative;width:220px;flex:none;margin-left:auto}
 .ci-search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-caption);pointer-events:none}
 .ci-search{width:100%;height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 28px 0 32px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none}
 .ci-search::-webkit-search-cancel-button,.ci-search::-webkit-search-decoration{appearance:none;-webkit-appearance:none;display:none}
@@ -71,7 +71,7 @@ window.__ModuleLoader__.load({
 .ci-table td.ci-ops-cell{white-space:nowrap;word-break:normal}
 .ci-table tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-rec-page{margin:0}
-.ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+.ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;height:32px;box-sizing:border-box;cursor:pointer;font:inherit;font-size:13px;line-height:32px;display:inline-flex;align-items:center;white-space:nowrap}
 .ci-mini.primary{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border-color:transparent}
 .ci-mini.danger{color:var(--dsw-alias-state-error-primary)}
 .ci-mini:disabled{opacity:.4;cursor:default}
@@ -122,16 +122,16 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
-.ci-regionbar{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
-.ci-regionbar label{color:var(--dsw-alias-label-tertiary);line-height:32px;flex:none}
-.ci-combo{position:relative;width:min(280px,100%)}
-.ci-combo input{height:32px;width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;font:inherit;background:var(--dsw-alias-bg-layer-1);color:inherit;box-sizing:border-box}
+.ci-regionbar{display:flex;align-items:center;gap:8px;flex:none;padding:0;border:0;background:transparent}
+.ci-regionbar label{color:var(--dsw-alias-label-secondary);line-height:32px;flex:none;font-size:13px;font-weight:400}
+.ci-combo{position:relative;width:240px;flex:none}
+.ci-combo input{height:32px;width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;font:inherit;font-size:13px;line-height:32px;background:var(--dsw-alias-bg-layer-1);color:inherit;box-sizing:border-box}
 .ci-combo input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-combo-list{position:absolute;left:0;right:0;top:36px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;max-height:200px;overflow:auto;z-index:3;margin:0;padding:4px 0;list-style:none}
 .ci-combo-list li{padding:6px 10px;cursor:pointer;font-size:13px}
 .ci-combo-list li.on,.ci-combo-list li:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-brand-primary)}
 .ci-combo-id{color:var(--dsw-alias-label-tertiary);margin-left:8px;font-size:12px}
-.ci-tool-left{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ci-tool-left{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:none}
 .ci-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:8px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);font-size:13px;color:var(--dsw-alias-label-secondary)}
 .ci-crumbs button{background:none;border:0;padding:0;font:inherit;color:var(--dsw-alias-brand-primary);cursor:pointer}
 .ci-crumbs span{color:var(--dsw-alias-label-caption)}
@@ -1179,18 +1179,7 @@ window.__ModuleLoader__.load({
         session ? h("div", { key: "crumb", className: "ci-crumb" },
           h("button", { type: "button", className: "ci-back", onClick: () => { setSession(null); setDraftQ(""); setErr(""); } }, "返回"),
           h("span", { className: "ci-head-t" }, session.item.title),
-        ) : h(CosRegionCombo, {
-          key: "region",
-          regions,
-          input,
-          selected,
-          open,
-          highlight,
-          onInput: onRegionInput,
-          onPick: pickRegion,
-          onOpen: setOpen,
-          onHighlight: setHighlight,
-        }),
+        ) : null,
         session ? h("div", { key: "path", className: "ci-crumbs" },
           crumbs.map((crumb, idx) => [
             idx ? h("span", { key: "s" + idx }, "/") : null,
@@ -1202,6 +1191,17 @@ window.__ModuleLoader__.load({
           ]),
         ) : null,
         h("div", { key: "bar", className: "ci-bar" },
+          session ? null : h(CosRegionCombo, {
+            regions,
+            input,
+            selected,
+            open,
+            highlight,
+            onInput: onRegionInput,
+            onPick: pickRegion,
+            onOpen: setOpen,
+            onHighlight: setHighlight,
+          }),
           h("div", { className: "ci-tool-left" },
             session ? [
               h("button", {
