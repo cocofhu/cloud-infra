@@ -213,3 +213,71 @@ test('g2.3 handleApi keeps COS rename/folder-delete errors instead of 云厂商�
   assert.match(folder.out.body, /未删尽/)
   assert.doesNotMatch(folder.out.body, /云厂商请求失败/)
 })
+
+test('handleApi query 响应包含 directItemId / notFoundQuery 字段', async () => {
+  registerModule({
+    id: 'tencent.cos',
+    provider: 'tencent',
+    kind: 'cos',
+    title: '对象存储',
+    implemented: true,
+    async list(ctx) {
+      const all = [
+        {
+          id: 'tencent.cos:ap-guangzhou:cloud-init-1251810746',
+          moduleId: 'tencent.cos',
+          provider: 'tencent',
+          kind: 'cos',
+          title: 'cloud-init-1251810746',
+          description: '广州',
+        },
+        {
+          id: 'tencent.cos:ap-guangzhou:assets-1250000000',
+          moduleId: 'tencent.cos',
+          provider: 'tencent',
+          kind: 'cos',
+          title: 'assets-1250000000',
+          description: '广州',
+        },
+      ]
+      const q = String(ctx.query || '').trim()
+      return {
+        items: q ? all.filter((item) => item.title.includes(q)) : all,
+        total: q ? all.filter((item) => item.title.includes(q)).length : all.length,
+        region: 'ap-guangzhou',
+      }
+    },
+  })
+  const cfg = withDefaults({
+    providers: { tencent: { secretId: 'AKIDxxxxxxxx', secretKey: 'secret' } },
+  })
+  const headers = { host: '127.0.0.1:3091', origin: 'http://127.0.0.1:3091' }
+  try {
+    const hit = res()
+    await handleApi(req(headers, {
+      remoteAddress: '127.0.0.1',
+      body: JSON.stringify({ method: 'query', kind: 'cos', query: 'cloud-init-1251810746', region: 'ap-guangzhou' }),
+    }), hit.response, cfg)
+    assert.equal(hit.out.status, 200)
+    const hitBody = JSON.parse(hit.out.body || '{}')
+    assert.equal(hitBody.ok, true)
+    assert.equal(hitBody.directItemId, 'tencent.cos:ap-guangzhou:cloud-init-1251810746')
+    assert.equal(hitBody.notFoundQuery, undefined)
+    assert.equal(hitBody.items.length, 1)
+
+    const miss = res()
+    await handleApi(req(headers, {
+      remoteAddress: '127.0.0.1',
+      body: JSON.stringify({ method: 'query', kind: 'cos', query: 'no-such-bucket-xyz', region: 'ap-guangzhou' }),
+    }), miss.response, cfg)
+    assert.equal(miss.out.status, 200)
+    const missBody = JSON.parse(miss.out.body || '{}')
+    assert.equal(missBody.ok, true)
+    assert.equal(missBody.notFoundQuery, 'no-such-bucket-xyz')
+    assert.equal(missBody.directItemId, undefined)
+  } finally {
+    // 恢复真实 cos 模块，避免影响其它用例
+    const { tencentCosModule } = await import('../providers/tencent/products/cos.js')
+    registerModule(tencentCosModule)
+  }
+})

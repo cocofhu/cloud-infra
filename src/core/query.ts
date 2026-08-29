@@ -46,6 +46,27 @@ export function wantsSearch(input: QueryInput): boolean {
   return false
 }
 
+/**
+ * 直达判定：用户带具体资源名时，query 与某条卡片的 title 或 id 最后一段
+ * （如 cos 的 bucket、cert 的证书 ID、cdb/cvm 的实例 ID、tke 的集群 ID、
+ * image 的 RegistryId）完全相等（不区分大小写）即视为直达命中。
+ * 空 query 返回 {}；非空但无精确命中返回 { notFoundQuery }。
+ */
+export function detectDirectHit(
+  items: ResourceCard[],
+  query: string,
+): { directItemId?: string; notFoundQuery?: string } {
+  const needle = String(query || '').trim().toLowerCase()
+  if (!needle) return {}
+  for (const item of items || []) {
+    if (!item) continue
+    if (String(item.title || '').trim().toLowerCase() === needle) return { directItemId: item.id }
+    const tail = String(item.id || '').split(':').pop()?.trim().toLowerCase()
+    if (tail && tail === needle) return { directItemId: item.id }
+  }
+  return { notFoundQuery: String(query || '').trim() }
+}
+
 export async function queryResources(
   input: QueryInput,
   config: PluginConfig,
@@ -178,6 +199,7 @@ export async function queryResources(
 
   const items = lists.flat()
   if (!total) total = extras.logs?.length || items.length
+  const direct = !search ? detectDirectHit(items, query) : {}
   return {
     query,
     kind,
@@ -190,6 +212,8 @@ export async function queryResources(
     region: extras.region || region || undefined,
     regions: extras.regions || (regions.length ? regions : undefined),
     ...(needsRegion ? { needsRegion: true } : {}),
+    ...(direct.directItemId ? { directItemId: direct.directItemId } : {}),
+    ...(direct.notFoundQuery ? { notFoundQuery: direct.notFoundQuery } : {}),
   }
 }
 
@@ -227,12 +251,18 @@ function clamp(n: number, min: number, max: number): number {
 
 export function renderQuery(result: QueryResult): string {
   if (result.kind === 'cls') return renderClsQuery(result)
+  const directHit = result.directItemId
+    ? result.items.find((item) => item.id === result.directItemId) || null
+    : null
   if (!result.items.length) {
     if (result.kind === 'cos' && result.needsRegion) {
       return '对话卡默认选中广州（ap-guangzhou，#ci-cos-region 可输入补全并改选其它官方地域）并自动列出该地域存储桶。不要用 Ask question 代替选地域，不要编造 region id，也不要把中文名或自由文本当作 region。'
     }
     const err = result.errors.map((item) => item.message).join('；')
     if (err) return err
+    if (result.notFoundQuery) {
+      return `没有找到与您输入的「${result.notFoundQuery}」完全匹配的资源（可能是名称打错、资源不存在或不在当前地域）。对话卡片里已给出提示；请用户确认名称或换个关键字重试。不要打印密钥。`
+    }
     if (result.kind === 'registrar') {
       return result.query
         ? `没有匹配「${result.query}」的可注册结果。请用户在对话卡片顶部搜索框改关键字再查。不要引导去设置页。不要打印密钥。`
@@ -279,7 +309,13 @@ export function renderQuery(result: QueryResult): string {
             : result.kind === 'image'
               ? '请用户在卡片中先选择地域，再点实例卡片查看仓库与版本。不要打印密钥。'
               : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
-  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
+  const directNote = directHit
+    ? `其中「${directHit.title}」与用户输入完全匹配，对话卡片将自动定位到「${directHit.title}」并直接打开它的详情面板，不要再说让用户自己点进去。`
+    : ''
+  const missNote = result.notFoundQuery
+    ? `注意：未找到与您输入的「${result.notFoundQuery}」完全匹配的资源（可能是名称打错、资源不存在或不在当前地域）；对话卡片将展示当前地域的全量列表并给出提示，请用户从列表中选择或换个关键字重试。`
+    : ''
+  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}${directNote ? ` ${directNote}` : ''}${missNote ? ` ${missNote}` : ''}\n\n${lines.join('\n')}${err}`
 }
 
 function sanitizeFilters(raw: Record<string, string> | undefined): Record<string, string> | undefined {

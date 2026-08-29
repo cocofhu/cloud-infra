@@ -218,6 +218,10 @@ export interface QueryResult {
   context?: string
   fields?: string[]
   instanceId?: string
+  /** query 与某条卡片的 title / id 尾部完全相等（不区分大小写）时，该卡片的 id。 */
+  directItemId?: string
+  /** query 非空但未精确命中任何条目时的原始 query（回落到全量列表时由客户端提示）。 */
+  notFoundQuery?: string
 }
 
 export interface ModuleContext {
