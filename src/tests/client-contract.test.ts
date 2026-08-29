@@ -839,3 +839,17 @@ test('g4.3 README documents chat card, region-first and TCR CAM', () => {
   assert.match(readme, /同 Digest/)
   assert.match(readme, /不在设置页增加地域/)
 })
+
+test('region pickers unify on RegionCombo with grouping and 全部地域 support', () => {
+  const client = read('src/client.js')
+  assert.match(client, /function RegionCombo\(/)
+  assert.match(client, /function RegionComboById\(/)
+  assert.match(client, /function matchRegionItems\(/)
+  assert.match(client, /REGION_ALL_ID = "__all__"/)
+  assert.match(client, /ci-combo-group/)
+  assert.match(client, /function RegionSelect/)
+  assert.match(client, /function ClsRegionSelect/)
+  assert.match(client, /function CosRegionCombo/)
+  assert.match(client, /clsRegionGroups/)
+  assert.match(client, /全部地域/)
+})
