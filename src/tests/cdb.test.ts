@@ -408,7 +408,7 @@ test('monitor tab returns chart series and tolerates single metric failure g2.5'
   const data = mon?.extra?.tabData as {
     range?: string
     metrics?: Array<{ key?: string; metricName?: string }>
-    series?: Array<{ metric: string; timestamps: number[]; values: Array<number | null> }>
+    series?: Array<{ key?: string; metric: string; timestamps: number[]; values: Array<number | null> }>
     cpu?: string
     note?: string
   }
@@ -420,7 +420,11 @@ test('monitor tab returns chart series and tolerates single metric failure g2.5'
   assert.deepEqual(cpu?.values, [10, 12.5])
   assert.equal(data.cpu, '12.5')
   const slow = data.series?.find((row) => row.metric === 'SlowQueries')
-  assert.deepEqual(slow, { metric: 'SlowQueries', timestamps: [], values: [] })
+  assert.deepEqual(slow, { key: 'slowQueries', metric: 'SlowQueries', timestamps: [], values: [] })
+  // series[].key 必须与 metrics[].key 对齐,前端 seriesMap 以 key 为键
+  for (const row of data.series || []) {
+    assert.ok(row.key && data.metrics?.some((m) => m.key === row.key), `series key ${row.key} 应对应 metrics 中某项`)
+  }
   assert.match(data.note || '', /部分指标拉取失败/)
   const firstCall = calls[0]
   assert.equal(firstCall.payload.Namespace, 'QCE/CDB')

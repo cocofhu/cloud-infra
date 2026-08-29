@@ -848,7 +848,10 @@ test('monitor charts: MonitorPanel/MonitorChart shared by CDB and instance detai
   assert.match(client, /"1h"/)
   assert.match(client, /"6h"/)
   assert.match(client, /"24h"/)
-  assert.match(client, /cdn\.jsdelivr\.net\/npm\/echarts/)
+  // echarts 由构建期打包进 lib/client.js,不允许出现任何运行时 CDN 注入
+  assert.doesNotMatch(client, /cdn\.jsdelivr\.net/)
+  assert.doesNotMatch(client, /createElement\("script"\)/)
+  assert.doesNotMatch(client, /ECHARTS_URL/)
   assert.match(client, /chart\.dispose\(\)/)
   assert.match(client, /暂无监控数据/)
   assert.match(client, /ci-monitor-grid/)
@@ -858,4 +861,8 @@ test('monitor charts: MonitorPanel/MonitorChart shared by CDB and instance detai
   assert.match(client, /\["实例详情", "实例监控"\]/)
   // 时间窗切换走 reload(tab, { range })
   assert.match(client, /onRangeChange: \(range\) => onReload\("实例监控", \{ range \}\)/)
+  // seriesMap 由 buildMonitorSeriesMap 统一构造,以 MetricDef.key 为键
+  assert.match(client, /function buildMonitorSeriesMap\(/)
+  assert.equal(client.split('buildMonitorSeriesMap(tabData.metrics, tabData.series)').length - 1, 2)
+  assert.match(client, /map\[m\.key\]/)
 })

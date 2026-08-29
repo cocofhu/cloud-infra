@@ -7,6 +7,8 @@ export type MonitorApi = TencentProductCall
 export type MonitorRange = '1h' | '6h' | '24h'
 
 export interface MetricSeries {
+  /** 指标定义 key(如 'cpu'),与 MetricDef.key 对齐,前端以此作 seriesMap 键 */
+  key?: string
   metric: string
   timestamps: number[]
   values: Array<number | null>
@@ -97,11 +99,31 @@ export interface HostMetricDef {
   color: string
 }
 
-/** CVM / 轻量应用服务器共用主机级指标集 */
+/** CVM(QCE/CVM)主机级指标集 */
 export const HOST_METRICS: HostMetricDef[] = [
   { key: 'cpu', metricName: 'CpuUsage', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
   { key: 'memory', metricName: 'MemUsage', label: '内存使用率', unit: '%', color: '#8a5cf6' },
   { key: 'disk', metricName: 'CvmDiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c' },
+  { key: 'lanIn', metricName: 'LanIntraffic', label: '内网入带宽', unit: 'Mbps', color: '#2fbf71' },
+  { key: 'lanOut', metricName: 'LanOuttraffic', label: '内网出带宽', unit: 'Mbps', color: '#1f9d8f' },
+  { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e' },
+  { key: 'diskWrite', metricName: 'DiskWriteIops', label: '磁盘写 IOPS', unit: '次/s', color: '#d48806' },
+  { key: 'pkgIn', metricName: 'LanInpkg', label: '内网入包量', unit: '个/s', color: '#6b7cff' },
+  { key: 'pkgOut', metricName: 'LanOutpkg', label: '内网出包量', unit: '个/s', color: '#9a6bff' },
+]
+
+/**
+ * 轻量应用服务器(QCE/LIGHTHOUSE)指标集。
+ * 命名空间与 CVM 不同,多项指标英文名也不同:
+ *  - CPU 使用率:CPUUsage(CVM 为 CpuUsage)
+ *  - 内存使用率:MemoryUsage(CVM 为 MemUsage;需实例安装监控组件,未装时返回空序列)
+ *  - 磁盘使用率:DiskUsage(CVM 为 CvmDiskUsage;Lighthouse 侧带 disk 维度,单 InstanceId 查询时云监控返回首块磁盘序列)
+ * 带宽 / IOPS / 包量指标名与 CVM 相同,已按官方 QCE/LIGHTHOUSE 指标文档核对。
+ */
+export const LIGHTHOUSE_METRICS: HostMetricDef[] = [
+  { key: 'cpu', metricName: 'CPUUsage', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
+  { key: 'memory', metricName: 'MemoryUsage', label: '内存使用率', unit: '%', color: '#8a5cf6' },
+  { key: 'disk', metricName: 'DiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c' },
   { key: 'lanIn', metricName: 'LanIntraffic', label: '内网入带宽', unit: 'Mbps', color: '#2fbf71' },
   { key: 'lanOut', metricName: 'LanOuttraffic', label: '内网出带宽', unit: 'Mbps', color: '#1f9d8f' },
   { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e' },
@@ -129,14 +151,16 @@ export async function fetchMonitorSeries(
   const range = normalizeMonitorRange(input.range)
   const results = await Promise.all(input.metrics.map(async (metric) => {
     try {
-      return await fetchMetricSeries(monitor, { ...input, metric: metric.metricName, range })
+      const row = await fetchMetricSeries(monitor, { ...input, metric: metric.metricName, range })
+      // 同步回填 MetricDef.key,前端 seriesMap 统一以 key 为键(避免 metricName 与 key 错位)
+      return { ...row, key: metric.key }
     } catch (err) {
-      return { metric: metric.metricName, timestamps: [] as number[], values: [] as Array<number | null>, error: publicErrorMessage(err) }
+      return { key: metric.key, metric: metric.metricName, timestamps: [] as number[], values: [] as Array<number | null>, error: publicErrorMessage(err) }
     }
   }))
   return {
     range,
-    series: results.map((row) => ({ metric: row.metric, timestamps: row.timestamps, values: row.values })),
+    series: results.map((row) => ({ key: row.key, metric: row.metric, timestamps: row.timestamps, values: row.values })),
     errors: results.map((row) => ('error' in row ? String(row.error) : '')).filter(Boolean),
   }
 }

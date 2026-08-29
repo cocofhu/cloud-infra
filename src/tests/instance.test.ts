@@ -8,6 +8,7 @@ import type { TencentProductCall } from '../providers/tencent/client.js'
 import { createCvmModule, mapCvmItem, cvmDetailGroups, matchCvmQuery } from '../providers/tencent/products/cvm.js'
 import {
   HOST_METRICS,
+  LIGHTHOUSE_METRICS,
   mapInstanceState,
   matchInstanceQuery,
   parseInstanceRef,
@@ -246,12 +247,18 @@ test('lighthouse detail monitor tab returns series and isolates errors', async (
     id: 'tencent.lighthouse:ap-guangzhou:lhins-4r4p',
     tab: '实例监控',
   })
-  const tabData = (detail?.extra as { tabData?: { series?: Array<{ metric: string; timestamps: number[] }>; note?: string } }).tabData
-  assert.equal(tabData?.series?.length, HOST_METRICS.length)
+  const tabData = (detail?.extra as { tabData?: { series?: Array<{ key?: string; metric: string; timestamps: number[] }>; note?: string } }).tabData
+  assert.equal(tabData?.series?.length, LIGHTHOUSE_METRICS.length)
   const lanIn = tabData?.series?.find((row) => row.metric === 'LanIntraffic')
   assert.deepEqual(lanIn?.timestamps, [])
-  const cpu = tabData?.series?.find((row) => row.metric === 'CpuUsage')
+  assert.equal(lanIn?.key, 'lanIn')
+  // QCE/LIGHTHOUSE 命名空间的 CPU 指标名为 CPUUsage(与 CVM 的 CpuUsage 不同)
+  const cpu = tabData?.series?.find((row) => row.metric === 'CPUUsage')
   assert.deepEqual(cpu?.timestamps, [1000])
+  assert.equal(cpu?.key, 'cpu')
+  // 磁盘使用率应为 DiskUsage 而非 CvmDiskUsage
+  const disk = tabData?.series?.find((row) => row.key === 'disk')
+  assert.equal(disk?.metric, 'DiskUsage')
   assert.match(tabData?.note || '', /部分指标拉取失败/)
   const emptyMonitor = (async () => ({})) as unknown as TencentProductCall
   const empty = await createLighthouseModule(call, emptyMonitor).detail?.({

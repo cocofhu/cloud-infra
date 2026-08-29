@@ -114,7 +114,10 @@ test('fetchMonitorSeries keeps per-metric failures isolated', async () => {
   assert.equal(result.range, '6h')
   assert.equal(result.series.length, 3)
   assert.deepEqual(result.series[0].values, [10, 20])
-  assert.deepEqual(result.series[1], { metric: 'MemUsage', timestamps: [], values: [] })
+  // 回填 key 与 MetricDef.key 对齐,前端 seriesMap 以 key 为键
+  assert.deepEqual(result.series[1], { key: 'memory', metric: 'MemUsage', timestamps: [], values: [] })
+  assert.equal(result.series[0].key, 'cpu')
+  assert.equal(result.series[2].key, 'disk')
   assert.deepEqual(result.series[2].values, [10, 20])
   assert.equal(result.errors.length, 1)
   assert.ok(result.errors[0].length > 0)

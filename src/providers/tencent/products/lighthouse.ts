@@ -3,7 +3,7 @@ import { registerModule } from '../../../core/registry.js'
 import type { FieldGroup, ModuleContext, ResourceCard, ResourceDetail, ResourceModule } from '../../../core/types.js'
 import { lighthouseCall, monitorCall, type TencentProductCall } from '../client.js'
 import {
-  HOST_METRICS,
+  LIGHTHOUSE_METRICS,
   INSTANCE_ACTIONS,
   POWER_ACTIONS,
   chargeTypeLabel,
@@ -186,7 +186,7 @@ export function createLighthouseModule(call: TencentProductCall = lighthouseCall
         const range = normalizeMonitorRange(ctx.range)
         const monitorData = await fetchMonitorSeries(monitor, {
           namespace: 'QCE/LIGHTHOUSE',
-          metrics: HOST_METRICS,
+          metrics: LIGHTHOUSE_METRICS,
           instanceId: ref.instanceId,
           region: ref.region,
           range,
@@ -200,9 +200,9 @@ export function createLighthouseModule(call: TencentProductCall = lighthouseCall
             tabs: ['实例详情', '实例监控'],
             tabData: {
               range: monitorData.range,
-              metrics: HOST_METRICS,
+              metrics: LIGHTHOUSE_METRICS,
               series: monitorData.series,
-              note: monitorData.errors.length === HOST_METRICS.length
+              note: monitorData.errors.length === LIGHTHOUSE_METRICS.length
                 ? '无法拉取监控数据，请检查 CAM 云监控权限'
                 : monitorData.errors.length ? `部分指标拉取失败（${monitorData.errors.length} 项）` : '',
             },

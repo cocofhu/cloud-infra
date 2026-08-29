@@ -452,33 +452,39 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (rd && typeof rd.createPortal === "function") createPortal = rd.createPortal;
     } catch { /* overlay still works without portal */ }
 
-    const ECHARTS_URL = "https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js";
+    // echarts 由构建期全量打包进本文件(见 scripts/bundle-client.mjs),
+    // 构建产物在加载本 module 前会把 echarts UMD 挂到 window.echarts / globalThis.echarts。
+    // 这里只做解析与缓存,不做任何运行时网络加载。
+    const echartsGlobal = () => {
+      if (typeof window !== "undefined" && window.echarts && typeof window.echarts.init === "function") return window.echarts;
+      if (typeof globalThis !== "undefined" && globalThis.echarts && typeof globalThis.echarts.init === "function") return globalThis.echarts;
+      return null;
+    };
     let echartsPromise = null;
     function loadEcharts() {
-      if (typeof window !== "undefined" && window.echarts && typeof window.echarts.init === "function") {
-        return Promise.resolve(window.echarts);
-      }
+      const lib = echartsGlobal();
+      if (lib) return Promise.resolve(lib);
       if (echartsPromise) return echartsPromise;
+      // 兼容极端场景(echarts 段在本模块之后异步注入):轮询一个短窗口后失败兜底
       echartsPromise = new Promise((resolve, reject) => {
-        if (typeof document === "undefined") return reject(new Error("no document"));
-        const done = () => {
-          const lib = window.echarts;
-          if (lib && typeof lib.init === "function") resolve(lib);
-          else reject(new Error("echarts 加载失败"));
+        let waited = 0;
+        const tick = () => {
+          const found = echartsGlobal();
+          if (found) {
+            echartsPromise = Promise.resolve(found);
+            resolve(found);
+            return;
+          }
+          waited += 50;
+          if (waited >= 3000) {
+            const err = new Error("echarts 未打包进构建产物");
+            echartsPromise = null;
+            reject(err);
+            return;
+          }
+          setTimeout(tick, 50);
         };
-        const existed = document.querySelector('script[data-ci-echarts]');
-        if (existed) {
-          existed.addEventListener("load", done, { once: true });
-          existed.addEventListener("error", () => reject(new Error("echarts 加载失败")), { once: true });
-          return;
-        }
-        const s = document.createElement("script");
-        s.src = ECHARTS_URL;
-        s.async = true;
-        s.dataset.ciEcharts = "1";
-        s.onload = done;
-        s.onerror = () => { echartsPromise = null; reject(new Error("echarts 加载失败")); };
-        document.head.appendChild(s);
+        tick();
       });
       return echartsPromise;
     }
@@ -591,6 +597,25 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       { id: "6h", label: "6小时" },
       { id: "24h", label: "24小时" },
     ];
+
+    // 后端 series[].key 与 MetricDef.key 对齐(经 fetchMonitorSeries 回填),
+    // 这里以 key 为主键挂载,同时按 metricName 反查兼容旧结构,保证 MonitorPanel 取 map[m.key] 一定能命中。
+    function buildMonitorSeriesMap(metrics, series) {
+      const map = {};
+      const defs = Array.isArray(metrics) ? metrics : [];
+      const rows = Array.isArray(series) ? series : [];
+      for (const row of rows) {
+        if (!row) continue;
+        if (row.key) {
+          map[String(row.key)] = row;
+          continue;
+        }
+        const def = defs.find((m) => m && (m.metricName === row.metric || m.key === row.metric));
+        if (def) map[String(def.key)] = row;
+        else if (row.metric) map[String(row.metric)] = row;
+      }
+      return map;
+    }
 
     function MonitorPanel({ metrics, seriesMap, range, onRangeChange, note }) {
       const cur = MONITOR_RANGES.some((row) => row.id === range) ? range : "1h";
@@ -2825,10 +2850,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           ];
         }
         if (tab === "实例监控") {
-          const seriesMap = {};
-          for (const row of Array.isArray(tabData.series) ? tabData.series : []) {
-            if (row && row.metric) seriesMap[row.metric] = row;
-          }
+          const seriesMap = buildMonitorSeriesMap(tabData.metrics, tabData.series);
           return h(MonitorPanel, {
             metrics: Array.isArray(tabData.metrics) ? tabData.metrics : [],
             seriesMap,
@@ -3510,10 +3532,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
         err ? h("p", { key: "err", className: "ci-err" }, err) : null,
         !loading && detail && activeTab === "实例监控" ? (() => {
-          const seriesMap = {};
-          for (const row of Array.isArray(tabData.series) ? tabData.series : []) {
-            if (row && row.metric) seriesMap[row.metric] = row;
-          }
+          const seriesMap = buildMonitorSeriesMap(tabData.metrics, tabData.series);
           return h(MonitorPanel, {
             key: "monitor",
             metrics: Array.isArray(tabData.metrics) ? tabData.metrics : [],
@@ -7278,6 +7297,6 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ));
     }
 
-    return { inject, apply, SearchToolView, ConfigCard };
+    return { inject, apply, SearchToolView, ConfigCard, __monitorInternals: { buildMonitorSeriesMap, MonitorPanel, MonitorChart } };
   },
 });
