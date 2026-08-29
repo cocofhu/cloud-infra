@@ -43,23 +43,16 @@ export interface DomainListRow {
 export interface DomainBaseInfo {
   DomainId?: string
   DomainName?: string
-  Status?: string
-  DomainStatus?: string
-  ExpirationDate?: string
-  Expire?: string
-  CreationDate?: string
-  AutoRenew?: number
-  CurrentDNS?: string
-  Dns?: string[]
-  RealNameAudit?: string
   RealNameAuditStatus?: string
-  UpdateProhibition?: boolean | number | string
-  TransferProhibition?: boolean | number | string
-  UpdateProhibitionStatus?: string
-  TransferProhibitionStatus?: string
-  RegistrantType?: string
+  CreationDate?: string
+  ExpirationDate?: string
+  DomainStatus?: string[]
   BuyStatus?: string
-  IsPremium?: boolean
+  RegistrarType?: string
+  NameServer?: string[]
+  /** 注册局安全锁，不是禁止转移锁，读写两锁时禁止使用 */
+  LockTransfer?: boolean
+  LockEndTime?: string
 }
 
 export interface TemplateInfo {
@@ -191,16 +184,30 @@ export function realNameLabel(status?: string): string {
   const value = String(status || '').trim()
   if (!value) return ''
   const key = value.toLowerCase()
-  if (key === 'approved' || key === 'ok') return '已实名'
-  if (key === 'pending' || key === 'auditing' || key === 'waitaudit' || key === 'inreview') return '审核中'
-  if (key === 'reject' || key === 'rejected' || key === 'unapproved' || key === 'notaudit' || key === 'unaudited') return '未实名'
+  if (key === 'approved') return '已实名'
+  if (key === 'inaudit') return '审核中'
+  if (key === 'notupload' || key === 'reject') return '未实名'
+  if (key === 'noaudit') return '无需实名'
   return value
 }
 
-export function isOnFlag(value: unknown): boolean {
-  if (value === true || value === 1 || value === '1') return true
-  const text = String(value || '').toLowerCase()
-  return text === 'yes' || text === 'true' || text === 'on' || text === 'enable'
+export function domainStatusFlags(status: unknown): string[] {
+  if (!Array.isArray(status)) return []
+  return status.map((item) => String(item || '').trim()).filter(Boolean)
+}
+
+/** 禁止更新锁/禁止转移锁以 DomainStatus 为准；LockTransfer 是注册局安全锁，不能当转移锁。 */
+export function locksFromDomainStatus(status: unknown): { updateLock: boolean; transferLock: boolean } {
+  const flags = new Set(domainStatusFlags(status).map((item) => item.toLowerCase()))
+  return {
+    updateLock: flags.has('clientupdateprohibited'),
+    transferLock: flags.has('clienttransferprohibited'),
+  }
+}
+
+export function nameServerText(servers: unknown): string {
+  if (!Array.isArray(servers)) return ''
+  return servers.map((item) => String(item || '').trim()).filter(Boolean).join(' ')
 }
 
 export function mapOwnedDomain(item: DomainListRow, moduleId = MY_DOMAIN_MODULE_ID): ResourceCard {
@@ -372,40 +379,45 @@ export function createMyDomainModule(call: typeof domainCall = domainCall): Reso
       if (!domain) throw new Error('缺少域名')
       const info = await call<{ DomainInfo?: DomainBaseInfo } & DomainBaseInfo>('DescribeDomainBaseInfo', {
         Domain: domain.includes('.') ? domain : title,
-        ...(domain.startsWith('domain-') ? { DomainId: domain } : {}),
       }, creds(ctx), opts(ctx))
       const base = info.DomainInfo || info
       const name = base.DomainName || title || domain
+      const { updateLock, transferLock } = locksFromDomainStatus(base.DomainStatus)
+      const dns = nameServerText(base.NameServer)
+      let listRow: DomainListRow | undefined
+      try {
+        listRow = await findOwnedRow(call, name, String(base.DomainId || domainId), ctx)
+      } catch {
+        listRow = undefined
+      }
       const card = mapOwnedDomain({
-        DomainId: base.DomainId || domainId,
+        DomainId: base.DomainId || listRow?.DomainId || domainId,
         DomainName: name,
-        ExpirationDate: base.ExpirationDate || base.Expire,
-        CreationDate: base.CreationDate,
-        AutoRenew: base.AutoRenew,
-        BuyStatus: base.BuyStatus || base.Status || base.DomainStatus,
-        IsPremium: base.IsPremium,
+        ExpirationDate: base.ExpirationDate || listRow?.ExpirationDate,
+        CreationDate: base.CreationDate || listRow?.CreationDate,
+        AutoRenew: listRow?.AutoRenew,
+        BuyStatus: base.BuyStatus || listRow?.BuyStatus,
+        IsPremium: listRow?.IsPremium,
       }, module.id)
-      const dns = Array.isArray(base.Dns) ? base.Dns.join(' ') : (base.CurrentDNS || '')
-      const updateLock = isOnFlag(base.UpdateProhibition ?? base.UpdateProhibitionStatus)
-      const transferLock = isOnFlag(base.TransferProhibition ?? base.TransferProhibitionStatus)
+      const autoRenew = Number(listRow?.AutoRenew) === 1
       const fields = [
         { label: '域名', value: name },
-        { label: '域名 ID', value: String(base.DomainId || domainId) },
-        { label: '状态', value: buyStatusLabel(base.BuyStatus || base.Status || base.DomainStatus) },
-        { label: '实名', value: realNameLabel(base.RealNameAuditStatus || base.RealNameAudit) },
-        { label: '注册时间', value: base.CreationDate || '' },
-        { label: '到期时间', value: base.ExpirationDate || base.Expire || '' },
-        { label: '自动续费', value: Number(base.AutoRenew) === 1 ? '开' : '关' },
+        { label: '域名 ID', value: String(base.DomainId || listRow?.DomainId || domainId) },
+        { label: '状态', value: buyStatusLabel(base.BuyStatus || listRow?.BuyStatus) },
+        { label: '实名', value: realNameLabel(base.RealNameAuditStatus) },
+        { label: '注册时间', value: base.CreationDate || listRow?.CreationDate || '' },
+        { label: '到期时间', value: base.ExpirationDate || listRow?.ExpirationDate || '' },
+        { label: '自动续费', value: autoRenew ? '开' : '关' },
         { label: 'DNS', value: dns },
         { label: '禁止更新锁', value: updateLock ? '开' : '关' },
         { label: '禁止转移锁', value: transferLock ? '开' : '关' },
       ].filter((row) => row.value)
       card.extras = {
         ...card.extras,
-        domainId: String(base.DomainId || domainId),
+        domainId: String(base.DomainId || listRow?.DomainId || domainId),
         updateLock,
         transferLock,
-        autoRenew: Number(base.AutoRenew) === 1,
+        autoRenew,
       }
       return { card, fields }
     },
@@ -549,6 +561,35 @@ async function orderStatus(call: typeof domainCall, payload: Record<string, unkn
   }
 }
 
+async function findOwnedRow(
+  call: typeof domainCall,
+  domainName: string,
+  domainId: string,
+  ctx: ModuleContext,
+): Promise<DomainListRow | undefined> {
+  const pageSize = 100
+  let offset = 0
+  let total = Number.POSITIVE_INFINITY
+  const name = domainName.toLowerCase()
+  while (offset < total) {
+    const data = await call<{ DomainSet?: DomainListRow[]; TotalCount?: number }>('DescribeDomainNameList', {
+      Offset: offset,
+      Limit: pageSize,
+    }, creds(ctx), opts(ctx))
+    const chunk = data.DomainSet || []
+    const found = chunk.find((item) => {
+      if (domainId && item.DomainId && item.DomainId === domainId) return true
+      return String(item.DomainName || '').toLowerCase() === name
+    })
+    if (found) return found
+    const reported = Number(data.TotalCount)
+    total = Number.isFinite(reported) ? reported : offset + chunk.length
+    if (!chunk.length) break
+    offset += chunk.length
+  }
+  return undefined
+}
+
 async function listOwnedPages(call: typeof domainCall, ctx: ModuleContext): Promise<{ rows: DomainListRow[]; total: number }> {
   const pageSize = 100
   const rows: DomainListRow[] = []
@@ -607,7 +648,7 @@ async function setTransferLock(call: typeof domainCall, payload: Record<string, 
   const domain = String(payload.domain || payload.title || '').trim().toLowerCase()
   if (!domain) return { ok: false, error: '缺少域名' }
   const base = await describeBaseInfo(call, domain, ctx)
-  const updateLock = isOnFlag(base.UpdateProhibition ?? base.UpdateProhibitionStatus)
+  const { updateLock } = locksFromDomainStatus(base.DomainStatus)
   if (updateLock) {
     return { ok: false, error: '更新锁已开，不能改转移锁' }
   }

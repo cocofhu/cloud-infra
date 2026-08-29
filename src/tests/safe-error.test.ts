@@ -43,6 +43,21 @@ test('balance and register failures map to readable copy without secrets', () =>
   )
 })
 
+test('lock-related UnsupportedOperation codes stay readable without secrets', () => {
+  assert.equal(
+    publicErrorMessage(new TencentApiError('lock on AKID12345678', 'UnsupportedOperation.DomainUpdateProhibitionLockStartOn')),
+    '更新锁已开，不能改转移锁',
+  )
+  assert.equal(
+    publicErrorMessage(new TencentApiError('cannot modify', 'UnsupportedOperation.ModifyDomainInfoOperateUnsupported')),
+    '当前域名状态不支持该操作',
+  )
+  assert.doesNotMatch(
+    publicErrorMessage(new TencentApiError('got AKIDabcdefghijklmnop', 'UnsupportedOperation.DomainUpdateProhibitionLockStartOn')),
+    /AKID/,
+  )
+})
+
 test('actionErrorMessage keeps module business copy for the HTTP 400 path', () => {
   assert.equal(actionErrorMessage('未勾选协议，不能提交订单'), '未勾选协议，不能提交订单')
   assert.equal(actionErrorMessage('购物车为空，不能提交订单'), '购物车为空，不能提交订单')

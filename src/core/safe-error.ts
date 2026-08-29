@@ -18,6 +18,8 @@ const CODE_HINTS: Record<string, string> = {
   'FailedOperation.RegisterDomainFailed': '注册失败，请核对账户余额与域名是否仍可注册',
   'FailedOperation.InsufficientBalance': '账户余额不足',
   ResourceInsufficient: '账户余额不足',
+  'UnsupportedOperation.DomainUpdateProhibitionLockStartOn': '更新锁已开，不能改转移锁',
+  'UnsupportedOperation.ModifyDomainInfoOperateUnsupported': '当前域名状态不支持该操作',
   InvalidParameter: '请求参数无效',
   InvalidParameterValue: '请求参数无效',
   MissingParameter: '请求参数无效',

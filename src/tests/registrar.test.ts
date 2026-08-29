@@ -14,9 +14,11 @@ import {
   createMyDomainModule,
   createRegistrarModule,
   filterOwned,
+  locksFromDomainStatus,
   mapCheckDomain,
   mapOwnedDomain,
   maxPeriodYears,
+  nameServerText,
   normalizeKeyword,
   realNameLabel,
   type CheckDomainResult,
@@ -226,10 +228,20 @@ test('g1.4 my-domain filters by card keyword and serves 基本信息/域名安�
   assert.ok(detail?.fields.some((row) => row.label === '禁止更新锁' && row.value === '开'))
   assert.ok(detail?.fields.some((row) => row.label === '禁止转移锁' && row.value === '关'))
   assert.ok(detail?.fields.some((row) => row.label === '实名' && row.value === '已实名'))
+  assert.ok(detail?.fields.some((row) => row.label === 'DNS' && row.value === 'f1g1ns1.dnspod.net f1g1ns2.dnspod.net'))
+  assert.ok(detail?.fields.some((row) => row.label === '自动续费' && row.value === '开'))
   assert.equal(detail?.card.extras?.updateLock, true)
+  assert.equal(detail?.card.extras?.transferLock, false)
+  assert.equal(detail?.card.extras?.autoRenew, true)
+  assert.equal(nameServerText((fixture('domain-base-info.json').DomainInfo as { NameServer?: string[] }).NameServer), 'f1g1ns1.dnspod.net f1g1ns2.dnspod.net')
+  assert.deepEqual(locksFromDomainStatus(['ok', 'clientUpdateProhibited']), { updateLock: true, transferLock: false })
+  assert.deepEqual(locksFromDomainStatus(['ok', 'clientTransferProhibited']), { updateLock: false, transferLock: true })
+  assert.deepEqual(locksFromDomainStatus(['ok']), { updateLock: false, transferLock: false })
   assert.equal(realNameLabel('Approved'), '已实名')
-  assert.equal(realNameLabel('Pending'), '审核中')
-  assert.equal(realNameLabel('UnApproved'), '未实名')
+  assert.equal(realNameLabel('InAudit'), '审核中')
+  assert.equal(realNameLabel('NotUpload'), '未实名')
+  assert.equal(realNameLabel('Reject'), '未实名')
+  assert.equal(realNameLabel('NoAudit'), '无需实名')
 
   const renew = await module.execute?.('autorenew.set', { domainId: 'domain-acme1', autoRenew: true }, {
     ...ctx,
@@ -256,14 +268,15 @@ test('g1.4 my-domain filters by card keyword and serves 基本信息/域名安�
   assert.equal(calls.some((row) => row.action === 'UpdateProhibitionBatch'), true)
 })
 
-test('g1.4 lock.transfer follows DescribeDomainBaseInfo not payload.updateLock', async () => {
+test('g1.4 lock.transfer follows DomainStatus not payload.updateLock or LockTransfer', async () => {
   const { calls, call } = mockCall((action) => {
     if (action === 'DescribeDomainBaseInfo') {
       return {
         DomainInfo: {
           DomainName: 'other.com',
-          UpdateProhibition: false,
-          TransferProhibition: false,
+          DomainStatus: ['ok'],
+          LockTransfer: true,
+          NameServer: ['ns1.example.com'],
         },
       }
     }
@@ -279,6 +292,108 @@ test('g1.4 lock.transfer follows DescribeDomainBaseInfo not payload.updateLock',
   assert.equal(allowed?.ok, true)
   assert.equal(calls.some((row) => row.action === 'DescribeDomainBaseInfo'), true)
   assert.equal(calls.some((row) => row.action === 'TransferProhibitionBatch'), true)
+})
+
+test('g1.4 lock.transfer rejects clientUpdateProhibited and does not send TransferProhibitionBatch', async () => {
+  const { calls, call } = mockCall((action) => {
+    if (action === 'DescribeDomainBaseInfo') {
+      return {
+        DomainInfo: {
+          DomainName: 'locked.cn',
+          DomainStatus: ['ok', 'clientUpdateProhibited'],
+          LockTransfer: false,
+          NameServer: ['f1g1ns1.dnspod.net', 'f1g1ns2.dnspod.net'],
+        },
+      }
+    }
+    if (action === 'TransferProhibitionBatch') return { LogId: 56 }
+    return {}
+  })
+  const module = createMyDomainModule(call)
+  const blocked = await module.execute?.('lock.transfer', {
+    domain: 'locked.cn',
+    enabled: true,
+    updateLock: false,
+  }, { ...ctx, id: 'tencent.my-domain:domain-locked' })
+  assert.equal(blocked?.ok, false)
+  if (!blocked?.ok) assert.equal(blocked.error, '更新锁已开，不能改转移锁')
+  assert.equal(calls.filter((row) => row.action === 'DescribeDomainBaseInfo').length, 1)
+  assert.equal(calls.some((row) => row.action === 'TransferProhibitionBatch'), false)
+})
+
+test('g1.4 detail keeps list AutoRenew and official RealNameAuditStatus', async () => {
+  const { call } = mockCall((action) => {
+    if (action === 'DescribeDomainNameList') {
+      return {
+        TotalCount: 1,
+        DomainSet: [{
+          DomainId: 'domain-audit',
+          DomainName: 'audit.cn',
+          AutoRenew: 1,
+          BuyStatus: 'ok',
+          ExpirationDate: '2028-01-01',
+          CreationDate: '2025-01-01',
+        }],
+      }
+    }
+    if (action === 'DescribeDomainBaseInfo') {
+      return {
+        DomainInfo: {
+          DomainId: 'domain-audit',
+          DomainName: 'audit.cn',
+          DomainStatus: ['ok', 'clientTransferProhibited'],
+          BuyStatus: 'ok',
+          NameServer: ['ns1.dnspod.net', 'ns2.dnspod.net'],
+          RealNameAuditStatus: 'InAudit',
+          LockTransfer: true,
+          ExpirationDate: '2028-01-01',
+          CreationDate: '2025-01-01',
+        },
+      }
+    }
+    return {}
+  })
+  const module = createMyDomainModule(call)
+  const detail = await module.detail?.({ ...ctx, id: 'tencent.my-domain:domain-audit', title: 'audit.cn' })
+  assert.ok(detail?.fields.some((row) => row.label === '实名' && row.value === '审核中'))
+  assert.ok(detail?.fields.some((row) => row.label === '自动续费' && row.value === '开'))
+  assert.ok(detail?.fields.some((row) => row.label === 'DNS' && row.value === 'ns1.dnspod.net ns2.dnspod.net'))
+  assert.ok(detail?.fields.some((row) => row.label === '禁止更新锁' && row.value === '关'))
+  assert.ok(detail?.fields.some((row) => row.label === '禁止转移锁' && row.value === '开'))
+  assert.equal(detail?.card.extras?.autoRenew, true)
+  assert.equal(detail?.card.extras?.updateLock, false)
+  assert.equal(detail?.card.extras?.transferLock, true)
+
+  const notUpload = realNameLabel('NotUpload')
+  assert.equal(notUpload, '未实名')
+})
+
+test('g1.4 TransferProhibitionBatch DomainUpdateProhibitionLockStartOn stays 更新锁已开', async () => {
+  const { call } = mockCall((action) => {
+    if (action === 'DescribeDomainBaseInfo') {
+      return {
+        DomainInfo: {
+          DomainName: 'race.com',
+          DomainStatus: ['ok'],
+          LockTransfer: true,
+        },
+      }
+    }
+    if (action === 'TransferProhibitionBatch') {
+      throw new TencentApiError('operate unsupported AKID12345678', 'UnsupportedOperation.DomainUpdateProhibitionLockStartOn')
+    }
+    return {}
+  })
+  const module = createMyDomainModule(call)
+  const failed = await module.execute?.('lock.transfer', {
+    domain: 'race.com',
+    enabled: true,
+  }, { ...ctx, id: 'tencent.my-domain:domain-race' })
+  assert.equal(failed?.ok, false)
+  if (!failed?.ok) {
+    assert.equal(failed.error, '更新锁已开，不能改转移锁')
+    assert.doesNotMatch(failed.error, /AKID/)
+  }
 })
 
 test('g1.4 keyword filter pages DescribeDomainNameList until TotalCount', async () => {
@@ -329,6 +444,26 @@ test('g1.3 CreateDomainBatch ResourceInsufficient stays 账户余额不足', asy
     assert.equal(paid.error, '账户余额不足')
     assert.doesNotMatch(paid.error, /AKID/)
   }
+})
+
+test('g1.4 DomainBaseInfo fixture matches official DomainStatus and NameServer', () => {
+  const src = readFileSync(join(dir, '../providers/tencent/products/registrar.js'), 'utf8')
+  assert.match(src, /locksFromDomainStatus\(base\.DomainStatus\)/)
+  assert.match(src, /nameServerText\(base\.NameServer\)/)
+  assert.doesNotMatch(src, /base\.UpdateProhibition/)
+  assert.doesNotMatch(src, /base\.TransferProhibition/)
+  assert.doesNotMatch(src, /base\.CurrentDNS/)
+  assert.doesNotMatch(src, /base\.LockTransfer/)
+  assert.doesNotMatch(src, /base\.AutoRenew/)
+
+  const info = fixture('domain-base-info.json').DomainInfo as Record<string, unknown>
+  assert.deepEqual(info.DomainStatus, ['ok', 'clientUpdateProhibited'])
+  assert.deepEqual(info.NameServer, ['f1g1ns1.dnspod.net', 'f1g1ns2.dnspod.net'])
+  assert.equal('UpdateProhibition' in info, false)
+  assert.equal('TransferProhibition' in info, false)
+  assert.equal('CurrentDNS' in info, false)
+  assert.equal('AutoRenew' in info, false)
+  assert.equal(info.RealNameAuditStatus, 'Approved')
 })
 
 test('g1.4 batch status labels stay async and never pretend WHOIS is instant', () => {
