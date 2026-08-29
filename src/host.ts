@@ -196,6 +196,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         to: body.to as number | undefined,
         context: String(body.context || ''),
         view: method === 'search' ? 'search' : String(body.view || ''),
+        title: String(body.title || ''),
       }, cfg)
       return sendJson(res, 200, { ok: true, ...result })
     }

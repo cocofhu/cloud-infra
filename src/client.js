@@ -9,7 +9,11 @@ window.__ModuleLoader__.load({
 .ci-root,.ci-tool{font-family:inherit;color:var(--dsw-alias-label-primary);width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:2px 0 6px}
 .ci-panel{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);overflow:hidden;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
 .ci-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;min-width:0;flex-wrap:wrap}
-.ci-bar-left{display:flex;align-items:baseline;gap:8px;min-width:0}
+.ci-bar-left{display:flex;align-items:center;gap:8px;min-width:0}
+.ci-search-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1);flex-wrap:wrap}
+.ci-search-bar-main{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.ci-search-meta{min-width:0}
+.ci-search-sub{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .ci-bar-title{font-size:14px;font-weight:650;line-height:22px;color:var(--dsw-alias-label-primary)}
 .ci-bar-count{color:var(--dsw-alias-label-tertiary);font-size:12px}
 .ci-search-wrap{position:relative;width:min(220px,100%);flex:none}
@@ -41,6 +45,7 @@ window.__ModuleLoader__.load({
 .ci-dot.error{background:var(--dsw-alias-state-error-primary)}
 .ci-dot.unknown{background:var(--dsw-alias-label-caption)}
 .ci-empty{padding:36px 16px;text-align:center;color:var(--dsw-alias-label-caption);font-size:13px;border-top:1px solid var(--dsw-alias-border-l1)}
+.ci-empty-search{border-top:0;padding:48px 16px}
 .ci-footbar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-tertiary);font-size:12px}
 .ci-page{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;font-size:12px;color:var(--dsw-alias-label-tertiary);flex-wrap:wrap}
 .ci-page-btns{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
@@ -131,12 +136,15 @@ window.__ModuleLoader__.load({
 .ci-id{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px;overflow:hidden;text-overflow:ellipsis}
 .ci-name-stack{display:flex;flex-direction:column;gap:2px;min-width:0}
 .ci-region{height:32px;max-width:160px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;font-size:13px}
-.ci-query{display:grid;grid-template-columns:1fr 168px;gap:8px;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.ci-cql{width:100%;min-height:58px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;resize:vertical;box-sizing:border-box}
+.ci-query{display:grid;grid-template-columns:minmax(0,1fr) 168px;gap:10px;padding:12px;border-bottom:1px solid var(--dsw-alias-border-l1);align-items:stretch}
+.ci-query-side{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ci-query .ci-tiny{margin:0 0 6px}
+.ci-cql{width:100%;min-height:72px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;resize:vertical;box-sizing:border-box}
 .ci-cql:focus,.ci-region:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-hist{display:flex;align-items:flex-end;gap:2px;height:56px;padding:8px 12px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l1)}
 .ci-hist i{flex:1;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 42%,transparent);border-radius:2px 2px 0 0;min-height:2px}
-.ci-split{display:grid;grid-template-columns:168px 1fr;min-width:0}
+.ci-split{display:grid;grid-template-columns:minmax(108px,140px) minmax(0,1fr);min-width:0}
+.ci-log-pane{min-width:0;overflow:auto;max-height:360px}
 .ci-fields{border-right:1px solid var(--dsw-alias-border-l1);padding:8px;background:var(--dsw-alias-bg-layer-2);min-width:0}
 .ci-fields button{display:block;width:100%;text-align:left;border:0;background:none;padding:5px 6px;cursor:pointer;border-radius:6px;font:inherit;color:inherit}
 .ci-fields button:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-brand-primary)}
@@ -741,6 +749,33 @@ window.__ModuleLoader__.load({
       return cellValue(item, "主题ID") || String((item && item.id) || "").split(":").pop() || "";
     }
 
+    function looksLikeUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || "").trim());
+    }
+
+    function clsRegionName(regions, id) {
+      const hit = (Array.isArray(regions) ? regions : []).find((item) => item && item.id === id);
+      return hit && hit.name ? hit.name : (id || "");
+    }
+
+    function topicCaption(topic, region, regions) {
+      const name = topic && topic.title && !looksLikeUuid(topic.title) ? topic.title : "日志主题";
+      const logset = cellValue(topic, "日志集");
+      return [name, logset || null, clsRegionName(regions, region)].filter(Boolean).join(" · ");
+    }
+
+    function keepClsTopic(cur, next) {
+      if (!next) return cur;
+      if (!cur) return next;
+      const keepTitle = cur.title && !looksLikeUuid(cur.title);
+      const keepCols = Array.isArray(cur.columns) && cur.columns.length > 1;
+      return {
+        ...next,
+        title: keepTitle ? cur.title : (next.title && !looksLikeUuid(next.title) ? next.title : cur.title),
+        columns: keepCols ? cur.columns : (next.columns || cur.columns),
+      };
+    }
+
     function histBars(logs) {
       const rows = Array.isArray(logs) ? logs : [];
       if (!rows.length) return Array.from({ length: 12 }, () => 8);
@@ -922,7 +957,7 @@ window.__ModuleLoader__.load({
           setCql(result.queryString != null ? result.queryString : nextCql);
           setRange(result.range || nextRange);
           if (result.region) setRegion(result.region);
-          if (result.items?.[0]) setTopic(result.items[0]);
+          if (result.items?.[0]) setTopic((cur) => keepClsTopic(cur, result.items[0]));
           if (result.errors?.length) setListErr(result.errors.map((e) => e.message).join("；"));
         } catch (e) {
           if (n !== seq.current) return;
@@ -965,16 +1000,18 @@ window.__ModuleLoader__.load({
       const extra = hasMore && offset + rows.length >= counted ? 1 : 0;
       const pageCount = Math.max(pages, Math.floor(offset / pageSize) + 1 + extra);
       const page = Math.floor(offset / pageSize) + 1;
-      const fieldNames = ["__SOURCE__"].concat(Array.from(new Set(logs.flatMap((row) => Object.keys(row.fields || {})))));
+      const fieldNames = Array.from(new Set(logs.flatMap((row) => Object.keys(row.fields || {}))));
       const bars = histBars(logs);
+      const regionName = clsRegionName(regions, region);
       if (view === "search" && topic) {
+        const hasLogs = logs.length > 0;
         return h("div", { className: "ci-root ci-tool" }, h("div", { className: "ci-panel" },
-          h("div", { className: "ci-bar" },
-            h("div", { className: "ci-bar-left", style: { alignItems: "center", gap: 8 } },
+          h("div", { className: "ci-search-bar" },
+            h("div", { className: "ci-search-bar-main" },
               h("button", { type: "button", className: "ci-back", onClick: () => { setView("list"); setTopic(null); } }, "返回主题"),
-              h("div", null,
+              h("div", { className: "ci-search-meta" },
                 h("div", { className: "ci-bar-title" }, "检索分析"),
-                h("div", { className: "ci-tiny" }, `${topic.title} · ${cellValue(topic, "日志集") || ""} · ${region}`),
+                h("div", { className: "ci-search-sub", title: topicCaption(topic, region, regions) }, topicCaption(topic, region, regions)),
               ),
             ),
             h(RegionSelect, { value: region, regions, disabled: logBusy, onChange: onRegion }),
@@ -989,7 +1026,7 @@ window.__ModuleLoader__.load({
                 onChange: (e) => setCql(e.target.value),
               }),
             ),
-            h("div", null,
+            h("div", { className: "ci-query-side" },
               h("div", { className: "ci-tiny" }, "日志时间"),
               h("select", {
                 className: "ci-region",
@@ -1002,7 +1039,7 @@ window.__ModuleLoader__.load({
                   key: "from",
                   type: "datetime-local",
                   className: "ci-region",
-                  style: { maxWidth: "100%", width: "100%", marginTop: 8 },
+                  style: { maxWidth: "100%", width: "100%" },
                   value: customFrom,
                   onChange: (e) => setCustomFrom(e.target.value),
                 }),
@@ -1010,30 +1047,31 @@ window.__ModuleLoader__.load({
                   key: "to",
                   type: "datetime-local",
                   className: "ci-region",
-                  style: { maxWidth: "100%", width: "100%", marginTop: 8 },
+                  style: { maxWidth: "100%", width: "100%" },
                   value: customTo,
                   onChange: (e) => setCustomTo(e.target.value),
                 }),
-              ] : h("div", { style: { height: 8 } }),
+              ] : null,
               h("button", {
                 type: "button",
                 className: "ci-mini primary",
                 disabled: logBusy,
-                style: { width: "100%", marginTop: 8 },
+                style: { width: "100%", marginTop: "auto" },
                 onClick: () => fetchSearch(topic, { queryString: cql, range }),
               }, logBusy ? "检索中" : "检索分析"),
             ),
           ),
-          logs.length && !listErr ? h("div", { className: "ci-hist", "aria-hidden": "true" },
+          hasLogs && !listErr ? h("div", { className: "ci-hist", "aria-hidden": "true" },
             bars.map((hgt, idx) => h("i", { key: idx, style: { height: hgt + "%" } })),
           ) : null,
           listErr ? h("div", { className: "ci-err" }, listErr) : null,
-          logBusy && !logs.length ? h("div", { className: "ci-load" }, h(Spin), "检索日志…")
-            : listErr && !logs.length ? null
+          logBusy && !hasLogs ? h("div", { className: "ci-load" }, h(Spin), "检索日志…")
+            : listErr && !hasLogs ? null
+            : !hasLogs ? h("div", { className: "ci-empty ci-empty-search" }, "该时间窗没有匹配日志")
             : h("div", { className: "ci-split" },
             h("div", { className: "ci-fields" },
               h("div", { className: "ci-tiny" }, "字段"),
-              fieldNames.map((name) => h("button", {
+              ["__SOURCE__"].concat(fieldNames).map((name) => h("button", {
                 type: "button",
                 key: name,
                 onClick: () => {
@@ -1042,16 +1080,14 @@ window.__ModuleLoader__.load({
                 },
               }, name)),
             ),
-            h("div", null, logs.length
-              ? logs.map((row, idx) => h("div", { className: "ci-log", key: (row.timeMs || 0) + "-" + idx },
-                h("div", { className: "ci-log-hd" },
-                  h("span", null, row.timeLabel || ""),
-                  h("span", null, row.source || ""),
-                ),
-                Object.entries(row.fields || {}).map(([k, v]) => h("span", { className: "ci-kv", key: k }, k + ": " + v)),
-                h("div", { className: "ci-raw" }, row.content || ""),
-              ))
-              : h("div", { className: "ci-empty" }, "该时间窗没有匹配日志")),
+            h("div", { className: "ci-log-pane" }, logs.map((row, idx) => h("div", { className: "ci-log", key: (row.timeMs || 0) + "-" + idx },
+              h("div", { className: "ci-log-hd" },
+                h("span", null, row.timeLabel || ""),
+                h("span", null, row.source || ""),
+              ),
+              Object.entries(row.fields || {}).map(([k, v]) => h("span", { className: "ci-kv", key: k }, k + ": " + v)),
+              h("div", { className: "ci-raw" }, row.content || ""),
+            ))),
           ),
           h("div", { className: "ci-foot-note" },
             h("span", null, `原始日志倒排 · ${logs.length} 条`),
@@ -1069,7 +1105,7 @@ window.__ModuleLoader__.load({
         h("div", { className: "ci-bar" },
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, "日志主题"),
-            h("span", { className: "ci-bar-count" }, `${counted} 条 · ${region}`),
+            h("span", { className: "ci-bar-count" }, `${counted} 条 · ${regionName}`),
           ),
           h("div", { className: "ci-bar-left", style: { flex: "none", alignItems: "center" } },
             h(RegionSelect, { value: region, regions, disabled: listBusy, onChange: onRegion }),

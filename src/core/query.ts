@@ -25,6 +25,7 @@ export interface QueryInput {
   range?: string
   context?: string
   view?: string
+  title?: string
 }
 
 export function wantsSearch(input: QueryInput): boolean {
@@ -116,6 +117,7 @@ export async function queryResources(
         context: input.context,
         view: input.view,
         id: input.topicId,
+        title: input.title,
       }
       if (search && module.search) {
         const result = await module.search(ctx)
