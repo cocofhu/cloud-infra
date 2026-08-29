@@ -454,7 +454,8 @@ window.__ModuleLoader__.load({
     function matchLocalInstance(item, q) {
       const needle = String(q || "").trim().toLowerCase();
       if (!needle) return true;
-      return [item.title, item.instanceId, item.id, item.privateIp, item.publicIp]
+      const cols = Array.isArray(item.columns) ? item.columns.map((col) => col && col.value) : [];
+      return [item.title, item.instanceId, item.id, item.privateIp, item.publicIp].concat(cols)
         .some((value) => String(value || "").toLowerCase().includes(needle));
     }
 
@@ -921,14 +922,31 @@ window.__ModuleLoader__.load({
       ];
     }
 
-    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion }) {
+    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery }) {
       const regionValue = region || defaultRegionName(regions);
+      const qValue = onQuery ? (q || "") : "";
       const rows = Array.isArray(items) ? items : [];
       return [
         h("div", { key: "bar", className: "ci-bar" },
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, "服务器"),
             h(RegionSelect, { regions, value: regionValue, onChange: onRegion }),
+          ),
+          h("div", { className: "ci-search-wrap" },
+            h(SearchIcon),
+            h("input", {
+              className: "ci-search",
+              type: "search",
+              placeholder: "搜索 ID / 名称 / IP",
+              value: qValue,
+              onChange: (e) => onQuery && onQuery(e.target.value),
+            }),
+            qValue ? h("button", {
+              type: "button",
+              className: "ci-search-x",
+              onClick: () => onQuery && onQuery(""),
+              "aria-label": "清空",
+            }, "×") : null,
           ),
         ),
         rows.length ? h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
@@ -1107,12 +1125,13 @@ window.__ModuleLoader__.load({
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
       const fetchList = async (nextOffset, q, region) => {
         const n = ++seq.current;
-        const useRegion = region !== undefined ? region : (listRegion || "华南地区（广州）");
+        const trimmed = String(q || "").trim();
+        const useRegion = region !== undefined ? region : (trimmed ? "all" : (listRegion || "华南地区（广州）"));
         setListBusy(true);
         setListErr("");
         try {
           const result = await api("query", {
-            query: q,
+            query: trimmed,
             kind,
             provider,
             offset: nextOffset,
@@ -1120,12 +1139,22 @@ window.__ModuleLoader__.load({
             region: useRegion || undefined,
           });
           if (n !== seq.current) return;
-          setRows(result.items || []);
-          setTotal(Number(result.total) || (result.items || []).length);
+          const items = result.items || [];
+          setRows(items);
+          setTotal(Number(result.total) || items.length);
           setHasMore(!!result.hasMore);
           setOffset(Number(result.offset) || nextOffset);
-          setActiveQ(q);
+          setActiveQ(trimmed);
           if (Array.isArray(result.regions)) setRegionOptions(result.regions);
+          if (trimmed) {
+            const cvmHit = items.some((row) => row && row.kind === "cvm");
+            const lhHit = items.some((row) => row && row.kind === "lighthouse");
+            setKindTab((cur) => {
+              if (cur === "cvm" && !cvmHit && lhHit) return "lighthouse";
+              if (cur === "lighthouse" && !lhHit && cvmHit) return "cvm";
+              return cur;
+            });
+          }
         } catch (e) {
           if (n !== seq.current) return;
           setListErr(publicErrorMessage(e));
@@ -1211,9 +1240,15 @@ window.__ModuleLoader__.load({
       }
       const extraCols = columnLabels(rows);
       const showProvider = new Set((Array.isArray(rows) ? rows : []).map((item) => item && item.provider)).size > 1;
-      const showCvm = kind === "cvm" || (kind !== "domain" && kind !== "lighthouse" && rows.some((row) => row && row.kind === "cvm"));
-      const showLh = kind === "lighthouse" || (kind !== "domain" && kind !== "cvm" && rows.some((row) => row && row.kind === "lighthouse"));
-      const showDomain = kind === "domain" || (!showCvm && !showLh);
+      const seed = fromTool || [];
+      const showCvm = kind === "cvm" || kind === "auto"
+        || seed.some((row) => row && row.kind === "cvm")
+        || rows.some((row) => row && row.kind === "cvm");
+      const showLh = kind === "lighthouse" || kind === "auto"
+        || seed.some((row) => row && row.kind === "lighthouse")
+        || rows.some((row) => row && row.kind === "lighthouse");
+      const showDomain = kind === "domain"
+        || (kind !== "cvm" && kind !== "lighthouse" && kind !== "auto" && !showCvm && !showLh);
       const cvmRows = rows.filter((row) => row && row.kind === "cvm");
       const lhRows = rows.filter((row) => row && row.kind === "lighthouse");
       const domainRows = rows.filter((row) => row && !isInstanceKind(row.kind));
@@ -1253,7 +1288,7 @@ window.__ModuleLoader__.load({
         listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : [
           showCvm && (!showLh || kindTab === "cvm") ? h(CvmConsole, {
             key: "cvm",
-            items: kind === "cvm" ? rows : cvmRows,
+            items: (kind === "cvm" ? rows : cvmRows).filter((row) => matchLocalInstance(row, draftQ)),
             pendingId,
             onOpen: openItem,
             onAction: onInstanceAction,
@@ -1269,7 +1304,7 @@ window.__ModuleLoader__.load({
           }) : null,
           showLh && (!showCvm || kindTab === "lighthouse") ? h(LhConsole, {
             key: "lh",
-            items: kind === "lighthouse" ? rows : lhRows,
+            items: (kind === "lighthouse" ? rows : lhRows).filter((row) => matchLocalInstance(row, draftQ)),
             pendingId,
             onOpen: openItem,
             onAction: onInstanceAction,
@@ -1280,6 +1315,8 @@ window.__ModuleLoader__.load({
               setListRegion(next);
               fetchList(0, String(activeQ || "").trim(), next);
             },
+            q: draftQ,
+            onQuery: onDraft,
           }) : null,
         ],
         h(Pager, {

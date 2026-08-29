@@ -16,6 +16,7 @@ import {
   listRegions,
   listZones,
   mapInstanceState,
+  instanceSearchText,
   matchInstanceQuery,
   matchRegion,
   optsOf,
@@ -145,13 +146,7 @@ export function lighthouseDetailGroups(item: LighthouseInstance, card: ResourceC
 }
 
 export function matchLighthouseQuery(card: ResourceCard, query: string): boolean {
-  return matchInstanceQuery([
-    card.title,
-    card.instanceId,
-    card.id,
-    card.privateIp,
-    card.publicIp,
-  ], query)
+  return matchInstanceQuery(instanceSearchText(card), query)
 }
 
 export function createLighthouseModule(call: TencentProductCall = lighthouseCall): ResourceModule {

@@ -84,6 +84,24 @@ export function matchInstanceQuery(haystacks: Array<string | undefined>, query: 
   return haystacks.some((value) => String(value || '').toLowerCase().includes(q))
 }
 
+export function instanceSearchText(card: {
+  title?: string
+  instanceId?: string
+  id?: string
+  privateIp?: string
+  publicIp?: string
+  columns?: Array<{ value?: string }>
+}): Array<string | undefined> {
+  return [
+    card.title,
+    card.instanceId,
+    card.id,
+    card.privateIp,
+    card.publicIp,
+    ...(card.columns || []).map((col) => col.value),
+  ]
+}
+
 export function matchRegion(card: { region?: string; regionName?: string }, region?: string): boolean {
   const want = String(region || '').trim()
   if (!want || want === 'all' || want === '*') return true

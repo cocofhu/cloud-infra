@@ -170,6 +170,7 @@ test('cvm and lighthouse consoles use two skins and console Chinese status', () 
   assert.match(client, /instance\.reboot/)
   assert.match(client, /kind === "cvm"/)
   assert.match(client, /kind === "lighthouse"/)
+  assert.match(client, /kind === "auto"/)
   assert.match(client, /ci-dense/)
   assert.match(client, /min-width:980px/)
   assert.match(client, /\.ci-select\{[^}]*max-width:180px/)
@@ -181,7 +182,12 @@ test('cvm and lighthouse consoles use two skins and console Chinese status', () 
   assert.match(tool, /h\(KindTabs/)
   assert.match(tool, /h\(Pager/)
   assert.match(tool, /region: useRegion/)
+  assert.match(tool, /trimmed \? "all"/)
+  assert.match(tool, /kind === "auto"/)
+  assert.match(tool, /kind !== "auto"/)
   assert.match(tool, /华南地区（广州）/)
+  assert.match(tool, /setKindTab\(\(cur\) =>/)
+  assert.doesNotMatch(tool, /showDomain = kind === "domain" \|\| \(!showCvm && !showLh\)/)
 })
 
 test('instance detail uses official groups and never renders DNS records', () => {
@@ -230,11 +236,22 @@ test('instancePower and matchLocalInstance cover console states and IP search', 
   const matchStart = src.indexOf('function matchLocalInstance')
   const matchEnd = src.indexOf('\n    function actionLabel', matchStart)
   const match = new Function('item', 'q', `${src.slice(matchStart, matchEnd)}\nreturn matchLocalInstance(item, q)`) as (
-    item: { title?: string; instanceId?: string; id?: string; privateIp?: string; publicIp?: string },
+    item: {
+      title?: string
+      instanceId?: string
+      id?: string
+      privateIp?: string
+      publicIp?: string
+      columns?: Array<{ value?: string }>
+    },
     q: string,
   ) => boolean
   assert.equal(match({ title: 'api-prod', instanceId: 'ins-8k2m1a', publicIp: '43.138.9.21' }, '43.138'), true)
   assert.equal(match({ title: 'api-prod', instanceId: 'ins-8k2m1a' }, 'lhins-'), false)
+  assert.equal(match({
+    title: 'unnamed',
+    columns: [{ value: '内网：10.0.0.1\n弹性：106.55.252.113' }],
+  }, '106.55.252.113'), true)
 })
 
 test('host tool kind lists domain lighthouse cvm auto and default stays domain', () => {

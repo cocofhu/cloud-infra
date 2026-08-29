@@ -5,7 +5,7 @@ import { queryResources, renderQuery } from '../core/query.js'
 import { createRegistry } from '../core/registry.js'
 import type { ModuleContext } from '../core/types.js'
 import type { TencentProductCall } from '../providers/tencent/client.js'
-import { createCvmModule, mapCvmItem, cvmDetailGroups } from '../providers/tencent/products/cvm.js'
+import { createCvmModule, mapCvmItem, cvmDetailGroups, matchCvmQuery } from '../providers/tencent/products/cvm.js'
 import {
   mapInstanceState,
   matchInstanceQuery,
@@ -155,6 +155,8 @@ test('keyword matches name, ins-/lhins- id and ipv4', () => {
   assert.equal(matchInstanceQuery([card.title, card.instanceId, card.privateIp, card.publicIp], '43.138.9.21'), true)
   assert.equal(matchInstanceQuery([card.title, card.instanceId, card.privateIp, card.publicIp], '172.16.0.8'), true)
   assert.equal(matchInstanceQuery([card.title, card.instanceId, card.privateIp, card.publicIp], 'nope'), false)
+  assert.equal(matchCvmQuery(card, '43.138.9.21'), true)
+  assert.equal(matchCvmQuery({ ...card, publicIp: undefined, privateIp: undefined }, '43.138.9.21'), true)
 })
 
 test('cvm and lighthouse detail groups cover official sections and omit DNS records', async () => {

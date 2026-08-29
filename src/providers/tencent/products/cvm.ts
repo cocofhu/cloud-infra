@@ -16,6 +16,7 @@ import {
   listRegions,
   listZones,
   mapInstanceState,
+  instanceSearchText,
   matchInstanceQuery,
   matchRegion,
   optsOf,
@@ -148,13 +149,7 @@ export function cvmDetailGroups(item: CvmInstance, card: ResourceCard): FieldGro
 }
 
 export function matchCvmQuery(card: ResourceCard, query: string): boolean {
-  return matchInstanceQuery([
-    card.title,
-    card.instanceId,
-    card.id,
-    card.privateIp,
-    card.publicIp,
-  ], query)
+  return matchInstanceQuery(instanceSearchText(card), query)
 }
 
 export function createCvmModule(call: TencentProductCall = cvmCall): ResourceModule {
