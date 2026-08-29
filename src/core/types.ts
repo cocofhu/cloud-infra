@@ -40,6 +40,29 @@ export interface ResourceCard {
   instanceId?: string
   privateIp?: string
   publicIp?: string
+  product?: string
+  /** Server-computed from module tabs; list health-score jump must not hardcode products. */
+  hasReport?: boolean
+}
+
+export interface DetailTab {
+  id: string
+  label: string
+}
+
+export interface DetailTable {
+  id?: string
+  title?: string
+  columns: string[]
+  rows: Array<Record<string, string>>
+  empty?: string
+}
+
+export interface DetailFormField {
+  key: string
+  label: string
+  placeholder?: string
+  kind?: 'text' | 'textarea'
 }
 
 export interface DnsRecord {
@@ -152,7 +175,8 @@ export interface ResourceDetail {
   fields: Array<{ label: string; value: string }>
   groups?: FieldGroup[]
   records?: DnsRecord[]
-  tables?: ResourceTable[]
+  /** TCR uses ResourceTable (cells); DBbrain uses DetailTable (column→value rows). */
+  tables?: Array<ResourceTable | DetailTable>
   scope?: ResourceScope
   logs?: LogHit[]
   entries?: DirEntry[]
@@ -167,6 +191,21 @@ export interface ResourceDetail {
   blocks?: DetailBlock[]
   cards?: Record<string, DetailCard[]>
   flags?: Record<string, string | number | boolean | undefined>
+  tabs?: DetailTab[]
+  activeTab?: string
+  subTabs?: DetailTab[]
+  activeSubTab?: string
+  ranges?: DetailTab[]
+  activeRange?: string
+  hints?: string[]
+  form?: {
+    id: string
+    title: string
+    submitLabel?: string
+    action?: string
+    fields: DetailFormField[]
+    values?: Record<string, string>
+  }
 }
 
 export interface ResourceAction {

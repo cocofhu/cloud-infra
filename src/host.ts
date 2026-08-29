@@ -30,10 +30,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List or search cloud resources and show the result as a conversation tool card (same place as the domain table). ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/SSL/我的证书/COS/对象存储/存储桶/注册/可注册/能不能注册/买域名/我的域名/TKE/集群/容器服务/CDB/云数据库/MySQL/云服务器/轻量/CVM/实例/CLS/日志主题/检索分析/检索日志/镜像/TCR/容器镜像/镜像仓库. kind=domain (default) for domains; kind=cls for CLS log topics or log search. Pass kind=domain for DNS 解析 (default). Pass kind=cert for 腾讯云 SSL 证书. 查证书必须传 kind=cert. 未传 kind 仍默认 domain. Pass kind=cos for COS. For COS: if the user did not already name an official region id, still call kind=cos and OMIT region so the console card can default #ci-cos-region to 广州 (ap-guangzhou) and stay selectable. Never use Ask question to pick a COS region. Never guess, invent, or pass Chinese names / free text as region. Only pass region when it is an official id such as ap-guangzhou. Pass kind=registrar to check if a name can be registered; kind=my-domain for purchased domains. Pass kind=cluster for TKE clusters. Pass kind=cdb for cloud MySQL, kind=cvm for 云服务器, kind=lighthouse for 轻量应用服务器, kind=image for TCR images. kind=auto to query every enabled module. After the card appears, the user searches and 立即加购 inside the card — do not send them to settings or a standalone page. For 「查一下我的服务器」use kind=cvm, kind=lighthouse or kind=auto — never kind=domain. For clusters, pass region if the user names one; if omitted, default to ap-guangzhou and do not ask which region. Results appear in the chat card, not a separate console. Region is runtime-only and must not be saved to settings. Do not write settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List or search cloud resources and show the result as a conversation tool card (same place as the domain table). ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/SSL/我的证书/COS/对象存储/存储桶/注册/可注册/能不能注册/买域名/我的域名/TKE/集群/容器服务/CDB/云数据库/MySQL/云服务器/轻量/CVM/实例/CLS/日志主题/检索分析/检索日志/DBbrain/数据库智能管家/慢SQL/异常诊断/健康报告/镜像/TCR/容器镜像/镜像仓库. kind=domain (default) for domains; kind=cls for CLS log topics or log search. Pass kind=domain for DNS 解析 (default). Pass kind=cert for 腾讯云 SSL 证书. 查证书必须传 kind=cert. 未传 kind 仍默认 domain. Pass kind=cos for COS. For COS: if the user did not already name an official region id, still call kind=cos and OMIT region so the console card can default #ci-cos-region to 广州 (ap-guangzhou) and stay selectable. Never use Ask question to pick a COS region. Never guess, invent, or pass Chinese names / free text as region. Only pass region when it is an official id such as ap-guangzhou. Pass kind=registrar to check if a name can be registered; kind=my-domain for purchased domains. Pass kind=cluster for TKE clusters. Pass kind=dbbrain for DBbrain instance diagnosis. Pass kind=cdb for cloud MySQL, kind=cvm for 云服务器, kind=lighthouse for 轻量应用服务器, kind=image for TCR images. kind=auto to query every enabled module. After the card appears, the user searches and 立即加购 inside the card — do not send them to settings or a standalone page. For 「查一下我的服务器」use kind=cvm, kind=lighthouse or kind=auto — never kind=domain. For clusters, pass region if the user names one; if omitted, default to ap-guangzhou and do not ask which region. Results appear in the chat card, not a separate console. Region is runtime-only and must not be saved to settings. Do not write settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
       query: { type: 'string', description: 'Keyword such as example.com, certificate id, a bucket name, instance name, cluster name, ins-/lhins-/cdb- ID, IP, or CLS topic name / topic ID / logset. Empty lists all purchased domains, or waits for in-card search on registrar.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cert, cos, registrar, my-domain, cluster, cdb, lighthouse, cvm, cls, image, or auto. kind=domain (default). kind=cls for CLS. 查证书必须传 kind=cert。 Never treat CLS as domain.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cert, cos, registrar, my-domain, cluster, cdb, lighthouse, cvm, cls, dbbrain, image, or auto. kind=domain (default). kind=cls for CLS. 查证书必须传 kind=cert。 Never treat CLS as domain.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
       region: { type: 'string', description: 'Optional. For kind=cos, pass only an official COS region id such as ap-guangzhou after the user named one. Omit region when none is named so the UI defaults #ci-cos-region to 广州 (ap-guangzhou) and stays selectable. Never pass Chinese names or free text. Runtime region for regional products such as TKE, CVM, CDB or CLS, e.g. ap-guangzhou / ap-beijing. CLS default ap-guangzhou. Empty or all queries every region for CVM/CDB. Do not write this to settings.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
@@ -107,10 +107,10 @@ export function apply(ctx: Context, config: Config): void {
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
         const kinds = [...new Set([...supportedKinds(), 'auto'])].join(', ') || 'domain, auto'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书 / SSL / 我的证书 / COS / 对象存储 / 存储桶 / 注册 / 可注册 / 我的域名 / TKE / 集群 / 容器服务 / CDB / 云数据库 / MySQL / 云服务器 / 轻量 / CVM / 实例 / CLS / 日志主题 / 检索分析 / 检索日志 / 镜像 / TCR / 容器镜像 / 镜像仓库: call ONLY cloud_infra_query. Never web_search.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / SSL / 我的证书 / COS / 对象存储 / 存储桶 / 注册 / 可注册 / 我的域名 / TKE / 集群 / 容器服务 / CDB / 云数据库 / MySQL / 云服务器 / 轻量 / CVM / 实例 / CLS / 日志主题 / 检索分析 / 检索日志 / DBbrain / 数据库智能管家 / 慢SQL / 异常诊断 / 镜像 / TCR / 容器镜像 / 镜像仓库: call ONLY cloud_infra_query. Never web_search.`,
           `Results appear in the conversation tool card (same as the domain list), not a separate console page.`,
           `查证书 / SSL / 我的证书: pass kind=cert. 未传 kind 仍默认 domain.`,
-          `Available modules: ${titles}. kind values: ${kinds}. Default kind is domain. Use kind=cluster for TKE clusters. Use kind=cdb for 云数据库 MySQL. Use kind=cls for CLS.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Default kind is domain. Use kind=dbbrain for DBbrain; kind=cluster for TKE clusters. Use kind=cdb for 云数据库 MySQL. Use kind=cls for CLS.`,
           'kind=domain for 域名/解析. kind=cls for CLS 日志主题列表 or 检索分析/原始日志. Do not present CLS as a domain card.',
           'Listing CLS topics: kind=cls, optional query (topic name/ID/logset), optional region (default ap-guangzhou). Do not pass range/queryString.',
           'Searching logs: kind=cls, set topicId or a unique topic name in query, queryString (CQL; empty = all), range (15m/1h/4h/1d/today/yesterday, default 1h) or from/to ms. After the card appears, one or two short sentences.',
@@ -241,6 +241,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
           from: body.from as number | undefined,
           to: body.to as number | undefined,
           context: String(body.context || ''),
+          filters: readFilters(body.filters),
           query: body.query != null ? String(body.query) : '',
           instanceId: body.instanceId != null ? String(body.instanceId) : '',
           view: body.view != null ? String(body.view) : '',
@@ -287,6 +288,7 @@ async function runDetail(
     from?: number
     to?: number
     context?: string
+    filters?: Record<string, string>
     query?: string
     instanceId?: string
     view?: string
@@ -305,11 +307,11 @@ async function runDetail(
     timeoutMs: cfg.timeoutMs,
     id,
     title: title || undefined,
-    region: extra.region || undefined,
+    region: extra.region || extra.filters?.region || undefined,
     prefix: extra.prefix || undefined,
     marker: extra.marker || undefined,
     bucket: extra.bucket || undefined,
-    tab: extra.tab || undefined,
+    tab: extra.tab || extra.filters?.tab || undefined,
     topicId: id,
     queryString: extra.queryString,
     range: extra.range,
@@ -317,6 +319,7 @@ async function runDetail(
     to: extra.to,
     context: extra.context,
     view: extra.view || 'search',
+    filters: extra.filters,
     instanceId: extra.instanceId || id,
     namespace: extra.namespace || undefined,
     repository: extra.repository || undefined,
@@ -344,6 +347,10 @@ async function runAction(
     prefix: typeof payload.prefix === 'string' ? payload.prefix : undefined,
     bucket: typeof payload.bucket === 'string' ? payload.bucket : undefined,
     tab: typeof payload.tab === 'string' ? payload.tab : undefined,
+    filters: readFilters({
+      region: payload.region,
+      product: payload.product,
+    }),
     instanceId: typeof payload.instanceId === 'string' ? payload.instanceId : id,
     namespace: typeof payload.namespace === 'string' ? payload.namespace : undefined,
     repository: typeof payload.repository === 'string' ? payload.repository : undefined,
