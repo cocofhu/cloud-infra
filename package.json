@@ -66,6 +66,7 @@
     }
   },
   "dependencies": {
+    "echarts": "^6.1.0",
     "mysql2": "^3.24.2"
   },
   "peerDependencies": {

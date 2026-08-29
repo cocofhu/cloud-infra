@@ -839,3 +839,23 @@ test('g4.3 README documents chat card, region-first and TCR CAM', () => {
   assert.match(readme, /同 Digest/)
   assert.match(readme, /不在设置页增加地域/)
 })
+
+test('monitor charts: MonitorPanel/MonitorChart shared by CDB and instance detail', () => {
+  const client = read('src/client.js')
+  assert.match(client, /function MonitorChart\(/)
+  assert.match(client, /function MonitorPanel\(/)
+  assert.match(client, /MONITOR_RANGES/)
+  assert.match(client, /"1h"/)
+  assert.match(client, /"6h"/)
+  assert.match(client, /"24h"/)
+  assert.match(client, /cdn\.jsdelivr\.net\/npm\/echarts/)
+  assert.match(client, /chart\.dispose\(\)/)
+  assert.match(client, /暂无监控数据/)
+  assert.match(client, /ci-monitor-grid/)
+  // CDB 与 CVM/轻量都走同一个 MonitorPanel
+  assert.equal(client.split('h(MonitorPanel').length - 1 >= 2, true)
+  // 实例详情带「实例详情 / 实例监控」两个 Tab
+  assert.match(client, /\["实例详情", "实例监控"\]/)
+  // 时间窗切换走 reload(tab, { range })
+  assert.match(client, /onRangeChange: \(range\) => onReload\("实例监控", \{ range \}\)/)
+})

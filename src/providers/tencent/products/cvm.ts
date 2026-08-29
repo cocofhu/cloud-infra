@@ -1,13 +1,15 @@
 import { publicErrorMessage } from '../../../core/safe-error.js'
 import { registerModule } from '../../../core/registry.js'
 import type { FieldGroup, ModuleContext, ResourceCard, ResourceDetail, ResourceModule } from '../../../core/types.js'
-import { cvmCall, type TencentProductCall } from '../client.js'
+import { cvmCall, monitorCall, type TencentProductCall } from '../client.js'
 import {
+  HOST_METRICS,
   INSTANCE_ACTIONS,
   POWER_ACTIONS,
   chargeTypeLabel,
   consoleTime,
   credsOf,
+  fetchMonitorSeries,
   firstIp,
   formatSpec,
   instanceCardId,
@@ -16,6 +18,7 @@ import {
   listRegions,
   listZones,
   mapInstanceState,
+  normalizeMonitorRange,
   instanceSearchText,
   matchInstanceQuery,
   matchRegion,
@@ -152,7 +155,7 @@ export function matchCvmQuery(card: ResourceCard, query: string): boolean {
   return matchInstanceQuery(instanceSearchText(card), query)
 }
 
-export function createCvmModule(call: TencentProductCall = cvmCall): ResourceModule {
+export function createCvmModule(call: TencentProductCall = cvmCall, monitor: TencentProductCall = monitorCall): ResourceModule {
   const module: ResourceModule = {
     id: 'tencent.cvm',
     provider: 'tencent',
@@ -177,11 +180,40 @@ export function createCvmModule(call: TencentProductCall = cvmCall): ResourceMod
       const raw = await loadOne(call, ctx, module.id)
       const card = raw.card
       const groups = cvmDetailGroups(raw.item, card)
-      return {
+      const detail = {
         card,
         fields: groups.flatMap((group) => group.fields),
         groups,
       } satisfies ResourceDetail
+      const ref = parseInstanceRef(String(ctx.id || ''))
+      if (String(ctx.tab || '') === '实例监控' && ref.region && ref.instanceId) {
+        const range = normalizeMonitorRange(ctx.range)
+        const monitorData = await fetchMonitorSeries(monitor, {
+          namespace: 'QCE/CVM',
+          metrics: HOST_METRICS,
+          instanceId: ref.instanceId,
+          region: ref.region,
+          range,
+          creds: credsOf(ctx),
+          opts: optsOf(ctx),
+        })
+        return {
+          ...detail,
+          extra: {
+            tab: '实例监控',
+            tabs: ['实例详情', '实例监控'],
+            tabData: {
+              range: monitorData.range,
+              metrics: HOST_METRICS,
+              series: monitorData.series,
+              note: monitorData.errors.length === HOST_METRICS.length
+                ? '无法拉取监控数据，请检查 CAM 云监控权限'
+                : monitorData.errors.length ? `部分指标拉取失败（${monitorData.errors.length} 项）` : '',
+            },
+          },
+        }
+      }
+      return { ...detail, extra: { tab: '实例详情', tabs: ['实例详情', '实例监控'] } }
     },
     async execute(actionId, payload, ctx) {
       return runPower(call, actionId, payload, ctx)
