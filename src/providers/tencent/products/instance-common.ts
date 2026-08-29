@@ -208,21 +208,30 @@ export async function listZones(
   }
 }
 
+/** 达到 cap 截断时置位,供调用方生成 warning;调用方每次调用前应复位为 false。 */
+export const listAllPagesTruncated = { current: false }
+
 export async function listAllPages<T>(
   fetchPage: (offset: number, limit: number) => Promise<{ items: T[]; total?: number }>,
   pageSize = 100,
   cap = 500,
 ): Promise<T[]> {
+  listAllPagesTruncated.current = false
   const all: T[] = []
   let offset = 0
+  let reportedTotal: number | undefined
   while (all.length < cap) {
     const { items, total } = await fetchPage(offset, pageSize)
+    if (total != null) reportedTotal = total
     all.push(...items)
     if (!items.length) break
     if (total != null && all.length >= total) break
     if (items.length < pageSize) break
     offset += items.length
   }
+  // 上游总数大于已拉取条数,说明触顶截断,标记给上层提示「仅显示前 N 条」
+  if (reportedTotal != null && reportedTotal > all.length) listAllPagesTruncated.current = true
+  if (all.length > cap) listAllPagesTruncated.current = true
   return all.slice(0, cap)
 }
 

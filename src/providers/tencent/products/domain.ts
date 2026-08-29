@@ -76,7 +76,7 @@ export function mapDomainItem(item: DomainListItem, moduleId = 'tencent.domain')
   const status = mapDomainStatus(item.Status, item.DNSStatus)
   const grade = item.GradeTitle || '-'
   const badges = [item.GradeTitle, recordCount ? `${recordCount} 条记录` : ''].filter(Boolean) as string[]
-  const description = [item.Remark, statusLabel(status), item.DNSStatus && item.DNSStatus !== 'ENABLE' ? item.DNSStatus : '']
+  const description = [item.Remark, statusLabel(status), item.DNSStatus && item.DNSStatus !== 'ENABLE' ? dnsStatusLabel(item.DNSStatus) : '']
     .filter(Boolean)
     .join(' · ')
   return {
@@ -159,12 +159,17 @@ export function createDomainModule(call: typeof dnspodCall = dnspodCall): Resour
       const info = await call<{ DomainInfo?: DomainListItem & { Name?: string } }>('DescribeDomain', lookup, creds(ctx), opts(ctx))
       const domain = info.DomainInfo || { DomainId: domainId || undefined, Name: domainName }
       const name = domain.Name || domainName || String(domainId)
+      let recordsError = ''
       const records = await call<{ RecordList?: RecordListItem[] }>('DescribeRecordList', {
         Domain: name,
         ...(Number.isFinite(domainId) && domainId > 0 ? { DomainId: domainId } : {}),
         ErrorOnEmpty: 'no',
         Limit: 3000,
-      }, creds(ctx), opts(ctx)).catch(() => ({ RecordList: [] as RecordListItem[] }))
+      }, creds(ctx), opts(ctx)).catch((err: unknown) => {
+        // 不把「拉取失败」伪装成「无记录」:记录失败原因,由详情字段透出
+        recordsError = publicErrorMessage(err)
+        return { RecordList: [] as RecordListItem[] }
+      })
       const card = mapDomainItem(domain, module.id)
       const fields = [
         { label: '域名', value: domain.Name || card.title },
@@ -177,6 +182,7 @@ export function createDomainModule(call: typeof dnspodCall = dnspodCall): Resour
         { label: 'DNS', value: (domain.EffectiveDNS || []).join(' ') },
         { label: 'TTL', value: domain.TTL != null ? String(domain.TTL) : '' },
         { label: '创建时间', value: domain.CreatedOn || '' },
+        ...(recordsError ? [{ label: '解析记录', value: `记录拉取失败：${recordsError}` }] : []),
       ].filter((row) => row.value)
       return {
         card,
