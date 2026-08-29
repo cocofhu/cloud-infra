@@ -7,6 +7,9 @@ import {
   aclLabelFromXml,
   bucketHost,
   buildFormatString,
+  copySourceHeader,
+  createCosClient,
+  encodedObjectPath,
   parseListPage,
   presignCosUrl,
   shortName,
@@ -76,4 +79,85 @@ test('g2.2 access permission label is read-only ACL mapping', () => {
       <Grant><URI>http://cam.qcloud.com/groups/global/AllUsers</URI><Permission>READ</Permission></Grant>
     </AccessControlPolicy>
   `), '公有读私有写')
+})
+
+test('g2.1 copyObject x-cos-copy-source uses regional host and encoded object key', async () => {
+  assert.equal(
+    copySourceHeader('assets-1250000000', 'ap-guangzhou', 'folder/中文.txt'),
+    'assets-1250000000.cos.ap-guangzhou.myqcloud.com/folder/%E4%B8%AD%E6%96%87.txt',
+  )
+  assert.equal(
+    copySourceHeader('assets-1250000000', 'ap-guangzhou', '/readme.txt'),
+    'assets-1250000000.cos.ap-guangzhou.myqcloud.com/readme.txt',
+  )
+  const recorded: Array<{ url: string; source?: string }> = []
+  const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+    const headers = (init?.headers || {}) as Record<string, string>
+    recorded.push({ url: String(url), source: headers['x-cos-copy-source'] })
+    return new Response('<CopyObjectResult><ETag>"abc"</ETag></CopyObjectResult>', {
+      status: 200,
+      headers: { 'content-type': 'application/xml' },
+    })
+  }) as typeof fetch
+  const client = createCosClient({ secretId: 'AKIDxxxxxxxx', secretKey: 'secret' }, fetchImpl)
+  await client.copyObject('assets-1250000000', 'ap-guangzhou', 'folder/中文.txt', 'folder/new.txt', { timeoutMs: 5000 })
+  assert.equal(recorded[0]?.source, 'assets-1250000000.cos.ap-guangzhou.myqcloud.com/folder/%E4%B8%AD%E6%96%87.txt')
+  assert.doesNotMatch(recorded[0]?.source || '', /^\/assets-1250000000\//)
+  assert.match(recorded[0]?.url || '', /\/folder\/new\.txt/)
+})
+
+test('g2.1 request URL and signature pathname share encodedObjectPath for Chinese keys', async () => {
+  const path = encodedObjectPath('/文档/说明.txt')
+  assert.equal(path, '/%E6%96%87%E6%A1%A3/%E8%AF%B4%E6%98%8E.txt')
+  const built = buildFormatString({
+    method: 'HEAD',
+    path: '/文档/说明.txt',
+    headers: { host: 'assets-1250000000.cos.ap-guangzhou.myqcloud.com' },
+  })
+  assert.match(built.formatString, /head\n\/%E6%96%87%E6%A1%A3\/%E8%AF%B4%E6%98%8E\.txt\n/)
+  const recorded: string[] = []
+  const fetchImpl = (async (url: string | URL) => {
+    recorded.push(String(url))
+    return new Response('', {
+      status: 200,
+      headers: { 'content-length': '1', 'last-modified': 'Wed, 01 Jan 2025 00:00:00 GMT' },
+    })
+  }) as typeof fetch
+  const client = createCosClient({ secretId: 'AKIDxxxxxxxx', secretKey: 'secret' }, fetchImpl)
+  await client.headObject('assets-1250000000', 'ap-guangzhou', '文档/说明.txt', { timeoutMs: 5000 })
+  assert.match(recorded[0] || '', /\/%E6%96%87%E6%A1%A3\/%E8%AF%B4%E6%98%8E\.txt/)
+  const signedUrl = presignCosUrl({
+    method: 'GET',
+    host: bucketHost('assets-1250000000', 'ap-guangzhou'),
+    path: '/文档/说明.txt',
+    creds: { secretId: 'AKIDxxxxxxxx', secretKey: 'secret' },
+    timestamp: 1700000000,
+    expiresSec: 900,
+  })
+  assert.match(signedUrl, /\/%E6%96%87%E6%A1%A3\/%E8%AF%B4%E6%98%8E\.txt\?/)
+})
+
+test('g2.3 deleteObjects posts Content-MD5 and delete query', async () => {
+  const recorded: Array<{ url: string; method?: string; md5?: string; body?: string }> = []
+  const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+    const headers = (init?.headers || {}) as Record<string, string>
+    recorded.push({
+      url: String(url),
+      method: init?.method,
+      md5: headers['content-md5'],
+      body: typeof init?.body === 'string' ? init.body : '',
+    })
+    return new Response(
+      '<DeleteResult><Deleted><Key>a.txt</Key></Deleted><Error><Key>b.txt</Key><Code>AccessDenied</Code><Message>denied</Message></Error></DeleteResult>',
+      { status: 200, headers: { 'content-type': 'application/xml' } },
+    )
+  }) as typeof fetch
+  const client = createCosClient({ secretId: 'AKIDxxxxxxxx', secretKey: 'secret' }, fetchImpl)
+  const result = await client.deleteObjects('assets-1250000000', 'ap-guangzhou', ['a.txt', 'b.txt'], { timeoutMs: 5000 })
+  assert.match(recorded[0]?.url || '', /[?&]delete=/)
+  assert.equal(recorded[0]?.method, 'POST')
+  assert.ok(recorded[0]?.md5)
+  assert.match(recorded[0]?.body || '', /<Key>a\.txt<\/Key>/)
+  assert.deepEqual(result.deleted, ['a.txt'])
+  assert.equal(result.errors[0]?.key, 'b.txt')
 })

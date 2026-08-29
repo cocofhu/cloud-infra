@@ -56,7 +56,9 @@ export function apply(ctx: Context, config: Config): void {
           ? '云资源查询失败'
           : result?.needsRegion
             ? '对象存储 · 请选择地域'
-            : `云资源 · ${result?.items?.length ?? 0} 条`,
+            : result?.kind === 'cos' && result?.errors?.length && !result?.items?.length
+              ? '对象存储 · 请先配置凭证'
+              : `云资源 · ${result?.items?.length ?? 0} 条`,
         content: [],
       }
     },
@@ -263,8 +265,22 @@ async function runAction(
   })
 }
 
+export function resolveModuleId(moduleId: string, id: string): string {
+  const explicit = String(moduleId || '').trim()
+  if (explicit) return explicit
+  const raw = String(id || '').trim()
+  if (!raw) return ''
+  const hits = registry.listModules()
+    .map((item) => item.id)
+    .filter((mid) => raw === mid || raw.startsWith(`${mid}:`))
+    .sort((a, b) => b.length - a.length)
+  if (hits[0]) return hits[0]
+  const colon = raw.indexOf(':')
+  return colon > 0 ? raw.slice(0, colon) : raw
+}
+
 function readyModule(cfg: PluginConfig, moduleId: string, id: string) {
-  const resolvedId = moduleId || (id.includes(':') ? id.slice(0, id.lastIndexOf(':')) : '')
+  const resolvedId = resolveModuleId(moduleId, id)
   const module = registry.getModule(resolvedId)
   if (!module) throw new Error('未知模块')
   const provider = registry.getProvider(module.provider)

@@ -6,7 +6,7 @@ import test from 'node:test'
 import { overlayPath, withDefaults } from '../core/config-store.js'
 import { queryResources } from '../core/query.js'
 import { createCosModule, mapBucketItem, parseCosRef } from '../providers/tencent/products/cos.js'
-import type { CosClient } from '../providers/tencent/cos-client.js'
+import { CosApiError, type CosClient } from '../providers/tencent/cos-client.js'
 
 function fakeClient(calls: Array<{ op: string; args: unknown[] }>, overrides: Partial<CosClient> = {}): CosClient {
   const base: CosClient = {
@@ -57,6 +57,10 @@ function fakeClient(calls: Array<{ op: string; args: unknown[] }>, overrides: Pa
     },
     async deleteObject(bucket, region, key) {
       calls.push({ op: 'deleteObject', args: [bucket, region, key] })
+    },
+    async deleteObjects(bucket, region, keys) {
+      calls.push({ op: 'deleteObjects', args: [bucket, region, keys] })
+      return { deleted: [...keys], errors: [] }
     },
     async copyObject(bucket, region, source, dest) {
       calls.push({ op: 'copyObject', args: [bucket, region, source, dest] })
@@ -111,6 +115,17 @@ test('g1.1 g2.2 list requires a selected region and only maps that region', asyn
   assert.equal(listed.items.some((item) => item.title === 'logs-1250000000'), false)
   assert.deepEqual(listed.items[0].columns?.map((col) => col.label), ['地域', '创建时间', '访问权限'])
   assert.equal(calls[0]?.args[0], 'ap-guangzhou')
+})
+
+test('g2.2 bucket ACL is cached across list calls to avoid search N+1', async () => {
+  const calls: Array<{ op: string; args: unknown[] }> = []
+  const module = createCosModule(() => fakeClient(calls))
+  await module.list(ctx({ region: 'ap-guangzhou' }))
+  const first = calls.filter((row) => row.op === 'getBucketAclLabel').length
+  await module.list(ctx({ region: 'ap-guangzhou', query: 'assets' }))
+  const second = calls.filter((row) => row.op === 'getBucketAclLabel').length
+  assert.equal(first, 2)
+  assert.equal(second, 2)
 })
 
 test('g1.2 detail returns current prefix layer with short names and region', async () => {
@@ -224,7 +239,9 @@ test('g2.3 upload folder rename delete and 15-minute presign stay on current pre
   assert.equal(removed?.ok, true)
   const listed = calls.filter((row) => row.op === 'listAllKeys')
   assert.equal(listed.length >= 1, true)
-  assert.equal(calls.filter((row) => row.op === 'deleteObject' && String(row.args[2]).startsWith('images/')).length, 3)
+  const batch = calls.find((row) => row.op === 'deleteObjects')
+  assert.deepEqual(batch?.args[2], ['images/a.png', 'images/b.png', 'images/'])
+  assert.equal(calls.filter((row) => row.op === 'deleteObject' && String(row.args[2]).startsWith('images/')).length, 0)
 })
 
 test('g1.3 action and region change do not write overlay', async () => {
@@ -308,4 +325,93 @@ test('g1.1 queryResources kind=cos without region never hits GetService', async 
   assert.equal(ok.items.length, 2)
   assert.equal(ok.needsRegion, undefined)
   assert.equal(calls[0]?.op, 'listBuckets')
+})
+
+test('g1.1 queryResources kind=cos without credentials returns settings hint not empty buckets', async () => {
+  const { createRegistry } = await import('../core/registry.js')
+  const { renderQuery } = await import('../core/query.js')
+  const source = createRegistry()
+  source.registerProvider({
+    id: 'tencent',
+    title: '腾讯云',
+    fields: [
+      { key: 'secretId', label: 'SecretId' },
+      { key: 'secretKey', label: 'SecretKey' },
+    ],
+  })
+  const calls: Array<{ op: string; args: unknown[] }> = []
+  source.registerModule(createCosModule(() => fakeClient(calls)))
+  const cfg = withDefaults({
+    providers: { tencent: {} },
+  })
+  const result = await queryResources({ kind: 'cos', region: 'ap-guangzhou' }, cfg, undefined, source)
+  assert.equal(result.items.length, 0)
+  assert.equal(calls.length, 0)
+  assert.match(result.errors[0]?.message || '', /设置 → 插件/)
+  assert.match(renderQuery(result), /设置 → 插件/)
+  assert.doesNotMatch(renderQuery(result), /请输入并选择地域/)
+})
+
+test('g1.2 g2.3 detail formats lastModified and surfaces hasMore/nextMarker', async () => {
+  const module = createCosModule(() => fakeClient([], {
+    async listCurrent() {
+      return {
+        entries: [{
+          kind: 'file',
+          name: 'a.txt',
+          key: 'a.txt',
+          size: 1,
+          storageClass: 'STANDARD',
+          lastModified: '2024-01-01T00:00:00Z',
+        }],
+        isTruncated: true,
+        nextMarker: 'a.txt',
+        keys: ['a.txt'],
+      }
+    },
+  }))
+  const detail = await module.detail?.(ctx({
+    id: 'tencent.cos:ap-guangzhou:assets-1250000000',
+    region: 'ap-guangzhou',
+    prefix: '',
+  }))
+  assert.equal(detail?.hasMore, true)
+  assert.equal(detail?.nextMarker, 'a.txt')
+  assert.match(detail?.entries?.[0]?.lastModified || '', /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+})
+
+test('g2.3 rename reports copy-ok delete-fail instead of silent success', async () => {
+  const calls: Array<{ op: string; args: unknown[] }> = []
+  const module = createCosModule(() => fakeClient(calls, {
+    async deleteObject() {
+      throw new CosApiError('AccessDenied', 'AccessDenied')
+    },
+  }))
+  const renamed = await module.execute?.('object.rename', {
+    key: 'readme.txt',
+    name: 'note.txt',
+    region: 'ap-guangzhou',
+    bucket: 'assets-1250000000',
+  }, ctx())
+  assert.equal(renamed?.ok, false)
+  if (renamed && !renamed.ok) assert.match(renamed.error, /源对象删除失败/)
+  assert.equal(calls.some((row) => row.op === 'copyObject'), true)
+})
+
+test('g2.3 folder.delete reports remaining count on partial batch failure', async () => {
+  const module = createCosModule(() => fakeClient([], {
+    async listAllKeys() {
+      return ['images/a.png', 'images/b.png', 'images/']
+    },
+    async deleteObjects(_bucket, _region, keys) {
+      return { deleted: keys.slice(0, 1), errors: keys.slice(1).map((key) => ({ key, message: 'AccessDenied' })) }
+    },
+  }))
+  const removed = await module.execute?.('folder.delete', {
+    key: 'images/',
+    region: 'ap-guangzhou',
+    bucket: 'assets-1250000000',
+  }, ctx())
+  assert.equal(removed?.ok, false)
+  if (removed && !removed.ok) assert.match(removed.error, /已删除 1 个对象，剩余 2 个未删尽/)
 })

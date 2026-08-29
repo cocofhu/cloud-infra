@@ -48,6 +48,20 @@ export function bucketHost(bucket: string, region: string): string {
   return `${bucket}.cos.${region}.myqcloud.com`
 }
 
+/** Pathname used both in HMAC-SHA1 and in the HTTPS request URL. */
+export function encodedObjectPath(path: string): string {
+  return cosEncode(normalizePath(path), false)
+}
+
+/**
+ * Official PUT Object - Copy header:
+ * `<BucketName-APPID>.cos.<Region>.myqcloud.com/<ObjectKey>` (ObjectKey URL-encoded).
+ */
+export function copySourceHeader(bucket: string, region: string, sourceKey: string): string {
+  const trimmed = String(sourceKey || '').replace(/^\/+/, '')
+  return `${bucketHost(bucket, region)}/${cosEncode(trimmed, false)}`
+}
+
 function hmacSha1Hex(key: string | Buffer, message: string): string {
   return createHmac('sha1', key).update(message, 'utf8').digest('hex')
 }
@@ -78,7 +92,7 @@ export function buildFormatString(input: {
   headers: Record<string, string>
 }): { formatString: string; headerList: string; paramList: string } {
   const method = input.method.toLowerCase()
-  const pathname = cosEncode(normalizePath(input.path), false)
+  const pathname = encodedObjectPath(input.path)
   const params = sortedQuery(input.query)
   const paramList = params.map(([key]) => key).join(';')
   const httpParameters = params.map(([key, value]) => `${cosEncode(key)}=${cosEncode(value)}`).join('&')
@@ -152,7 +166,7 @@ export function presignCosUrl(input: {
   ]
   const baseQuery = sortedQuery(input.query).map(([key, value]) => `${cosEncode(key)}=${cosEncode(value)}`)
   const qs = [...baseQuery, ...extra].join('&')
-  return `https://${input.host}${normalizePath(input.path)}?${qs}`
+  return `https://${input.host}${encodedObjectPath(input.path)}?${qs}`
 }
 
 function queryString(query: Record<string, string | undefined> | undefined): string {
@@ -164,6 +178,7 @@ function queryString(query: Record<string, string | undefined> | undefined): str
 export async function cosRequest(options: CosRequestOptions): Promise<{ status: number; headers: Headers; text: string; buffer: Buffer }> {
   const method = options.method.toUpperCase()
   const path = normalizePath(options.path || '/')
+  const urlPath = encodedObjectPath(path)
   const start = options.timestamp ?? Math.floor(Date.now() / 1000)
   const end = start + Math.max(60, options.signExpiresSec ?? 600)
   const headers: Record<string, string> = { host: options.host, ...(options.headers || {}) }
@@ -185,7 +200,7 @@ export async function cosRequest(options: CosRequestOptions): Promise<{ status: 
   try {
     const fetchImpl = options.fetchImpl || fetch
     const body = options.body == null ? undefined : (Buffer.isBuffer(options.body) ? new Uint8Array(options.body) : options.body)
-    const res = await fetchImpl(`https://${options.host}${path}${queryString(options.query)}`, {
+    const res = await fetchImpl(`https://${options.host}${urlPath}${queryString(options.query)}`, {
       method,
       headers,
       body,
@@ -279,9 +294,15 @@ export interface CosClient {
   listAllKeys: (bucket: string, region: string, prefix: string, opts: { timeoutMs: number; signal?: AbortSignal }) => Promise<string[]>
   putObject: (bucket: string, region: string, key: string, body: Buffer, opts: { timeoutMs: number; signal?: AbortSignal; contentType?: string }) => Promise<void>
   deleteObject: (bucket: string, region: string, key: string, opts: { timeoutMs: number; signal?: AbortSignal }) => Promise<void>
+  deleteObjects: (bucket: string, region: string, keys: string[], opts: { timeoutMs: number; signal?: AbortSignal }) => Promise<CosDeleteBatchResult>
   copyObject: (bucket: string, region: string, sourceKey: string, destKey: string, opts: { timeoutMs: number; signal?: AbortSignal }) => Promise<void>
   headObject: (bucket: string, region: string, key: string, opts: { timeoutMs: number; signal?: AbortSignal }) => Promise<CosObjectStat>
   presignGet: (bucket: string, region: string, key: string, expiresSec?: number) => string
+}
+
+export interface CosDeleteBatchResult {
+  deleted: string[]
+  errors: Array<{ key: string; code?: string; message: string }>
 }
 
 export function createCosClient(
@@ -407,13 +428,46 @@ export function createCosClient(
         signal: opts.signal,
       })
     },
+    async deleteObjects(bucket, region, keys, opts) {
+      const unique = [...new Set(keys.map((key) => String(key || '')).filter(Boolean))]
+      const deleted: string[] = []
+      const errors: Array<{ key: string; code?: string; message: string }> = []
+      for (let i = 0; i < unique.length; i += 1000) {
+        const chunk = unique.slice(i, i + 1000)
+        const body = `<?xml version="1.0" encoding="utf-8"?><Delete><Quiet>false</Quiet>${chunk.map((key) => `<Object><Key>${escapeXml(key)}</Key></Object>`).join('')}</Delete>`
+        const md5 = createHash('md5').update(body).digest('base64')
+        const res = await req({
+          method: 'POST',
+          host: bucketHost(bucket, region),
+          path: '/',
+          query: { delete: '' },
+          headers: {
+            'content-type': 'application/xml',
+            'content-md5': md5,
+            'content-length': String(Buffer.byteLength(body)),
+          },
+          body,
+          timeoutMs: opts.timeoutMs,
+          signal: opts.signal,
+        })
+        const gone = xmlBlocks(res.text, 'Deleted').map((block) => xmlText(block, 'Key')).filter(Boolean)
+        const failed = xmlBlocks(res.text, 'Error').map((block) => ({
+          key: xmlText(block, 'Key'),
+          code: xmlText(block, 'Code') || undefined,
+          message: xmlText(block, 'Message') || '删除失败',
+        }))
+        deleted.push(...gone)
+        errors.push(...failed)
+        if (!gone.length && !failed.length) deleted.push(...chunk)
+      }
+      return { deleted, errors }
+    },
     async copyObject(bucket, region, sourceKey, destKey, opts) {
-      const source = `/${bucket}/${encodeURI(sourceKey).replace(/\/+/g, '/')}`
       await req({
         method: 'PUT',
         host: bucketHost(bucket, region),
         path: `/${destKey}`,
-        headers: { 'x-cos-copy-source': source },
+        headers: { 'x-cos-copy-source': copySourceHeader(bucket, region, sourceKey) },
         timeoutMs: opts.timeoutMs,
         signal: opts.signal,
       })
@@ -434,7 +488,7 @@ export function createCosClient(
         storageClass: res.headers.get('x-cos-storage-class') || 'STANDARD',
         lastModified: res.headers.get('last-modified') || undefined,
         contentType: res.headers.get('content-type') || undefined,
-        url: `https://${bucketHost(bucket, region)}/${key.split('/').map((part) => cosEncode(part)).join('/')}`,
+        url: `https://${bucketHost(bucket, region)}${encodedObjectPath(`/${key}`)}`,
       }
     },
     presignGet(bucket, region, key, expiresSec = 900) {

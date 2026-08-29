@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import test from 'node:test'
-import { handleApi } from '../host.js'
+import { handleApi, resolveModuleId } from '../host.js'
 import { withDefaults } from '../core/config-store.js'
 
 function req(headers: Record<string, string | undefined>, opts: {
@@ -59,4 +59,10 @@ test('handleApi rejects untrusted query and write, keeps meta public', async () 
   }), meta.response, cfg)
   assert.equal(meta.out.status, 200)
   assert.match(meta.out.body, /"ok":true/)
+})
+
+test('g1 readyModule fallback parses tencent.cos from resource id without moduleId', () => {
+  assert.equal(resolveModuleId('tencent.cos', 'tencent.cos:ap-guangzhou:assets-1250000000'), 'tencent.cos')
+  assert.equal(resolveModuleId('', 'tencent.cos:ap-guangzhou:assets-1250000000'), 'tencent.cos')
+  assert.notEqual(resolveModuleId('', 'tencent.cos:ap-guangzhou:assets-1250000000'), 'tencent.cos:ap-guangzhou')
 })

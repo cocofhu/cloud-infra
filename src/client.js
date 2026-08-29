@@ -689,16 +689,27 @@ window.__ModuleLoader__.load({
     }
 
     const COS_REGION_FALLBACK = [
-      { id: "ap-beijing", label: "北京", aliases: ["bj", "beijing"] },
+      { id: "ap-beijing", label: "北京", aliases: ["bj", "beijing", "pek"] },
+      { id: "ap-beijing-fsi", label: "北京金融", aliases: ["beijing-fsi"] },
+      { id: "ap-nanjing", label: "南京", aliases: ["nj", "nanjing"] },
       { id: "ap-shanghai", label: "上海", aliases: ["sh", "shanghai"] },
-      { id: "ap-guangzhou", label: "广州", aliases: ["gz", "guangzhou"] },
+      { id: "ap-shanghai-fsi", label: "上海金融", aliases: ["shanghai-fsi"] },
+      { id: "ap-guangzhou", label: "广州", aliases: ["gz", "guangzhou", "canton"] },
+      { id: "ap-shenzhen-fsi", label: "深圳金融", aliases: ["sz-fsi", "shenzhen-fsi"] },
       { id: "ap-chengdu", label: "成都", aliases: ["cd", "chengdu"] },
       { id: "ap-chongqing", label: "重庆", aliases: ["cq", "chongqing"] },
-      { id: "ap-nanjing", label: "南京", aliases: ["nj", "nanjing"] },
-      { id: "ap-hongkong", label: "中国香港", aliases: ["hk", "hongkong", "香港"] },
+      { id: "ap-hongkong", label: "中国香港", aliases: ["hk", "hongkong", "hong kong", "香港"] },
       { id: "ap-singapore", label: "新加坡", aliases: ["sg", "singapore"] },
+      { id: "ap-mumbai", label: "孟买", aliases: ["in", "mumbai", "india"] },
+      { id: "ap-jakarta", label: "雅加达", aliases: ["id", "jakarta"] },
+      { id: "ap-seoul", label: "首尔", aliases: ["kr", "seoul"] },
+      { id: "ap-bangkok", label: "曼谷", aliases: ["th", "bangkok"] },
       { id: "ap-tokyo", label: "东京", aliases: ["jp", "tokyo"] },
-      { id: "na-ashburn", label: "弗吉尼亚", aliases: ["ashburn", "virginia"] },
+      { id: "na-siliconvalley", label: "硅谷", aliases: ["usw", "siliconvalley", "silicon valley"] },
+      { id: "na-ashburn", label: "弗吉尼亚", aliases: ["use", "ashburn", "virginia"] },
+      { id: "na-toronto", label: "多伦多", aliases: ["ca", "toronto"] },
+      { id: "sa-saopaulo", label: "圣保罗", aliases: ["br", "saopaulo", "sao paulo"] },
+      { id: "eu-frankfurt", label: "法兰克福", aliases: ["de", "frankfurt"] },
     ];
 
     function normRegion(value) {
@@ -726,6 +737,14 @@ window.__ModuleLoader__.load({
 
     function displayRegion(region) {
       return region ? `${region.label}（${region.id}）` : "";
+    }
+
+    function formatFileTime(raw) {
+      if (!raw) return "-";
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return String(raw).replace("T", " ").replace(/Z$/, "");
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
     }
 
     function formatBytes(bytes) {
@@ -858,7 +877,7 @@ window.__ModuleLoader__.load({
           )),
           h("td", null, row.kind === "folder" ? "-" : formatBytes(row.size)),
           h("td", null, row.kind === "folder" ? "-" : storageLabel(row.storageClass)),
-          h("td", null, row.kind === "folder" ? "-" : (row.lastModified || "-")),
+          h("td", null, row.kind === "folder" ? "-" : formatFileTime(row.lastModified)),
           h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
             row.kind === "folder"
               ? [
@@ -908,6 +927,7 @@ window.__ModuleLoader__.load({
       const [stat, setStat] = useState(null);
       const fileRef = useRef(null);
       const seq = useRef(0);
+      const searchTimer = useRef(0);
       useEffect(() => {
         api("meta", {}).then((d) => {
           const mods = Array.isArray(d.modules) ? d.modules : [];
@@ -915,8 +935,10 @@ window.__ModuleLoader__.load({
           if (cos) setRegions(cos.regions);
           if (onSkipConfirm) onSkipConfirm(!!d.skipConfirm);
         }).catch(() => {});
+        return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
       }, []);
       const seedSig = `${payload?.kind || ""}|${args.region || ""}|${(payload?.items || []).map((i) => i.id).join(",")}`;
+      const payloadErrSig = (Array.isArray(payload?.errors) ? payload.errors : []).map((e) => e && e.message).join("；");
       useEffect(() => {
         const hinted = resolveCosRegion(args.region, regions);
         if (hinted) {
@@ -930,6 +952,9 @@ window.__ModuleLoader__.load({
           }
         }
       }, [seedSig, regions]);
+      useEffect(() => {
+        if (payloadErrSig) setListErr(payloadErrSig);
+      }, [payloadErrSig]);
       const fetchBuckets = async (region, nextOffset, q) => {
         const n = ++seq.current;
         setListBusy(true);
@@ -943,6 +968,16 @@ window.__ModuleLoader__.load({
             limit: pageSize,
           });
           if (n !== seq.current) return;
+          const errs = Array.isArray(result.errors) ? result.errors.map((e) => e && e.message).filter(Boolean) : [];
+          if (errs.length) {
+            setListErr(errs.join("；"));
+            setRows(result.items || []);
+            setTotal(Number(result.total) || (result.items || []).length);
+            setHasMore(false);
+            setOffset(Number(result.offset) || nextOffset);
+            setActiveQ(q || "");
+            return;
+          }
           setRows(result.items || []);
           setTotal(Number(result.total) || (result.items || []).length);
           setHasMore(!!result.hasMore);
@@ -951,6 +986,7 @@ window.__ModuleLoader__.load({
         } catch (e) {
           if (n !== seq.current) return;
           setListErr(publicErrorMessage(e));
+          setRows([]);
         } finally {
           if (n === seq.current) setListBusy(false);
         }
@@ -970,11 +1006,20 @@ window.__ModuleLoader__.load({
         setSession(null);
         setOpen(true);
         setHighlight(0);
-        setListErr("");
       };
       const loadFiles = async (item, prefix, marker) => {
+        const append = !!marker;
         setPendingId(item.id);
-        setSession((cur) => ({ item, prefix, marker: marker || "", loading: true, detail: cur && cur.item?.id === item.id ? cur.detail : null }));
+        setSession((cur) => ({
+          item,
+          prefix,
+          marker: marker || "",
+          loading: true,
+          detail: cur && cur.item?.id === item.id ? cur.detail : null,
+          entries: append && cur && cur.item?.id === item.id ? (cur.entries || []) : [],
+          hasMore: append && cur ? cur.hasMore : false,
+          nextMarker: marker || "",
+        }));
         try {
           const detail = await api("detail", {
             moduleId: item.moduleId,
@@ -985,9 +1030,21 @@ window.__ModuleLoader__.load({
             prefix: prefix || "",
             marker: marker || "",
           });
-          setSession({ item, prefix: detail.prefix || prefix || "", loading: false, detail });
+          setSession((cur) => {
+            const same = cur && cur.item?.id === item.id && (cur.prefix || "") === (detail.prefix || prefix || "");
+            const prev = append && same ? (cur.entries || []) : [];
+            return {
+              item,
+              prefix: detail.prefix || prefix || "",
+              loading: false,
+              detail,
+              entries: [...prev, ...(detail.entries || [])],
+              hasMore: !!detail.hasMore,
+              nextMarker: detail.nextMarker || "",
+            };
+          });
         } catch (e) {
-          setSession({ item, prefix: prefix || "", loading: false, detail: null, error: publicErrorMessage(e) });
+          setSession({ item, prefix: prefix || "", loading: false, detail: null, error: publicErrorMessage(e), entries: [], hasMore: false, nextMarker: "" });
         } finally {
           setPendingId("");
         }
@@ -1015,10 +1072,18 @@ window.__ModuleLoader__.load({
           else if (action.id === "object.presign" || action.id === "object.download") {
             const url = result.data && result.data.url;
             if (action.id === "object.download" && url && typeof window !== "undefined") window.open(url, "_blank", "noopener");
-            if (action.id === "object.presign" && url && navigator.clipboard) {
-              await navigator.clipboard.writeText(url);
-              setStat({ copied: true, expiresSec: result.data.expiresSec });
-            } else if (action.id === "object.presign") setStat({ url, expiresSec: result.data?.expiresSec });
+            if (action.id === "object.presign" && url) {
+              let copied = false;
+              try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                  await navigator.clipboard.writeText(url);
+                  copied = true;
+                }
+              } catch { copied = false; }
+              setStat(copied
+                ? { copied: true, expiresSec: result.data.expiresSec }
+                : { url, expiresSec: result.data?.expiresSec, copied: false });
+            }
           } else if (session?.item) await loadFiles(session.item, session.prefix || "");
           else if (selected) await fetchBuckets(selected, 0, activeQ);
           return result;
@@ -1048,14 +1113,13 @@ window.__ModuleLoader__.load({
       const extra = hasMore && offset + rows.length >= counted ? 1 : 0;
       const pageCount = Math.max(pages, Math.floor(offset / pageSize) + 1 + extra);
       const page = Math.floor(offset / pageSize) + 1;
-      const fileEntries = (session?.detail?.entries || []).filter((row) => {
+      const fileEntries = (session?.entries || session?.detail?.entries || []).filter((row) => {
         const q = String(draftQ || "").trim().toLowerCase();
-        if (!q || session) {
-          if (session && q) return String(row.name || "").toLowerCase().includes(q);
-        }
+        if (session && q) return String(row.name || "").toLowerCase().includes(q);
         return true;
       });
       const crumbs = prefixCrumbs(session?.prefix || session?.detail?.prefix || "");
+      const showFiles = !!(session && (session.detail || (session.entries || []).length) && (!session.loading || (session.entries || []).length));
       return [
         session ? h("div", { key: "crumb", className: "ci-crumb" },
           h("button", { type: "button", className: "ci-back", onClick: () => { setSession(null); setDraftQ(""); setErr(""); } }, "返回"),
@@ -1133,8 +1197,12 @@ window.__ModuleLoader__.load({
               placeholder: session ? "搜索文件名" : "请输入存储桶名称",
               value: draftQ,
               onChange: (e) => {
-                setDraftQ(e.target.value);
-                if (!session && selected) fetchBuckets(selected, 0, e.target.value);
+                const value = e.target.value;
+                setDraftQ(value);
+                if (!session && selected) {
+                  if (searchTimer.current) clearTimeout(searchTimer.current);
+                  searchTimer.current = setTimeout(() => fetchBuckets(selected, 0, value), 300);
+                }
               },
             }),
           ),
@@ -1145,10 +1213,10 @@ window.__ModuleLoader__.load({
           }, "刷新") : null,
         ),
         err ? h("div", { key: "err", className: "ci-err" }, err) : null,
-        listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
-        !session && !selected ? h("div", { key: "need-region", className: "ci-empty" }, "请输入并选择地域，再查看该地域下的存储桶。") : null,
+        listErr ? h("div", { key: "lerr", className: "ci-err", id: "ci-cos-cred-err" }, listErr) : null,
+        !session && !selected && !listErr ? h("div", { key: "need-region", className: "ci-empty" }, "请输入并选择地域，再查看该地域下的存储桶。") : null,
         !session && selected && listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : null,
-        !session && selected && !listBusy ? h(CosBucketTable, {
+        !session && selected && !listBusy && !(listErr && !rows.length) ? h(CosBucketTable, {
           key: "buckets",
           items: rows,
           pendingId,
@@ -1159,7 +1227,7 @@ window.__ModuleLoader__.load({
             `确定删除空存储桶 ${item.title}？非空桶会失败。`,
           ),
         }) : null,
-        !session && selected ? h(Pager, {
+        !session && selected && !(listErr && !rows.length) ? h(Pager, {
           key: "pager",
           total: counted,
           page,
@@ -1167,9 +1235,10 @@ window.__ModuleLoader__.load({
           busy: listBusy,
           onPage: (next) => fetchBuckets(selected, (next - 1) * pageSize, activeQ),
         }) : null,
-        session && session.loading ? h("div", { key: "fload", className: "ci-load" }, h(Spin), "加载文件列表…") : null,
+        session && session.loading && !(session.entries || []).length ? h("div", { key: "fload", className: "ci-load" }, h(Spin), "加载文件列表…") : null,
         session && session.error && !session.detail ? h("div", { key: "ferr", className: "ci-err" }, session.error) : null,
-        session && !session.loading && session.detail ? h(CosFileTable, {
+        session && draftQ && session.hasMore ? h("p", { key: "search-hint", className: "ci-hint" }, "仅搜索已加载的文件，可先加载更多") : null,
+        showFiles ? h(CosFileTable, {
           key: "files",
           entries: fileEntries,
           pendingKey,
@@ -1197,6 +1266,18 @@ window.__ModuleLoader__.load({
             );
           },
         }) : null,
+        showFiles && session.hasMore ? h("div", { key: "file-more", className: "ci-footbar", id: "ci-cos-file-pager" },
+          h("div", { className: "ci-page" },
+            h("span", null, `已加载 ${(session.entries || []).length} 条，一层过多可翻页`),
+            h("button", {
+              id: "ci-cos-load-more",
+              type: "button",
+              className: "ci-page-btn",
+              disabled: !!session.loading || busy,
+              onClick: () => loadFiles(session.item, session.prefix || "", session.nextMarker),
+            }, "加载更多"),
+          ),
+        ) : null,
         form ? h(RecordForm, {
           key: "form",
           action: {
@@ -1242,9 +1323,32 @@ window.__ModuleLoader__.load({
           className: "ci-modal-mask",
           onClick: (e) => { if (e.target === e.currentTarget) setStat(null); },
         }, h("div", { className: "ci-modal", role: "dialog" },
-          h("h3", null, stat.copied ? "临时链接" : "详情"),
+          h("h3", null, stat.copied ? "临时链接" : (stat.url ? "临时链接" : "详情")),
           stat.copied ? h("p", null, `已复制到剪贴板，约 ${Math.round((stat.expiresSec || 900) / 60)} 分钟有效。`) : null,
-          stat.url && !stat.copied ? h("p", null, "链接已生成，请尽快使用，约 15 分钟有效。") : null,
+          stat.url && !stat.copied ? [
+            h("p", { key: "hint" }, "剪贴板不可用，请手动复制。约 15 分钟有效。"),
+            h("input", {
+              key: "url",
+              id: "ci-cos-presign-url",
+              className: "ci-search",
+              readOnly: true,
+              value: stat.url,
+              onFocus: (e) => e.target.select(),
+            }),
+            h("button", {
+              key: "copy",
+              type: "button",
+              className: "ci-mini",
+              onClick: async () => {
+                try {
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(stat.url);
+                    setStat({ copied: true, expiresSec: stat.expiresSec });
+                  }
+                } catch { /* keep input visible */ }
+              },
+            }, "复制"),
+          ] : null,
           !stat.copied && !stat.url ? ["名称", "大小", "存储类型", "修改时间", "对象地址"].map((label) => {
             const map = { 名称: stat.name, 大小: stat.sizeLabel, 存储类型: stat.storageClass, 修改时间: stat.lastModified, 对象地址: stat.url || stat.address };
             return h("p", { key: label }, `${label}：${map[label] || "-"}`);

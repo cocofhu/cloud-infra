@@ -32,6 +32,7 @@ export const COS_SAFE_ERRORS = [
   '删除文件夹未列尽全部对象，请重试',
   '对象已存在',
   '缺少文件内容',
+  '已复制到新名称，但源对象删除失败，请手动删除源文件',
 ]
 
 const ACTIONS: ResourceAction[] = [
@@ -122,6 +123,7 @@ export function parentPrefix(prefix: string): string {
 }
 
 export function createCosModule(clientFor: (ctx: ModuleContext) => CosClient = defaultClient): ResourceModule {
+  const aclCache = new Map<string, { label: string; exp: number }>()
   const module: ResourceModule = {
     id: 'tencent.cos',
     provider: 'tencent',
@@ -143,10 +145,19 @@ export function createCosModule(clientFor: (ctx: ModuleContext) => CosClient = d
         ? buckets.filter((item) => item.name.toLowerCase().includes(needle))
         : buckets
       const sliced = filtered.slice(ctx.offset, ctx.offset + ctx.limit)
-      const items = await Promise.all(sliced.map(async (item) => {
-        const acl = await client.getBucketAclLabel(item.name, item.region || region.id, opts(ctx)).catch(() => '-')
-        return mapBucketItem({ ...item, region: item.region || region.id }, module.id, acl)
-      }))
+      const items = await mapPool(sliced, 4, async (item) => {
+        const bucketRegion = item.region || region.id
+        const cacheKey = `${bucketRegion}:${item.name}`
+        const hit = aclCache.get(cacheKey)
+        let acl = '-'
+        if (hit && hit.exp > Date.now()) {
+          acl = hit.label
+        } else {
+          acl = await client.getBucketAclLabel(item.name, bucketRegion, opts(ctx)).catch(() => '-')
+          aclCache.set(cacheKey, { label: acl, exp: Date.now() + 60_000 })
+        }
+        return mapBucketItem({ ...item, region: bucketRegion }, module.id, acl)
+      })
       return {
         items,
         total: filtered.length,
@@ -171,7 +182,10 @@ export function createCosModule(clientFor: (ctx: ModuleContext) => CosClient = d
           { label: '地域', value: regionLabel(region) },
           { label: '当前目录', value: prefix || '/' },
         ],
-        entries: page.entries,
+        entries: page.entries.map((entry) => ({
+          ...entry,
+          lastModified: entry.lastModified ? formatTime(entry.lastModified) : entry.lastModified,
+        })),
         prefix,
         region,
         bucket,
@@ -184,6 +198,9 @@ export function createCosModule(clientFor: (ctx: ModuleContext) => CosClient = d
         return await runAction(actionId, payload, ctx, clientFor(ctx))
       } catch (err) {
         if (err instanceof CosApiError && err.message && COS_SAFE_ERRORS.includes(err.message)) {
+          return { ok: false, error: err.message }
+        }
+        if (err instanceof CosApiError && /未删尽/.test(err.message)) {
           return { ok: false, error: err.message }
         }
         const code = err instanceof CosApiError ? err.code : ''
@@ -283,7 +300,11 @@ async function runAction(
     const exists = await client.headObject(bucket, region, dest, opts(ctx)).then(() => true).catch(() => false)
     if (exists) return { ok: false, error: '对象已存在' }
     await client.copyObject(bucket, region, key, dest, opts(ctx))
-    await client.deleteObject(bucket, region, key, opts(ctx))
+    try {
+      await client.deleteObject(bucket, region, key, opts(ctx))
+    } catch {
+      throw new CosApiError('已复制到新名称，但源对象删除失败，请手动删除源文件')
+    }
     return { ok: true }
   }
 
@@ -302,8 +323,17 @@ async function runAction(
       await client.deleteObject(bucket, region, key, opts(ctx)).catch(() => undefined)
       return { ok: true }
     }
-    for (const item of keys) {
-      await client.deleteObject(bucket, region, item, opts(ctx))
+    let deleted = 0
+    let failed = 0
+    for (let i = 0; i < keys.length; i += 1000) {
+      const chunk = keys.slice(i, i + 1000)
+      const batch = await client.deleteObjects(bucket, region, chunk, opts(ctx))
+      deleted += batch.deleted.length
+      failed += batch.errors.length
+    }
+    const remaining = Math.max(failed, keys.length - deleted)
+    if (remaining > 0) {
+      return { ok: false, error: `已删除 ${deleted} 个对象，剩余 ${remaining} 个未删尽，请重试` }
     }
     return { ok: true }
   }
@@ -359,6 +389,21 @@ function decodeUpload(payload: Record<string, unknown>): Buffer {
   const buf = Buffer.from(raw, 'base64')
   if (!buf.length) throw new CosApiError('缺少文件内容')
   return buf
+}
+
+async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  if (!items.length) return []
+  const out: R[] = new Array(items.length)
+  let next = 0
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next
+      next += 1
+      out[index] = await fn(items[index])
+    }
+  })
+  await Promise.all(workers)
+  return out
 }
 
 export const tencentCosModule = createCosModule()
