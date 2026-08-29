@@ -536,7 +536,7 @@ async function listRegionInstances(
 ): Promise<CdbInstance[]> {
   const pageSize = 100
   const collected: CdbInstance[] = []
-  const q = ctx.query.trim()
+  const q = ctx.clientLocalFilter === false ? ctx.query.trim() : ''
   let offset = 0
   let total = Number.POSITIVE_INFINITY
   while (offset < total) {
@@ -552,7 +552,7 @@ async function listRegionInstances(
     if (batch.length < pageSize) break
     if (looksLikeInstanceId(q) || looksLikeIp(q)) break
   }
-  return collected.filter((item) => instanceMatchesQuery(item, ctx.query))
+  return collected.filter((item) => (ctx.clientLocalFilter === false ? instanceMatchesQuery(item, ctx.query) : true))
 }
 
 function logRows(items: unknown[]): Array<{ time: string; sql: string; user: string; extra: string }> {

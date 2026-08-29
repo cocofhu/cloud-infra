@@ -53,6 +53,9 @@ window.__ModuleLoader__.load({
 .ci-page-btn.active{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border-color:transparent}
 .ci-page-btn:disabled{opacity:.4;cursor:default}
 .ci-hint{color:var(--dsw-alias-label-caption);font-size:12px;line-height:18px;margin:0 0 10px}
+.ci-info{display:flex;align-items:flex-start;gap:8px;margin:8px 14px;padding:8px 10px;border-radius:8px;background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label);font-size:12px;line-height:18px}
+.ci-info span{flex:1;min-width:0;word-break:break-all}
+.ci-info-x{flex:none;width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font:inherit;line-height:1;padding:0}
 .ci-badge{display:inline-block;margin-right:6px;padding:1px 6px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);font-size:10px;color:var(--dsw-alias-label-secondary)}
 .ci-st{font-size:11px;padding:1px 6px;border-radius:999px}
 .ci-st.enable{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
@@ -766,6 +769,71 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       visit(props, 0);
       return found[0] || null;
+    }
+
+    // —— 资源直达 / 未命中回落提示（共享 util，6 类视图复用）——
+    const DIRECT_KINDS = new Set(["cos", "cert", "cdb", "cluster", "cvm", "lighthouse", "image"]);
+
+    /** payload 是否属于需要直达检测的资源类型（domain/registrar/cls 等不在范围内）。 */
+    function directHitEnabled(kind) {
+      return DIRECT_KINDS.has(String(kind || ""));
+    }
+
+    /** payload 带了直达 id 时，从 items 里找到对应条目（找不到返回 null，静默跳过）。 */
+    function directHitItem(payload, items) {
+      const id = String((payload && payload.directItemId) || "");
+      if (!id) return null;
+      return (Array.isArray(items) ? items : []).find((item) => item && item.id === id) || null;
+    }
+
+    const DIRECT_LABELS = {
+      cos: "存储桶",
+      cert: "证书",
+      cdb: "数据库实例",
+      cluster: "集群",
+      cvm: "实例",
+      lighthouse: "实例",
+      image: "实例/仓库",
+    };
+
+    function directResourceLabel(kind) {
+      return DIRECT_LABELS[String(kind || "")] || "资源";
+    }
+
+    function regionLabelOf(region) {
+      if (region && typeof region === "object") {
+        return region.label ? `${region.label}（${region.id || ""}）` : String(region.id || "");
+      }
+      return String(region || "").trim();
+    }
+
+    /**
+     * 挂载 + items 更新时检查 payload.directItemId：命中且 items 里能找到该条目时
+     * 调用该视图现成的 onOpenDetail(item)；找不到 / 已触发过则静默跳过。
+     * 返回是否触发了直达。
+     */
+    function maybeAutoOpenDetail(payload, items, onOpenDetail) {
+      const item = directHitItem(payload, items);
+      if (!item || typeof onOpenDetail !== "function") return false;
+      onOpenDetail(item);
+      return true;
+    }
+
+    /** 未命中回落提示条文案：items 非空时承诺「以下是该地域的全部 X」，为空时改成「没有可列出的 X」，避免文案与空表格矛盾。 */
+    function notFoundText(label, query, region, itemCount) {
+      const where = regionLabelOf(region) || "当前地域";
+      const head = `未找到与您输入完全匹配的${label}「${query}」（${where}）。`;
+      return itemCount > 0
+        ? `${head}以下是该地域的全部${label}，请在列表中选择。`
+        : `${head}该地域当前没有可列出的${label}，可切换地域或换个关键字重试。`;
+    }
+
+    /** 未命中回落提示条：可关闭（用户关闭后本次挂载内不再重现）。 */
+    function NotFoundNotice({ text, onClose }) {
+      return h("div", { className: "ci-info" },
+        h("span", null, text),
+        h("button", { type: "button", className: "ci-info-x", onClick: onClose, "aria-label": "关闭提示" }, "×"),
+      );
     }
 
     function ChevronDown({ className }) {
@@ -2319,10 +2387,12 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState("");
       const [stat, setStat] = useState(null);
+      const [missDismissed, setMissDismissed] = useState(false);
       const fileRef = useRef(null);
       const seq = useRef(0);
       const fileSeq = useRef(0);
       const searchTimer = useRef(0);
+      const directTried = useRef("");
       useEffect(() => {
         api("meta", {}).then((d) => {
           const mods = Array.isArray(d.modules) ? d.modules : [];
@@ -2368,6 +2438,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             query: q || "",
             offset: nextOffset,
             limit: pageSize,
+            clientLocalFilter: false,
           });
           if (n !== seq.current) return;
           const errs = Array.isArray(result.errors) ? result.errors.map((e) => e && e.message).filter(Boolean) : [];
@@ -2402,6 +2473,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       }, [selected, regions]);
       const pickRegion = (region) => {
         fileSeq.current += 1;
+        directTried.current = "";
+        setMissDismissed(false);
         setSelected(region);
         setInput(displayRegion(region));
         setSession(null);
@@ -2409,6 +2482,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       const onRegionInput = (value) => {
         fileSeq.current += 1;
+        directTried.current = "";
+        setMissDismissed(false);
         setInput(value);
         setRows([]);
         setTotal(0);
@@ -2465,6 +2540,17 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           if (n === fileSeq.current) setPendingId("");
         }
       };
+      // 资源直达：payload 带 directItemId 且当前桶列表里能找到该桶时，自动进入它的文件列表（只触发一次）。
+      // 防重 key 带 region：同一资源名换地域重查时能再次直达，不依赖人工 reset。
+      useEffect(() => {
+        const directId = String(payload?.directItemId || "");
+        if (!directId) return;
+        const key = `${payload?.region || ""}|${directId}`;
+        if (directTried.current === key) return;
+        directTried.current = key;
+        maybeAutoOpenDetail(payload, rows, (item) => { setDraftQ(""); loadFiles(item, ""); });
+      });
+      const missQuery = payload?.notFoundQuery && !missDismissed ? String(payload.notFoundQuery) : "";
       const run = async (action, extra) => {
         if (!selected && action.id !== "bucket.create") throw new Error("缺少合法地域，请先选择地域");
         setBusy(true);
@@ -2626,6 +2712,11 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         ),
         err ? h("div", { key: "err", className: "ci-err" }, err) : null,
         listErr ? h("div", { key: "lerr", className: "ci-err", id: "ci-cos-cred-err" }, listErr) : null,
+        !session && missQuery ? h(NotFoundNotice, {
+          key: "miss",
+          text: notFoundText("存储桶", missQuery, selected, rows.length),
+          onClose: () => setMissDismissed(true),
+        }) : null,
         !session && !selected && !listErr ? h("div", { key: "need-region", className: "ci-empty" }, "请输入并选择地域，再查看该地域下的存储桶。") : null,
         !session && selected && listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : null,
         !session && selected && !listBusy && !(listErr && !rows.length) ? h(CosBucketTable, {
@@ -4900,7 +4991,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState("");
       const [confirm, setConfirm] = useState(null);
+      const [missDismissed, setMissDismissed] = useState(false);
       const seq = useRef(0);
+      const directTried = useRef("");
       const fetchList = async (nextOffset, q, nextRegion, nextFilters) => {
         const usedRegion = nextRegion != null ? nextRegion : region;
         if (!usedRegion) {
@@ -4921,6 +5014,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             filters: nextFilters || filters,
             offset: nextOffset,
             limit: pageSize,
+            clientLocalFilter: false,
           });
           if (n !== seq.current) return;
           setRows(result.items || []);
@@ -4951,6 +5045,19 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           setPendingId("");
         }
       };
+      // 资源直达：payload 带 directItemId 且集群列表里能找到该集群时，自动打开集群配置（只触发一次）。
+      const directItem = directHitEnabled("cluster") && payload
+        ? (rows.find((row) => row && row.id === String(payload.directItemId || "")) || null)
+        : null;
+      useEffect(() => {
+        if (!directItem) return;
+        const directId = directItem.id;
+        const key = `${payload?.region || ""}|${directId}`;
+        if (directTried.current === key) return;
+        directTried.current = key;
+        maybeAutoOpenDetail(payload, rows, (item) => openItem(item));
+      });
+      const missQuery = payload?.notFoundQuery && !missDismissed ? String(payload.notFoundQuery) : "";
       const reload = async () => {
         if (!session?.item) return;
         const detail = await api("detail", { moduleId: session.item.moduleId, id: session.item.id, title: session.item.title, region });
@@ -5077,6 +5184,11 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               h("input", { placeholder: "标签", value: filters.tag, onChange: (e) => setFilters({ ...filters, tag: e.target.value }), onBlur: () => fetchList(0, draftQ, region, filters) }),
             ),
             listErr || err ? h("div", { key: "lerr", className: "ci-err" }, listErr || err) : null,
+            missQuery ? h(NotFoundNotice, {
+              key: "miss",
+              text: notFoundText("集群", missQuery, { id: region }, rows.length),
+              onClose: () => setMissDismissed(true),
+            }) : null,
             listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ClusterListTable, {
               key: "table",
               items: rows,
@@ -5693,9 +5805,11 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [confirm, setConfirm] = useState(null);
       const [actBusy, setActBusy] = useState(false);
       const [truncated, setTruncated] = useState(!!payload?.hasMore);
+      const [missDismissed, setMissDismissed] = useState(false);
       const seq = useRef(0);
       const debounce = useRef(0);
       const copyTimer = useRef(0);
+      const directTried = useRef("");
       const current = (Array.isArray(instances) ? instances : []).find((item) => item && item.id === instanceId) || instances[0];
 
       const toolSig = `${payload?.region || ""}|${(fromTool || []).map((i) => i.id).join(",")}|${(payload?.errors || []).length}|${args.kind || payload?.resourceKind || ""}`;
@@ -5781,8 +5895,24 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         }
       };
 
+      // 资源直达：payload 带 directItemId 且实例列表里能找到该实例时，自动进入它的镜像仓库面板（只触发一次）。
+      const directItem = directHitEnabled("image") && payload
+        ? ((instances || []).find((row) => row && row.id === String(payload.directItemId || "")) || null)
+        : null;
+      useEffect(() => {
+        if (!directItem) return;
+        const directId = directItem.id;
+        const key = `${payload?.region || ""}|${directId}`;
+        if (directTried.current === key) return;
+        directTried.current = key;
+        maybeAutoOpenDetail(payload, instances, (item) => selectInstance(item, "repo"));
+      });
+      const missQuery = payload?.notFoundQuery && !missDismissed ? String(payload.notFoundQuery) : "";
+
       const changeRegion = (next) => {
         setRegion(next);
+        directTried.current = "";
+        setMissDismissed(false);
         setView("inst");
         setRepo(null);
         setNsFilter("");
@@ -6062,6 +6192,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("button", { type: "button", className: "ci-tab" + (view === "repo" || view === "detail" ? " on" : ""), onClick: () => changeView("repo") }, "镜像仓库"),
           ),
           err ? h("div", { className: "ci-err", style: { fontSize: 12, lineHeight: "18px", fontWeight: 400 } }, err) : null,
+          view === "inst" && missQuery ? h(NotFoundNotice, {
+            text: notFoundText(directResourceLabel("image"), missQuery, { id: region }, (instances || []).length),
+            onClose: () => setMissDismissed(true),
+          }) : null,
           h("div", { className: "ci-image-body" }, body()),
         ),
         h(ConfirmDialog, {
@@ -6521,10 +6655,12 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [notice, setNotice] = useState("");
       const [listConfirm, setListConfirm] = useState(null);
       const [listBusyAct, setListBusyAct] = useState(false);
+      const [missDismissed, setMissDismissed] = useState(false);
       const seq = useRef(0);
       const detailSeq = useRef(0);
       const debounce = useRef(0);
       const groupRef = useRef("");
+      const directTried = useRef("");
       const isCert = kind === "cert";
       const isDbbrain = kind === "dbbrain";
       const [dbProduct, setDbProduct] = useState((fromTool && fromTool[0] && fromTool[0].product) || "mysql");
@@ -6568,6 +6704,24 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         else if (kind === "cvm" || kind === "auto") setKindTab("cvm");
         setListErr("");
       }, [toolSig]);
+      // 资源直达：payload 带 directItemId 且 rows 里能找到对应条目时，自动调用该视图现成的「打开详情」（只触发一次）。
+      // 覆盖 cert（证书详情）、cdb（实例管理）、cvm/lighthouse（实例详情）共用视图。
+      const directItem = directHitEnabled(kind) && payload
+        ? (rows.find((row) => row && row.id === String(payload.directItemId || "")) || null)
+        : null;
+      useEffect(() => {
+        if (!directItem) return;
+        const directId = directItem.id;
+        const key = `${payload?.region || ""}|${directId}`;
+        if (directTried.current === key) return;
+        directTried.current = key;
+        maybeAutoOpenDetail(payload, rows, (item) => openItem(item));
+      });
+      const missQuery = directHitEnabled(kind) && payload?.notFoundQuery && !missDismissed ? String(payload.notFoundQuery) : "";
+      const missNode = missQuery ? h(NotFoundNotice, {
+        text: notFoundText(directResourceLabel(kind), missQuery, { id: payload?.region }, rows.length),
+        onClose: () => setMissDismissed(true),
+      }) : null;
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
       const fetchList = async (nextOffset, q, regionOverride, tab, filterOverride) => {
         const n = ++seq.current;
@@ -6588,6 +6742,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             limit: pageSize,
             group: isCert ? (groupRef.current || group || "") : "",
             region: useRegion || undefined,
+            clientLocalFilter: false,
             filters: isDbbrain ? {
               product: (filterOverride && filterOverride.product) || dbProduct,
               region: (filterOverride && filterOverride.region != null) ? filterOverride.region : dbRegion,
@@ -7246,6 +7401,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               }, tab.label)),
             ) : null,
             listErr || payloadErr ? h("div", { key: "lerr", className: "ci-err" }, listErr || payloadErr) : null,
+            isCert ? missNode : null,
             listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : (
               isCert
                 ? h(CertTable, {
@@ -7502,6 +7658,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           ),
         ),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
+        missNode,
         listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(CdbTable, {
           key: "cdb-table",
           items: rows,
@@ -7569,6 +7726,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           }),
         ),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
+        missNode,
         errors.length ? h("div", { key: "perr", className: "ci-err" }, errors.map((e) => e.message).join("；")) : null,
         kindTab === "cvm" ? h(CvmConsole, {
           key: "cvm",

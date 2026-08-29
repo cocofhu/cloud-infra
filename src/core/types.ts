@@ -257,6 +257,10 @@ export interface QueryResult {
   context?: string
   fields?: string[]
   instanceId?: string
+  /** query 与某条卡片的 title / id 尾部完全相等（不区分大小写）时，该卡片的 id。 */
+  directItemId?: string
+  /** query 非空但未精确命中任何条目时的原始 query（回落到全量列表时由客户端提示）。 */
+  notFoundQuery?: string
 }
 
 export interface ModuleContext {
@@ -266,6 +270,12 @@ export interface ModuleContext {
   limit: number
   timeoutMs: number
   signal?: AbortSignal
+  /**
+   * query 关键字在哪里过滤：
+   * - undefined / true：模块不按 query 过滤，返回全量集合；queryResources 层负责直达判定与未命中回落；
+   * - false（显式）：模块按既有逻辑自行过滤（远端 API 参数或本地过滤），用于兼容既有调用方与测试。
+   */
+  clientLocalFilter?: boolean
   id?: string
   title?: string
   group?: string

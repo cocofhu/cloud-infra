@@ -166,7 +166,9 @@ export function createLighthouseModule(call: TencentProductCall = lighthouseCall
       const scoped = pickRegions(regions, ctx.region)
       const { items, errors } = await listAcrossRegions(scoped, async (region) => {
         const mapped = await loadLhRegion(call, ctx, module.id, region)
-        return mapped.filter((card) => matchLighthouseQuery(card, ctx.query) && matchRegion(card, ctx.region))
+        return ctx.clientLocalFilter === false
+          ? mapped.filter((card) => matchLighthouseQuery(card, ctx.query) && matchRegion(card, ctx.region))
+          : mapped.filter((card) => matchRegion(card, ctx.region))
       }, module.id)
       // 单地域超过拉取上限被截断时,明确提示而不是让用户以为「只有这些」
       if (listAllPagesTruncated.current) {

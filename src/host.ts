@@ -116,6 +116,7 @@ export function apply(ctx: Context, config: Config): void {
           'Searching logs: kind=cls, set topicId or a unique topic name in query, queryString (CQL; empty = all), range (15m/1h/4h/1d/today/yesterday, default 1h) or from/to ms. After the card appears, one or two short sentences.',
           'When the user says 查 COS / 对象存储 / 存储桶 without naming a region: still call kind=cos and omit region. CosConsoleView defaults #ci-cos-region to 广州 (ap-guangzhou), lists that region\'s buckets, and stays selectable. Never use Ask question to pick a COS region. Never invent region ids or pass Chinese names / free text. Only pass region= an official id (e.g. ap-guangzhou) if the user already named one.',
           'kind=registrar for 注册/能不能注册; kind=my-domain for 我的域名; kind=domain for DNS 解析; kind=cert for SSL 证书. For 镜像/TCR/容器镜像/镜像仓库 pass kind=image.',
+          'When the user names a specific resource (bucket name, certificate ID, instance ID such as ins-/lhins-/cdb-, cluster name/ID, or registry/repo name), pass that name verbatim as query to cloud_infra_query — the card auto-opens the exact match (direct hit) or falls back to the region list with a notice. Do not list everything first and ask the user to pick.',
           'The result is a chat tool card. Users search and 立即加购 inside the card. Do not send them to settings or a standalone page.',
           'For 服务器 / 实例 / CVM / 轻量 (e.g. 「我有哪些服务器」), make ONE call with kind=auto — do NOT split into two calls (kind=cvm + kind=lighthouse); the card always shows 云服务器 | 轻量应用服务器 tabs and the user can switch between them inside the same card. Do not query domains when the user asks for 服务器.',
           'For TKE/集群, use kind=cluster. Default region ap-guangzhou when unspecified; do not ask which region.',
@@ -221,6 +222,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         view: method === 'search' ? 'search' : String(body.view || ''),
         title: String(body.title || ''),
         instanceId: body.instanceId != null ? String(body.instanceId) : undefined,
+        clientLocalFilter: body.clientLocalFilter != null ? Boolean(body.clientLocalFilter) : undefined,
       }, cfg)
       return sendJson(res, 200, { ok: true, ...result })
     }

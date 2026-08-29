@@ -499,7 +499,7 @@ export function createCertModule(call: SslCall = sslCall, dnsCall: DnsCall = dns
     async list(ctx) {
       const statuses = GROUP_STATUSES[ctx.group || '']
       const data = await call<{ Certificates?: CertificatesItem[]; TotalCount?: number }>('DescribeCertificates', {
-        SearchKey: ctx.query || undefined,
+        SearchKey: ctx.clientLocalFilter === false ? (ctx.query || undefined) : undefined,
         Offset: ctx.offset,
         Limit: ctx.limit,
         ...(statuses ? { CertificateStatus: statuses } : {}),

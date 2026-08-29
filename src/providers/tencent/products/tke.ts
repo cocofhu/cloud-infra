@@ -268,7 +268,7 @@ export function nodePoolTypeLabel(type?: string): string {
 
 export function buildClusterFilters(ctx: ModuleContext): Array<{ Name: string; Values: string[] }> {
   const filters: Array<{ Name: string; Values: string[] }> = []
-  const keyword = String(ctx.query || ctx.filters?.keyword || ctx.filters?.name || '').trim()
+  const keyword = ctx.clientLocalFilter === false ? String(ctx.query || '').trim() : String(ctx.filters?.keyword || ctx.filters?.name || '').trim()
   if (keyword) filters.push({ Name: 'ClusterName', Values: [keyword] })
   const type = String(ctx.filters?.clusterType || ctx.filters?.type || '').trim()
   if (type) filters.push({ Name: 'ClusterType', Values: [normalizeClusterType(type)] })
@@ -1355,7 +1355,7 @@ async function loadOps(call: typeof tkeCall, ctx: ModuleContext, region: string,
 }
 
 function applyClientFilters(items: ResourceCard[], ctx: ModuleContext): ResourceCard[] {
-  const keyword = String(ctx.query || ctx.filters?.keyword || ctx.filters?.name || '').trim().toLowerCase()
+  const keyword = ctx.clientLocalFilter === false ? String(ctx.query || '').trim().toLowerCase() : String(ctx.filters?.keyword || ctx.filters?.name || '').trim().toLowerCase()
   const vpc = String(ctx.filters?.vpcId || ctx.filters?.vpc || '').trim()
   const tag = String(ctx.filters?.tag || '').trim()
   const type = String(ctx.filters?.clusterType || ctx.filters?.type || '').trim()

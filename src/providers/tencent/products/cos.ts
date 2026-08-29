@@ -140,7 +140,7 @@ export function createCosModule(clientFor: (ctx: ModuleContext) => CosClient = d
       const client = clientFor(ctx)
       const all = await client.listBuckets(region.id, opts(ctx))
       const buckets = all.filter((item) => (item.region || region.id) === region.id)
-      const needle = String(ctx.query || '').trim().toLowerCase()
+      const needle = ctx.clientLocalFilter === false ? String(ctx.query || '').trim().toLowerCase() : ''
       const filtered = needle
         ? buckets.filter((item) => item.name.toLowerCase().includes(needle))
         : buckets
