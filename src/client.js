@@ -155,6 +155,33 @@ window.__ModuleLoader__.load({
 .ci-tiny{font-size:12px;color:var(--dsw-alias-label-tertiary)}
 .ci-table-scroll{overflow-x:auto;overflow-y:hidden;width:100%;max-width:100%;min-width:0;-webkit-overflow-scrolling:touch}
 .ci-foot-note{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;color:var(--dsw-alias-label-tertiary);font-size:12px;border-top:1px solid var(--dsw-alias-border-l1);flex-wrap:wrap}
+.ci-cls{--cls-blue:#0052d9;--cls-blue-h:#266fe8;--cls-line:#e7e7e7;--cls-head:#f3f3f3;--cls-sub:#888}
+.ci-cls .ci-panel{border-color:var(--cls-line)}
+.ci-cls .ci-name,.ci-cls .ci-link{color:var(--cls-blue)}
+.ci-cls .ci-name:hover,.ci-cls .ci-link:hover{color:var(--cls-blue-h)}
+.ci-cls .ci-table th{background:var(--cls-head);color:#111;font-weight:600;border-top:0;border-bottom:1px solid var(--cls-line)}
+.ci-cls .ci-table td{border-top:1px solid var(--cls-line);padding:10px 12px}
+.ci-cls .ci-mini.primary{background:var(--cls-blue);color:#fff;border-radius:3px;height:32px;padding:0 16px;font-size:14px;border:0}
+.ci-cls .ci-mini.primary:hover:not(:disabled){background:var(--cls-blue-h)}
+.ci-cls .ci-back{border-radius:3px;border-color:var(--cls-line);background:#fff;height:32px}
+.ci-cls .ci-region,.ci-cls .ci-search{border-radius:3px;border-color:var(--cls-line);background:#fff}
+.ci-cls .ci-cql{border-radius:3px;border-color:var(--cls-line);background:#fff;min-height:64px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.ci-cls-mode{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
+.ci-cls-tag{height:22px;padding:0 8px;border:1px solid var(--cls-line);border-radius:3px;font-size:12px;line-height:20px;color:#111;background:#fff}
+.ci-cls-tag.on{border-color:var(--cls-blue);color:var(--cls-blue);background:#f2f3ff}
+.ci-cls-hint{font-size:12px;color:var(--cls-sub)}
+.ci-cls-filter{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--cls-sub);flex:none}
+.ci-cls-dist{padding:8px 12px 6px;border-bottom:1px solid var(--cls-line);background:#fafafa}
+.ci-cls-dist-h{display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;font-size:12px;color:var(--cls-sub)}
+.ci-cls .ci-hist{height:44px;padding:0;background:transparent;border:0}
+.ci-cls .ci-hist i{background:var(--cls-blue);opacity:.55;min-height:2px}
+.ci-cls-tabs{display:flex;align-items:flex-end;gap:4px;padding:0 12px;border-bottom:1px solid var(--cls-line);background:#fff}
+.ci-cls-tab{height:36px;padding:0 14px;border:0;background:none;font:inherit;font-size:14px;color:#666}
+.ci-cls-tab.on{color:var(--cls-blue);font-weight:600;box-shadow:inset 0 -2px 0 var(--cls-blue)}
+.ci-cls .ci-split{grid-template-columns:minmax(120px,160px) minmax(0,1fr);min-height:200px}
+.ci-cls .ci-fields{background:#fafafa}
+.ci-cls .ci-log-hd span:first-child{color:var(--cls-blue);font-variant-numeric:tabular-nums}
+.ci-cls .ci-page-btn.active{background:var(--cls-blue);color:#fff;border-color:var(--cls-blue)}
 @media(max-width:640px){.ci-query,.ci-split{grid-template-columns:1fr}.ci-fields{border-right:0;border-bottom:1px solid var(--dsw-alias-border-l1)}}
 `;
 
@@ -942,7 +969,7 @@ window.__ModuleLoader__.load({
             queryString: nextCql,
             range: nextRange,
             context: used.append ? logContext : "",
-            limit: pageSize,
+            limit: used.append ? pageSize : 100,
           };
           if (nextRange === "custom") {
             if (customFrom) body.from = new Date(customFrom).getTime();
@@ -1005,7 +1032,7 @@ window.__ModuleLoader__.load({
       const regionName = clsRegionName(regions, region);
       if (view === "search" && topic) {
         const hasLogs = logs.length > 0;
-        return h("div", { className: "ci-root ci-tool" }, h("div", { className: "ci-panel" },
+        return h("div", { className: "ci-root ci-tool ci-cls" }, h("div", { className: "ci-panel" },
           h("div", { className: "ci-search-bar" },
             h("div", { className: "ci-search-bar-main" },
               h("button", { type: "button", className: "ci-back", onClick: () => { setView("list"); setTopic(null); } }, "返回主题"),
@@ -1014,11 +1041,18 @@ window.__ModuleLoader__.load({
                 h("div", { className: "ci-search-sub", title: topicCaption(topic, region, regions) }, topicCaption(topic, region, regions)),
               ),
             ),
-            h(RegionSelect, { value: region, regions, disabled: logBusy, onChange: onRegion }),
+            h("div", { className: "ci-cls-filter" },
+              h("span", null, "地域"),
+              h(RegionSelect, { value: region, regions, disabled: logBusy, onChange: onRegion }),
+            ),
           ),
           h("div", { className: "ci-query" },
             h("div", null,
-              h("div", { className: "ci-tiny" }, "语句模式 · CQL · 空则查全部"),
+              h("div", { className: "ci-cls-mode" },
+                h("span", { className: "ci-cls-tag on" }, "语句模式"),
+                h("span", { className: "ci-cls-tag on" }, "CQL"),
+                h("span", { className: "ci-cls-hint" }, "空则查全部"),
+              ),
               h("textarea", {
                 className: "ci-cql",
                 value: cql,
@@ -1061,10 +1095,19 @@ window.__ModuleLoader__.load({
               }, logBusy ? "检索中" : "检索分析"),
             ),
           ),
-          hasLogs && !listErr ? h("div", { className: "ci-hist", "aria-hidden": "true" },
-            bars.map((hgt, idx) => h("i", { key: idx, style: { height: hgt + "%" } })),
+          !listErr ? h("div", { className: "ci-cls-dist" },
+            h("div", { className: "ci-cls-dist-h" },
+              h("span", null, "日志分布"),
+              h("span", null, hasLogs ? `${logs.length} 条` : "本页无数据"),
+            ),
+            h("div", { className: "ci-hist", "aria-hidden": "true" },
+              bars.map((hgt, idx) => h("i", { key: idx, style: { height: (hasLogs ? hgt : 8) + "%" } })),
+            ),
           ) : null,
           listErr ? h("div", { className: "ci-err" }, listErr) : null,
+          h("div", { className: "ci-cls-tabs" },
+            h("span", { className: "ci-cls-tab on" }, "原始日志"),
+          ),
           logBusy && !hasLogs ? h("div", { className: "ci-load" }, h(Spin), "检索日志…")
             : listErr && !hasLogs ? null
             : !hasLogs ? h("div", { className: "ci-empty ci-empty-search" }, "该时间窗没有匹配日志")
@@ -1101,14 +1144,17 @@ window.__ModuleLoader__.load({
           }, logBusy ? "拉取中" : "继续拉取")) : null,
         ));
       }
-      return h("div", { className: "ci-root ci-tool" }, h("div", { className: "ci-panel" },
+      return h("div", { className: "ci-root ci-tool ci-cls" }, h("div", { className: "ci-panel" },
         h("div", { className: "ci-bar" },
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, "日志主题"),
             h("span", { className: "ci-bar-count" }, `${counted} 条 · ${regionName}`),
           ),
           h("div", { className: "ci-bar-left", style: { flex: "none", alignItems: "center" } },
-            h(RegionSelect, { value: region, regions, disabled: listBusy, onChange: onRegion }),
+            h("div", { className: "ci-cls-filter" },
+              h("span", null, "地域"),
+              h(RegionSelect, { value: region, regions, disabled: listBusy, onChange: onRegion }),
+            ),
             h("div", { className: "ci-search-wrap" },
               h(SearchIcon),
               h("input", {
