@@ -159,6 +159,8 @@ test('cdb conversation UI uses official login/manage and 11 tabs g1-g3', () => {
   assert.match(client, /const CDB_TAB_GROUPS/)
   assert.match(client, /function cdbTabGroup/)
   assert.match(client, /className: "ci-subnav"/)
+  assert.doesNotMatch(client, /新建实例|续费|购买相同配置/)
+  assert.doesNotMatch(client, /购买类操作不在插件内下单/)
   assert.doesNotMatch(client, /CDB_OFFICIAL_TABS[\s\S]{0,500}在线查询/)
   assert.doesNotMatch(client, /CDB_OFFICIAL_TABS[\s\S]{0,500}慢查询/)
   assert.doesNotMatch(client, /if\s*\(.*===\s*['"]tencent['"]/)

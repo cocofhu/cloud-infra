@@ -1055,7 +1055,6 @@ window.__ModuleLoader__.load({
               h("span", { className: "ci-sec-t" }, "备份恢复"),
               h("button", { type: "button", className: "ci-mini primary", onClick: () => request({ id: "backup.create", label: "手动备份", confirm: "default" }, {}, "确认发起手动备份？") }, "手动备份"),
             ),
-            h("p", { className: "ci-hint" }, tabData.note || "回档、克隆、跨地域不在插件内做完整向导。"),
             backups.length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
               h("thead", null, h("tr", null, h("th", null, "备份 ID"), h("th", null, "类型"), h("th", null, "时间"), h("th", null, "操作"))),
               h("tbody", null, backups.map((row) => h("tr", { key: row.BackupId },
@@ -1547,7 +1546,6 @@ window.__ModuleLoader__.load({
         }
       };
       const selectedItems = rows.filter((item) => selected[item.id]);
-      const buyNotice = "购买类操作不在插件内下单，请到腾讯云控制台完成。";
       const runListAction = async (item, action, payload) => {
         setListBusyAct(true);
         try {
@@ -1621,7 +1619,6 @@ window.__ModuleLoader__.load({
           askListAction(item, "instance.protect", on ? "确认关闭实例销毁保护？" : "确认开启实例销毁保护？", { enable: !on });
         } },
         { id: "destroy", label: "销毁实例", danger: true, onClick: (item) => askListAction(item, "instance.destroy", `确定销毁实例 ${item.title}？此操作不可撤销。`, {}, true) },
-        { id: "buySame", label: "购买相同配置", onClick: () => setNotice(buyNotice) },
       ];
       return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
         h("div", { className: "ci-panel" },
@@ -1645,8 +1642,6 @@ window.__ModuleLoader__.load({
                   CDB_REGIONS.map((row) => h("option", { key: row.id, value: row.id }, row.name)),
                 ) : null,
                 kind === "cdb" ? [
-                  h("button", { key: "n", type: "button", className: "ci-mini primary", onClick: () => setNotice(buyNotice) }, "新建实例"),
-                  h("button", { key: "r", type: "button", className: "ci-mini", onClick: () => setNotice(buyNotice) }, "续费"),
                   h("button", { key: "reb", type: "button", className: "ci-mini", onClick: () => {
                     const target = selectedItems[0];
                     if (!target) return setNotice("请先选择实例");

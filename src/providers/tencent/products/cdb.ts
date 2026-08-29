@@ -1026,7 +1026,6 @@ async function loadTab(
     )
     return {
       backups: data.Items || [],
-      note: '回档、克隆、跨地域备份不在插件内做完整向导。',
     }
   }
   if (tab === '日志中心') {
@@ -1067,7 +1066,7 @@ async function loadTab(
       o,
     ).catch(() => ({ RoGroups: [] as Array<{ RoInstances?: CdbInstance[] }> }))
     const rows = (data.RoGroups || []).flatMap((group) => group.RoInstances || [])
-    return { readonlyInstances: rows, empty: rows.length ? '' : '暂无只读实例。不在插件内新购。' }
+    return { readonlyInstances: rows, empty: rows.length ? '' : '暂无只读实例' }
   }
   if (tab === '数据库代理') {
     const data = await call<Record<string, unknown>>('DescribeCdbProxyInfo', { InstanceId: instanceId }, c, o).catch((err) => ({
