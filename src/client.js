@@ -108,8 +108,13 @@ window.__ModuleLoader__.load({
 .ci-monitor-chart-v{font-size:13px;font-weight:650;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums;white-space:nowrap}
 .ci-monitor-chart-v i{font-style:normal;font-size:11px;font-weight:400;color:var(--dsw-alias-label-tertiary);margin-left:2px}
 .ci-monitor-chart-box{width:100%;height:180px;min-width:0}
-.ci-monitor-empty{display:flex;align-items:center;justify-content:center;height:180px;color:var(--dsw-alias-label-caption);font-size:12px}
+.ci-monitor-empty{display:flex;align-items:center;justify-content:center;height:180px;color:var(--dsw-alias-label-caption);font-size:12px;text-align:center;padding:0 12px;box-sizing:border-box}
 .ci-monitor-note{padding:16px 4px;text-align:center;color:var(--dsw-alias-label-caption);font-size:13px}
+.ci-monitor-errs{display:flex;flex-direction:column;gap:6px;margin:8px 0 12px}
+.ci-monitor-err{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-1);font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.5}
+.ci-monitor-err b{color:var(--dsw-alias-label-primary);font-weight:600;white-space:nowrap}
+.ci-monitor-err-tag{flex:none;font-size:11px;border-radius:6px;padding:1px 6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary);white-space:nowrap}
+.ci-monitor-err-hint{flex:1;min-width:0}
 .ci-modal-mask{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--dsw-alias-bg-mask-3);box-sizing:border-box}
 .ci-modal-mask.stacked{z-index:41}
 .ci-modal{width:min(400px,100%);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:14px;padding:16px;box-shadow:var(--dsw-alias-shadow);box-sizing:border-box}
@@ -531,7 +536,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return unit ? `${text} ${unit}` : text;
     }
 
-    function MonitorChart({ title, unit, series, color, height, range }) {
+    function MonitorChart({ title, unit, series, color, height, range, emptyNote }) {
       const box = useRef(null);
       const chartRef = useRef(null);
       const [failed, setFailed] = useState(false);
@@ -612,7 +617,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         failed
           ? h("div", { className: "ci-monitor-empty" }, "图表组件加载失败")
           : !points.length
-            ? h("div", { className: "ci-monitor-empty" }, "暂无监控数据")
+            ? h("div", { className: "ci-monitor-empty" }, emptyNote || "暂无监控数据")
             : h("div", { className: "ci-monitor-chart-box", ref: box, style: height ? { height } : undefined }),
       );
     }
@@ -642,14 +647,35 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return map;
     }
 
-    function MonitorPanel({ metrics, seriesMap, range, onRangeChange, note }) {
+    // 指标级根因分类的中文标签,与后端 MetricErrorType 对齐
+    const METRIC_ERROR_TYPE_LABEL = {
+      AGENT_MISSING: "监控组件未安装",
+      METRIC_NOT_FOUND: "指标不可用",
+      API_ERROR: "接口错误",
+    };
+
+    function MonitorPanel({ metrics, seriesMap, range, onRangeChange, note, errors }) {
       const cur = MONITOR_RANGES.some((row) => row.id === range) ? range : "1h";
       const list = Array.isArray(metrics) ? metrics : [];
       const map = seriesMap && typeof seriesMap === "object" ? seriesMap : {};
+      // 指标级失败列表:优先使用后端结构化 errors(含 errorType/suggestion),兼容缺省
+      const errList = Array.isArray(errors) ? errors.filter((row) => row && row.key) : [];
+      const errByKey = {};
+      for (const row of errList) errByKey[String(row.key)] = row;
       const empty = !list.length || list.every((m) => {
         const s = map[m.key];
         return !s || !Array.isArray(s.timestamps) || !s.timestamps.length;
       });
+      // 指标级卡内占位文案:官方未提供 / 监控组件缺失 等,替代笼统的「暂无监控数据」
+      const perChartNote = (m) => {
+        if (m && m.unavailable) return m.unavailable;
+        const err = errByKey[String(m && m.key)];
+        if (!err) return "";
+        if (err.suggestion) return err.suggestion;
+        if (err.errorType === "AGENT_MISSING") return "请检查并安装实例内监控组件";
+        if (err.errorType === "METRIC_NOT_FOUND") return "云监控未提供该指标";
+        return "";
+      };
       return h("div", { className: "ci-monitor" },
         h("div", { className: "ci-monitor-bar" },
           h("span", { className: "ci-monitor-title" }, "实例监控"),
@@ -663,8 +689,20 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           )),
         ),
         note ? h("div", { className: "ci-monitor-note" }, note) : null,
-        !note && empty ? h("div", { className: "ci-monitor-note" }, "暂无监控数据") : null,
-        !note && !empty ? h("div", { className: "ci-monitor-grid" }, list.map((m) =>
+        errList.length ? h("div", { className: "ci-monitor-errs" }, errList.map((row) =>
+          h("div", { key: String(row.key), className: "ci-monitor-err" },
+            h("span", { className: "ci-monitor-err-tag" }, METRIC_ERROR_TYPE_LABEL[row.errorType] || row.errorType || "错误"),
+            h("span", { className: "ci-monitor-err-hint" },
+              h("b", null, ((list.find((m) => m.key === row.key) || {}).label) || row.metric || row.key),
+              row.message ? `：${row.message}` : "",
+              row.suggestion ? `(${row.suggestion})` : "",
+              row.code ? ` [${row.code}]` : "",
+            ),
+          ),
+        )) : null,
+        !note && !errList.length && empty ? h("div", { className: "ci-monitor-note" }, "暂无监控数据") : null,
+        // 部分失败时仍渲染有数据的图表(不再因 note 隐藏整个网格)
+        !empty ? h("div", { className: "ci-monitor-grid" }, list.map((m) =>
           h(MonitorChart, {
             key: m.key,
             title: m.label || m.key,
@@ -672,6 +710,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             color: m.color || "#3a7bff",
             range: cur,
             series: map[m.key] || { timestamps: [], values: [] },
+            emptyNote: perChartNote(m),
           }),
         )) : null,
       );
@@ -3127,6 +3166,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             seriesMap,
             range: tabData.range || "1h",
             note: tabData.note || (extra.tabError && !tabData.series ? "无法拉取监控数据，请检查 CAM 云监控权限" : ""),
+            errors: Array.isArray(tabData.errors) ? tabData.errors : [],
             onRangeChange: (range) => onReload("实例监控", { range }),
           });
         }
@@ -3759,6 +3799,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             seriesMap,
             range: tabData.range || "1h",
             note: tabData.note || "",
+            errors: Array.isArray(tabData.errors) ? tabData.errors : [],
             onRangeChange: (range) => onReload("实例监控", { range }),
           });
         })() : null,

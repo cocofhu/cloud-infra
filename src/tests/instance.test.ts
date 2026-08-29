@@ -224,7 +224,9 @@ test('cvm detail monitor tab returns monitorSeries with QCE/CVM namespace', asyn
   assert.equal(extra.tabData?.range, '6h')
   assert.equal(extra.tabData?.series?.length, HOST_METRICS.length)
   assert.deepEqual(extra.tabData?.series?.[0]?.values, [12.5, 13])
-  assert.equal(monitorCalls.length, HOST_METRICS.length)
+  // DiskReadIops/DiskWriteIops 官方未提供(标记 unavailable),不再发起 GetMonitorData
+  assert.equal(monitorCalls.length, HOST_METRICS.length - 2)
+  assert.ok(!monitorCalls.some((row) => /Disk(Read|Write)Iops/.test(String(row.payload.MetricName))))
   assert.equal(monitorCalls[0].payload.Namespace, 'QCE/CVM')
   assert.equal(monitorCalls[0].payload.Period, 300)
   const defaultDetail = await createCvmModule(call, monitor).detail?.({ ...ctx, id: 'tencent.cvm:ap-shanghai:ins-8k2m1a' })
@@ -259,7 +261,15 @@ test('lighthouse detail monitor tab returns series and isolates errors', async (
   // 磁盘使用率应为 DiskUsage 而非 CvmDiskUsage
   const disk = tabData?.series?.find((row) => row.key === 'disk')
   assert.equal(disk?.metric, 'DiskUsage')
-  assert.match(tabData?.note || '', /部分指标拉取失败/)
+  assert.match(tabData?.note || '', /部分指标拉取失败（3 项）/)
+  // 结构化指标级错误:2 项官方未提供(METRIC_NOT_FOUND) + 1 项接口错(API_ERROR)
+  type MetricErr = { key: string; errorType: string; suggestion?: string }
+  const errs = (detail?.extra as { tabData?: { errors?: MetricErr[] } }).tabData?.errors || []
+  assert.equal(errs.length, 3)
+  const notFound = errs.filter((row) => row.errorType === 'METRIC_NOT_FOUND').map((row) => row.key).sort()
+  assert.deepEqual(notFound, ['diskRead', 'diskWrite'])
+  const apiErr = errs.find((row) => row.errorType === 'API_ERROR')
+  assert.equal(apiErr?.key, 'lanIn')
   const emptyMonitor = (async () => ({})) as unknown as TencentProductCall
   const empty = await createLighthouseModule(call, emptyMonitor).detail?.({
     ...ctx,
