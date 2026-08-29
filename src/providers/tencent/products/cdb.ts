@@ -892,7 +892,7 @@ async function runLoggedSql(
       sql: `SELECT * FROM ${ident} LIMIT ${limit} OFFSET ${offset}`,
       timeoutMs: ctx.timeoutMs,
     })
-    return { ok: true, data: result }
+    return { ok: true, data: { ...result } }
   }
   if (actionId === 'dmc.row.write') {
     const table = String(payload.table || '').trim()
@@ -916,7 +916,7 @@ async function runLoggedSql(
       sql = `UPDATE ${ident} SET ${sets.join(',')} WHERE ${whereSql(where)}`
     }
     const result = await driver.query({ ...session, database, sql, timeoutMs: ctx.timeoutMs })
-    return { ok: true, data: result }
+    return { ok: true, data: { ...result } }
   }
   const sql = String(payload.sql || '').trim()
   if (!sql) return { ok: false, error: '缺少 SQL' }
