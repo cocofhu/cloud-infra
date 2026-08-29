@@ -19,8 +19,9 @@ window.__ModuleLoader__.load({
 .ci-search:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-search-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;line-height:1}
 .ci-search-x:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
-.ci-list{border-top:1px solid var(--dsw-alias-border-l1);overflow-x:hidden;overflow-y:auto;width:100%;max-width:100%;min-width:0}
-.ci-row{display:grid;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);min-width:0;width:100%;max-width:100%;box-sizing:border-box}
+.ci-list{border-top:1px solid var(--dsw-alias-border-l1);overflow:auto;width:100%;max-width:100%;min-width:0}
+.ci-row{display:grid;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);min-width:0;width:100%;box-sizing:border-box}
+.ci-cert-list .ci-row{min-width:860px}
 .ci-row.head{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:500;padding:8px 14px}
 .ci-row:last-child{border-bottom:0}
 .ci-row:not(.head):hover,.ci-row:not(.head).open{background:var(--dsw-alias-interactive-bg-hover)}
@@ -687,9 +688,9 @@ window.__ModuleLoader__.load({
     function CertTable({ items, pendingId, moreId, setMoreId, onOpen, emptyHint, onDeploy, onDownload, onMore }) {
       const rows = Array.isArray(items) ? items.filter(Boolean) : [];
       if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "没有证书");
-      const template = "minmax(0,1.1fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1fr) minmax(0,0.9fr) minmax(0,1fr) 128px";
+      const template = "minmax(110px,1.1fr) minmax(140px,1.3fr) minmax(72px,0.8fr) minmax(110px,1fr) minmax(88px,0.9fr) minmax(130px,1fr) 128px";
       const head = ["证书 ID", "绑定域名", "备注", "类型/品牌", "状态", "有效期", "操作"];
-      return h("div", { className: "ci-list" },
+      return h("div", { className: "ci-list ci-cert-list" },
         h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
           head.map((label) => h("div", { key: label, className: "ci-cell" }, label)),
         ),
