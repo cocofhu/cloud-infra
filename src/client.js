@@ -927,7 +927,6 @@ window.__ModuleLoader__.load({
                 }, extra.wanOpen ? "关闭外网连接地址" : "开启外网连接地址") : null,
               ),
             ])),
-            h("p", { key: "hint", className: "ci-hint", style: { margin: "0 14px 14px" } }, "顶栏 11 个名称与顺序来自官方操作总览。参数设置在「数据库管理」下；慢日志在「日志中心」；SQL 请走列表「登录」。"),
           ];
         }
         if (tab === "实例监控") {

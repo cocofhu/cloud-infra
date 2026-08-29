@@ -958,7 +958,6 @@ async function loadTab(
   if (tab === '实例详情') {
     return {
       wanOpen: raw.WanStatus === 2,
-      note: '参数设置在「数据库管理」下；慢日志在「日志中心」；SQL 请走列表「登录」。',
     }
   }
   if (tab === '实例监控') {
