@@ -760,10 +760,6 @@ window.__ModuleLoader__.load({
         ),
       ), document.body);
     }
-          ),
-        ),
-      ), document.body);
-    }
 
     function UploadCertDialog({ busy, err, onCancel, onSubmit }) {
       const [draft, setDraft] = useState({

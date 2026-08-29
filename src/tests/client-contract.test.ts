@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -139,6 +140,16 @@ test('g2-g3 list chrome and in-card DetailView replace fullscreen drawer', () =>
   assert.match(client, /onBack:\s*\(\)\s*=>\s*setSession\(null\)/)
   assert.doesNotMatch(client, /ci-overlay|ci-drawer|function Drawer\b/)
   assert.doesNotMatch(client, /2147483|86vh/)
+})
+
+test('client.js parses so DSH can load 我的证书 card', () => {
+  const check = spawnSync(process.execPath, ['--check', join(root, 'src/client.js')], { encoding: 'utf8' })
+  assert.equal(check.status, 0, check.stderr || check.stdout || 'node --check src/client.js failed')
+  const client = read('src/client.js')
+  const verify = client.slice(client.indexOf('function VerifyCertDialog'), client.indexOf('function UploadCertDialog'))
+  assert.match(verify, /查看验证状态/)
+  assert.match(verify, /document\.body\);\s*\}\s*$/)
+  assert.doesNotMatch(verify, /document\.body\);\s*\}\s+\),/)
 })
 
 test('conversation card clones 我的证书 while ConfigCard stays frozen', () => {
