@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -231,6 +232,109 @@ test('g2-g3 list chrome and in-card DetailView replace fullscreen drawer', () =>
   assert.match(client, /onBack:\s*\(\)\s*=>\s*setSession\(null\)/)
   assert.doesNotMatch(client, /ci-overlay|ci-drawer|function Drawer\b/)
   assert.doesNotMatch(client, /2147483|86vh/)
+})
+
+test('client.js parses so DSH can load 我的证书 card', () => {
+  const check = spawnSync(process.execPath, ['--check', join(root, 'src/client.js')], { encoding: 'utf8' })
+  assert.equal(check.status, 0, check.stderr || check.stdout || 'node --check src/client.js failed')
+  const client = read('src/client.js')
+  const verify = client.slice(client.indexOf('function VerifyCertDialog'), client.indexOf('function ReplaceCertDialog'))
+  assert.match(verify, /查看验证状态/)
+  assert.match(verify, /document\.body\);\s*\}\s*$/)
+  assert.doesNotMatch(verify, /document\.body\);\s*\}\s+\),/)
+  assert.match(client, /function ReplaceCertDialog/)
+  assert.match(client, /type: "replace"/)
+  assert.match(client, /请确认验证方式/)
+})
+
+test('conversation card clones 我的证书 while ConfigCard stays frozen', () => {
+  const client = read('src/client.js')
+  const host = read('src/host.ts')
+  assert.match(client, /我的证书/)
+  assert.match(client, /申请免费证书/)
+  assert.match(client, /上传证书/)
+  assert.match(client, /证书详情/)
+  assert.match(client, /function CertTable/)
+  assert.match(client, /function CertDetailView/)
+  assert.match(client, /基本信息/)
+  assert.match(client, /域名验证/)
+  assert.match(client, /证书链摘要/)
+  assert.match(client, /关联云资源/)
+  assert.match(client, /function triggerDownload/)
+  assert.match(client, /国密 SM2/)
+  assert.match(client, /搜索证书 ID \/ 备注 \/ 域名/)
+  assert.match(host, /kind=cert/)
+  assert.match(host, /查证书必须传 kind=cert/)
+  assert.match(host, /未传 kind 仍默认 domain/)
+  const cardStart = client.indexOf('function ConfigCard()')
+  const cardEnd = client.indexOf('const inject = ["slots"]')
+  const card = client.slice(cardStart, cardEnd)
+  assert.ok(cardStart > 0 && cardEnd > cardStart)
+  assert.doesNotMatch(card, /申请免费证书|上传证书|我的证书|CertTable|证书详情/)
+  const handle = host.slice(host.indexOf('export async function handleApi'), host.indexOf('async function runDetail'))
+  const queryBlock = handle.slice(handle.indexOf("if (method === 'query')"), handle.indexOf("if (method === 'detail')"))
+  const detailBlock = handle.slice(handle.indexOf("if (method === 'detail')"), handle.indexOf("if (method === 'action')"))
+  const actionBlock = handle.slice(handle.indexOf("if (method === 'action')"))
+  assert.doesNotMatch(queryBlock, /writeOverlay|assignConfig/)
+  assert.doesNotMatch(detailBlock, /writeOverlay|assignConfig/)
+  assert.doesNotMatch(actionBlock, /writeOverlay|assignConfig/)
+})
+
+test('empty cert query still paints 我的证书 card and pickPayload keeps resourceKind', () => {
+  const client = read('src/client.js')
+  const host = read('src/host.ts')
+  assert.match(host, /kind: 'cloud-infra-query'/)
+  assert.match(host, /resourceKind:/)
+  assert.doesNotMatch(host, /kind: 'cloud-infra-query', \.\.\.\(value/)
+  assert.match(client, /function isCloudInfraPayload/)
+  assert.match(client, /if \(!isCert && !fromTool/)
+  assert.match(client, /function VerifyCertDialog/)
+  assert.match(client, /查看验证状态/)
+  assert.match(client, /完成审核/)
+  assert.match(client, /completeIfManual: true/)
+  const start = client.indexOf('function isCloudInfraPayload')
+  const end = client.indexOf('\n    function ChevronDown', start)
+  const pick = new Function('props', `${client.slice(start, end)}\nreturn pickPayload(props)`) as (props: unknown) => {
+    resourceKind?: string
+    items?: unknown[]
+    kind?: string
+  } | null
+  const empty = pick({
+    presentationMeta: {
+      kind: 'cloud-infra-query',
+      resourceKind: 'cert',
+      items: [],
+      errors: [{ moduleId: 'tencent.cert', message: '未配置 SecretId' }],
+      query: '',
+    },
+  })
+  assert.ok(empty)
+  assert.equal(empty?.resourceKind, 'cert')
+  assert.equal(empty?.items?.length, 0)
+  const legacyEmpty = pick({
+    kind: 'cert',
+    items: [],
+    errors: [{ moduleId: 'tencent.cert', message: '未配置 SecretId' }],
+  })
+  assert.ok(legacyEmpty)
+  assert.equal(legacyEmpty?.kind, 'cert')
+  const ops = client.slice(client.indexOf('function CertOps'), client.indexOf('function CertTable'))
+  assert.match(ops, /部署/)
+  assert.match(ops, /下载/)
+  assert.match(ops, /MoreMenu/)
+  assert.doesNotMatch(ops, /"详情"/)
+  const more = client.slice(client.indexOf('function MoreMenu'), client.indexOf('function CertOps'))
+  assert.match(more, /cert\.verify/)
+  assert.match(more, /cancelable/)
+  assert.match(more, /else \{\s*items\.push\(\{ id: "cert\.delete"/)
+  const onMore = client.slice(client.indexOf('const onMore ='), client.indexOf('const onDownload'))
+  assert.match(onMore, /cert\.replace/)
+  assert.match(onMore, /type: "replace"/)
+  assert.doesNotMatch(onMore, /askConfirm\(item, row, "确定重颁发该证书/)
+  const dl = client.slice(client.indexOf('function triggerDownload'), client.indexOf('\n    function FieldInput'))
+  assert.match(dl, /if \(\/-----BEGIN \/i\.test\(raw\)\) throw/)
+  assert.match(dl, /不支持明文下发/)
+  assert.doesNotMatch(dl, /if \(!content \|\| \/-----BEGIN/)
 })
 
 test('g3 ClusterConsole is a separate console tree and never saves settings', () => {

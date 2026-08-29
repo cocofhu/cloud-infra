@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { withDefaults } from '../core/config-store.js'
-import { queryResources } from '../core/query.js'
+import { queryResources, renderQuery } from '../core/query.js'
 import { createRegistry, resolveModuleId } from '../core/registry.js'
 import type { ResourceModule } from '../core/types.js'
 
@@ -87,6 +87,33 @@ test('missing credentials point the user at settings', async () => {
   const result = await queryResources({ kind: 'domain' }, withDefaults({}), undefined, source)
   assert.equal(result.items.length, 0)
   assert.match(result.errors[0]?.message || '', /设置/)
+})
+
+test('cert missing credentials mention existing SecretId/SecretKey not 设置页', async () => {
+  const source = createRegistry()
+  source.registerProvider({
+    id: 'fake',
+    title: '假云',
+    fields: [{ key: 'secretId', label: 'SecretId' }, { key: 'secretKey', label: 'SecretKey' }],
+  })
+  source.registerModule({
+    id: 'fake.cert',
+    provider: 'fake',
+    kind: 'cert',
+    title: '假云证书',
+    implemented: true,
+    async list() {
+      return { items: [] }
+    },
+  })
+  const result = await queryResources({ kind: 'cert' }, withDefaults({}), undefined, source)
+  assert.equal(result.items.length, 0)
+  const message = result.errors[0]?.message || ''
+  assert.match(message, /已有腾讯云 SecretId\/SecretKey/)
+  assert.doesNotMatch(message, /设置/)
+  const text = renderQuery(result)
+  assert.doesNotMatch(text, /设置/)
+  assert.doesNotMatch(text, /设置页/)
 })
 
 test('resolveModuleId prefers the longest registered module prefix', () => {

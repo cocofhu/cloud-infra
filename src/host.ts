@@ -4,7 +4,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import Schema from '@deepseek-ai/schemastery'
 import { assignConfig, publicConfig, readOverlay, sanitizePatch, withDefaults, writeOverlay } from './core/config-store.js'
 import { queryResources, renderQuery } from './core/query.js'
-import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, resolveModuleId, SETTINGS_HINT, supportedKinds } from './core/registry.js'
+import { credentialHint, credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, resolveModuleId, supportedKinds } from './core/registry.js'
 import { actionErrorMessage, publicErrorMessage } from './core/safe-error.js'
 import { isPost, trustedUiRequest } from './core/trusted-request.js'
 import type { PluginConfig, QueryResult } from './core/types.js'
@@ -30,10 +30,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates / COS buckets / domain registration / TKE clusters / CDB MySQL / CVM / Lighthouse as a console-style chat tool card. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/COS/对象存储/存储桶/注册/可注册/能不能注册/买域名/我的域名/TKE/集群/容器服务/CDB/云数据库/MySQL/云服务器/轻量/CVM/实例. Pass kind=domain for DNS 解析 (default). Pass kind=cos for COS. For COS: if the user did not already name an official region id, still call kind=cos and OMIT region so the console card can default #ci-cos-region to 广州 (ap-guangzhou) and stay selectable. Never use Ask question to pick a COS region. Never guess, invent, or pass Chinese names / free text as region. Only pass region when it is an official id such as ap-guangzhou. Pass kind=registrar to check if a name can be registered; kind=my-domain for purchased domains. Pass kind=cluster for TKE clusters. Pass kind=cdb for cloud MySQL, kind=cvm for 云服务器, kind=lighthouse for 轻量应用服务器, kind=auto to query every enabled module. After the card appears, the user searches and 立即加购 inside the card — do not send them to settings or a standalone page. For 「查一下我的服务器」use kind=cvm, kind=lighthouse or kind=auto — never kind=domain. For clusters, pass region if the user names one; if omitted, default to ap-guangzhou and do not ask which region. Region is runtime-only and must not be saved to settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / COS buckets / domain registration / TKE clusters / CDB MySQL / CVM / Lighthouse as a console-style chat tool card. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/SSL/我的证书/COS/对象存储/存储桶/注册/可注册/能不能注册/买域名/我的域名/TKE/集群/容器服务/CDB/云数据库/MySQL/云服务器/轻量/CVM/实例. Pass kind=domain for DNS 解析 (default). Pass kind=cert for 腾讯云 SSL 证书. 查证书必须传 kind=cert. 未传 kind 仍默认 domain. Pass kind=cos for COS. For COS: if the user did not already name an official region id, still call kind=cos and OMIT region so the console card can default #ci-cos-region to 广州 (ap-guangzhou) and stay selectable. Never use Ask question to pick a COS region. Never guess, invent, or pass Chinese names / free text as region. Only pass region when it is an official id such as ap-guangzhou. Pass kind=registrar to check if a name can be registered; kind=my-domain for purchased domains. Pass kind=cluster for TKE clusters. Pass kind=cdb for cloud MySQL, kind=cvm for 云服务器, kind=lighthouse for 轻量应用服务器, kind=auto to query every enabled module. After the card appears, the user searches and 立即加购 inside the card — do not send them to settings or a standalone page. For 「查一下我的服务器」use kind=cvm, kind=lighthouse or kind=auto — never kind=domain. For clusters, pass region if the user names one; if omitted, default to ap-guangzhou and do not ask which region. Region is runtime-only and must not be saved to settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com, a bucket name, instance name, cluster name, ins-/lhins-/cdb- ID, or IP. Empty lists all purchased domains, or waits for in-card search on registrar.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cos, registrar, my-domain, cluster, cdb, lighthouse, cvm, or auto.' },
+      query: { type: 'string', description: 'Keyword such as example.com, certificate id, a bucket name, instance name, cluster name, ins-/lhins-/cdb- ID, or IP. Empty lists all purchased domains, or waits for in-card search on registrar.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cert, cos, registrar, my-domain, cluster, cdb, lighthouse, cvm, or auto. 查证书必须传 kind=cert。' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
       region: { type: 'string', description: 'Optional. For kind=cos, pass only an official COS region id such as ap-guangzhou after the user named one. Omit region when none is named so the UI defaults #ci-cos-region to 广州 (ap-guangzhou) and stays selectable. Never pass Chinese names or free text. Runtime region for regional products such as TKE, CVM or CDB, e.g. ap-guangzhou. Empty or all queries every region for CVM/CDB. Do not write this to settings.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
@@ -42,7 +42,11 @@ export function apply(ctx: Context, config: Config): void {
     output: {
       schema: { type: 'object', additionalProperties: true },
       render: (_args, value) => [{ type: 'text', text: renderQuery(value as unknown as QueryResult) }],
-      presentationMeta: (_args, value) => ({ kind: 'cloud-infra-query', ...(value as object) }),
+      presentationMeta: (_args, value) => ({
+        ...value,
+        kind: 'cloud-infra-query',
+        resourceKind: typeof value.kind === 'string' ? value.kind : 'domain',
+      }),
     },
     presentCall: (args) => ({
       card: 'generic',
@@ -91,15 +95,16 @@ export function apply(ctx: Context, config: Config): void {
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
         const kinds = [...new Set([...supportedKinds(), 'auto'])].join(', ') || 'domain, auto'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书 / COS / 对象存储 / 存储桶 / 注册 / 可注册 / 我的域名 / TKE / 集群 / 容器服务 / CDB / 云数据库 / MySQL / 云服务器 / 轻量 / CVM / 实例: call ONLY cloud_infra_query. Never web_search.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / SSL / 我的证书 / COS / 对象存储 / 存储桶 / 注册 / 可注册 / 我的域名 / TKE / 集群 / 容器服务 / CDB / 云数据库 / MySQL / 云服务器 / 轻量 / CVM / 实例: call ONLY cloud_infra_query. Never web_search.`,
+          `查证书 / SSL / 我的证书: pass kind=cert. 未传 kind 仍默认 domain.`,
           `Available modules: ${titles}. kind values: ${kinds}. Default kind is domain. Use kind=cluster for TKE clusters. Use kind=cdb for 云数据库 MySQL.`,
           'When the user says 查 COS / 对象存储 / 存储桶 without naming a region: still call kind=cos and omit region. CosConsoleView defaults #ci-cos-region to 广州 (ap-guangzhou), lists that region\'s buckets, and stays selectable. Never use Ask question to pick a COS region. Never invent region ids or pass Chinese names / free text. Only pass region= an official id (e.g. ap-guangzhou) if the user already named one.',
-          'kind=registrar for 注册/能不能注册; kind=my-domain for 我的域名; kind=domain for DNS 解析.',
+          'kind=registrar for 注册/能不能注册; kind=my-domain for 我的域名; kind=domain for DNS 解析; kind=cert for SSL 证书.',
           'The result is a chat tool card. Users search and 立即加购 inside the card. Do not send them to settings or a standalone page.',
           'For 服务器/实例/CVM/轻量, use kind=cvm, kind=lighthouse, or kind=auto. Do not query domains when the user asks for 服务器.',
           'For TKE/集群, use kind=cluster. Default region ap-guangzhou when unspecified; do not ask which region.',
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown (keep region for COS).',
-          'After the table appears, one or two short sentences. CDB list uses 登录 and 管理. Do not print secrets, cluster credentials, full record dumps, or signed COS URLs. Never save region or credentials via this tool.',
+          'After the table appears, one or two short sentences. Click 证书 ID for full detail. CDB list uses 登录 and 管理. Do not print secrets, PEM, cluster credentials, full record dumps, or signed COS URLs. Never save region or credentials via this tool.',
         ].join(' ')
       },
     })
@@ -189,6 +194,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         filters: readFilters(body.filters),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
+        group: body.group != null ? String(body.group) : '',
       }, cfg)
       return sendJson(res, 200, { ok: true, ...result })
     }
@@ -296,6 +302,6 @@ function readyModule(cfg: PluginConfig, moduleId: string, id: string) {
   const provider = registry.getProvider(module.provider)
   if (!provider) throw new Error('未知云厂商')
   const missing = missingCredentialKeys(provider, cfg.providers[module.provider])
-  if (missing.length) throw new Error(`${provider.title} 未配置 ${missing.join('、')}。${SETTINGS_HINT}`)
+  if (missing.length) throw new Error(`${provider.title} 未配置 ${missing.join('、')}。${credentialHint(module.kind)}`)
   return { module, creds: credentialMap(provider, cfg.providers[module.provider]) }
 }

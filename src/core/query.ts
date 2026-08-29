@@ -4,7 +4,7 @@ import {
   isModuleEnabled,
   isProviderEnabled,
   missingCredentialKeys,
-  SETTINGS_HINT,
+  credentialHint,
   type Registry,
   registry,
 } from './registry.js'
@@ -17,6 +17,7 @@ export interface QueryInput {
   query?: string
   offset?: number
   limit?: number
+  group?: string
   region?: string
   filters?: Record<string, string>
 }
@@ -30,6 +31,7 @@ export async function queryResources(
   const kind = String(input.kind || 'domain').trim() || 'domain'
   const provider = String(input.provider || '').trim()
   const query = String(input.query || '').trim()
+  const group = String(input.group || '').trim()
   const region = String(input.region || '').trim() || (kind === 'cluster' ? 'ap-guangzhou' : '')
   const filters = sanitizeFilters(input.filters)
   const offset = Math.max(0, Math.floor(Number(input.offset) || 0))
@@ -77,7 +79,7 @@ export async function queryResources(
     }
     const missing = missingCredentialKeys(providerDef, config.providers[module.provider])
     if (missing.length) {
-      errors.push({ moduleId: module.id, message: `${providerDef.title} 未配置 ${missing.join('、')}。${SETTINGS_HINT}` })
+      errors.push({ moduleId: module.id, message: `${providerDef.title} 未配置 ${missing.join('、')}。${credentialHint(module.kind)}` })
       return
     }
     try {
@@ -88,6 +90,7 @@ export async function queryResources(
         limit,
         timeoutMs: config.timeoutMs,
         signal,
+        group: group || undefined,
         region: input.region || region || undefined,
         filters,
       })
@@ -188,13 +191,15 @@ export function renderQuery(result: QueryResult): string {
     || result.items.some((item) => item.kind === 'cvm' || item.kind === 'lighthouse')
   const hint = result.kind === 'cos'
     ? '用一两句话概括即可，请用户点击存储桶名称进入文件列表。不要打印密钥或签名 URL。'
-    : cluster
-      ? '用一两句话概括即可，列表默认广州，用户可在顶栏切换地域并点击集群 ID 进入配置。不要询问地域、不要打印密钥或集群凭证，不要套用域名解析页。'
-      : cdb
-        ? '用一两句话概括即可，请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。不要打印密钥。'
-        : instance
-          ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
-          : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
+    : result.kind === 'cert'
+      ? '用一两句话概括即可，请用户点击证书 ID 或绑定域名查看完整详情。不要打印密钥或证书正文。'
+      : cluster
+        ? '用一两句话概括即可，列表默认广州，用户可在顶栏切换地域并点击集群 ID 进入配置。不要询问地域、不要打印密钥或集群凭证，不要套用域名解析页。'
+        : cdb
+          ? '用一两句话概括即可，请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。不要打印密钥。'
+          : instance
+            ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
+            : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
   return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
 }
 
