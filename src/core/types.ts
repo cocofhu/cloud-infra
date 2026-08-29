@@ -54,6 +54,21 @@ export interface DnsRecord {
   remark?: string
 }
 
+export interface LogHit {
+  timeMs: number
+  timeLabel: string
+  content: string
+  source?: string
+  fileName?: string
+  fields?: Record<string, string>
+}
+
+export interface ClsRegionOption {
+  id: string
+  name: string
+  group: string
+}
+
 export interface DirEntry {
   kind: 'folder' | 'file'
   name: string
@@ -109,6 +124,7 @@ export interface ResourceDetail {
   fields: Array<{ label: string; value: string }>
   groups?: FieldGroup[]
   records?: DnsRecord[]
+  logs?: LogHit[]
   entries?: DirEntry[]
   prefix?: string
   region?: string
@@ -139,7 +155,9 @@ export interface ListResult {
   needsRegion?: boolean
   warnings?: string[]
   errors?: ModuleError[]
-  regions?: string[]
+  region?: string
+  regions?: Array<string | ClsRegionOption>
+  view?: string
 }
 
 export interface ModuleError {
@@ -156,8 +174,18 @@ export interface QueryResult {
   offset?: number
   hasMore?: boolean
   needsRegion?: boolean
+  view?: string
   region?: string
-  regions?: string[]
+  regions?: Array<string | ClsRegionOption>
+  topicId?: string
+  topicName?: string
+  queryString?: string
+  range?: string
+  from?: number
+  to?: number
+  logs?: LogHit[]
+  context?: string
+  fields?: string[]
 }
 
 export interface ModuleContext {
@@ -176,9 +204,35 @@ export interface ModuleContext {
   bucket?: string
   tab?: string
   filters?: Record<string, string>
+  topicId?: string
+  queryString?: string
+  from?: number
+  to?: number
+  range?: string
+  context?: string
+  view?: string
 }
 
 export type ActionResult = { ok: true; data?: Record<string, unknown> } | { ok: false; error: string }
+
+export interface SearchResult {
+  card?: ResourceCard
+  items?: ResourceCard[]
+  topicId?: string
+  topicName?: string
+  region: string
+  queryString: string
+  range: string
+  from: number
+  to: number
+  logs: LogHit[]
+  context?: string
+  hasMore?: boolean
+  total?: number
+  fields?: string[]
+  regions?: ClsRegionOption[]
+  error?: string
+}
 
 export interface ResourceModule {
   id: string
@@ -188,6 +242,7 @@ export interface ResourceModule {
   implemented: boolean
   list: (ctx: ModuleContext) => Promise<ListResult>
   detail?: (ctx: ModuleContext) => Promise<ResourceDetail>
+  search?: (ctx: ModuleContext) => Promise<SearchResult>
   execute?: (actionId: string, payload: Record<string, unknown>, ctx: ModuleContext) => Promise<ActionResult>
   actions?: ResourceAction[]
   regions?: RegionOption[]

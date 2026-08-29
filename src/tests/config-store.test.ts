@@ -47,6 +47,17 @@ test('empty secret on save keeps the previous key', () => {
   assert.equal(live.providers.tencent.secretKey, 'keep-me-secret-key')
 })
 
+test('sanitizePatch ignores dialog region so overlay cannot store it', () => {
+  const patch = sanitizePatch({
+    region: 'ap-beijing',
+    clsRegion: 'ap-shanghai',
+    providers: { tencent: { secretId: 'AKIDabcdefghijklmnop', region: 'ap-beijing' } },
+  }, source)
+  assert.equal((patch as { region?: string }).region, undefined)
+  assert.equal((patch as { clsRegion?: string }).clsRegion, undefined)
+  assert.equal((patch.providers?.tencent as { region?: string } | undefined)?.region, undefined)
+})
+
 test('writeOverlay stores secrets with 0600 when possible', () => {
   const dir = mkdtempSync(join(tmpdir(), 'cloud-infra-'))
   const prev = process.env.DSH_HOME

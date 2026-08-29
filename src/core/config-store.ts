@@ -53,6 +53,8 @@ export function persistable(cfg: PluginConfig): Pick<PluginConfig, 'timeoutMs' |
   }
 }
 
+/** Overlay never stores CLS region; dialog query/search/detail must not call writeOverlay. */
+
 export function sanitizePatch(raw: Record<string, unknown>, source: Registry = registry): Partial<PluginConfig> {
   const out: Partial<PluginConfig> = {}
   const timeout = Number(raw.timeoutMs)

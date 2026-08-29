@@ -2,7 +2,7 @@
 
 DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、证书、对象存储、TKE 集群、云服务器与云数据库，以对齐各产品控制台的列表展示；在设置页配置各云 AccessKey。
 
-已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录，[腾讯云 SSL「我的证书」](https://cloud.tencent.com/document/product/400/55741)（列表、完整详情、申请/上传/部署/下载/更多），对话卡片内的 [腾讯云域名注册](https://cloud.tencent.com/document/product/242/9595)（查询、立即加购、购物车、提交订单、核对信息、账户余额支付、我的域名），[腾讯云 COS](https://cloud.tencent.com/document/product/436/8291) 存储桶列表与文件列表，[腾讯云 TKE](https://cloud.tencent.com/document/product/457/31824) 控制台「集群」配置树，[CVM](https://cloud.tencent.com.cn/document/product/213/16533) 与 [轻量应用服务器](https://cloud.tencent.com/document/product/1207/44574)，以及 [腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦；Host / Query 不按厂商名分支。地域只在对话参数或资源 UI 会话中传递，不写回设置。
+已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录，[腾讯云 SSL「我的证书」](https://cloud.tencent.com/document/product/400/55741)（列表、完整详情、申请/上传/部署/下载/更多），对话卡片内的 [腾讯云域名注册](https://cloud.tencent.com/document/product/242/9595)（查询、立即加购、购物车、提交订单、核对信息、账户余额支付、我的域名），[腾讯云 COS](https://cloud.tencent.com/document/product/436/8291) 存储桶列表与文件列表，[腾讯云 TKE](https://cloud.tencent.com/document/product/457/31824) 控制台「集群」配置树，[CVM](https://cloud.tencent.com.cn/document/product/213/16533) 与 [轻量应用服务器](https://cloud.tencent.com/document/product/1207/44574)，以及 [腾讯云 CLS](https://cloud.tencent.com/document/product/614/56447) 日志主题查看与检索分析、[腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦；Host / Query 不按厂商名分支。地域只在对话参数或资源 UI 会话中传递，不写回设置。
 
 ## 功能
 
@@ -22,6 +22,9 @@ DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、
 - kubeconfig 只在 APIServer 区块的受信 UI 复制或下载，不进对话
 - 对话里查询云服务器：默认广州地域，顶栏下拉切换地域；同时有云服务器和轻量时用 Tab 切换产品。CVM / 轻量均为密表 + 行内更多。实例过多时按设置里的每页条数翻页
 - 实例详情按官方分组展示；开机 / 关机 / 重启在行内更多与详情顶栏完成
+- 对话里查询 CLS **日志主题**（名称/ID、日志集、存储类型、保存时间、创建时间），点「检索分析」仍在同一张卡片内打开
+- 对话一句话可直接检索指定主题的原始日志（CQL 语句模式；空语句查该时间窗全部日志）
+- 卡片顶部可按官方地域分组切换（大陆/港澳台/海外/金融/特殊）。**只改当前对话卡片，不写设置页与覆盖文件**
 - 对话里查询 CDB：列表为「登录 / 管理」，管理页为官方 11 个页签；SQL 走 DMC 登录，库账号只在进程内存
 - 设置页按厂商 schema 填写 AKSK，并开关 `tencent.tke`；无必填地域字段。密钥只保存在本机。不新增地域、库账号或电源控件；新产品只出现在既有产品模块勾选。证书操作不改设置
 - 预留阿里云凭证字段，产品模块尚未实现
@@ -53,6 +56,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 - 轻量：`QcloudLighthouseReadOnlyAccess` / `QcloudLighthouseFullAccess`
 - 云数据库：CDB 读权限；登录 DMC 与写操作还需对应写权限与库账号
 - 对象存储：COS 读权限；上传 / 删除 / 建桶还需写权限
+- CLS：CAM 需包含日志服务读权限（如 `DescribeTopics`、`DescribeLogsets`、`SearchLog`）。已有 AKSK 可直接复用，不必重填
 
 然后可以直接对 Agent 说：
 
@@ -76,11 +80,17 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 > 列出轻量应用服务器
 
+> 查一下 CLS 主题
+
+> 北京的 CLS 主题
+
+> 检索 nginx-access 近 1 小时 status:500
+
 > 查一下我的 CDB
 
 > 还有吗
 
-插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cert`、`cos`、`cluster`、`cdb`、`lighthouse`、`cvm`、`registrar`、`my-domain`、`auto`。**查证书必须传 `kind=cert`**。用户说「查 COS」时必须调用 `kind=cos` **且可以不带 region**，对话卡默认选中广州（`ap-guangzhou`）并列出该地域存储桶，顶部 `#ci-cos-region` 仍可输入补全改选。清空后回到「请输入并选择地域」。禁止把中文名或自由文本当 region，也禁止用 Ask question 代替卡内补全。未配置腾讯云密钥时卡片置顶提示去 **设置 → 插件 → 云资源**，不会把鉴权失败画成「该地域下没有存储桶」。查 TKE 用 `kind=cluster` 并传入运行时 `region`（如 `ap-guangzhou`）。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。查询、切地域、写操作都不会改 `cloud-infra.json`。
+插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cert`、`cos`、`cluster`、`cdb`、`lighthouse`、`cvm`、`registrar`、`my-domain`、`cls`、`auto`。查 CLS 时传 `kind=cls`；检索日志时再传 `topicId` 或主题名、`queryString`（CQL）、`range`（`15m` / `1h` / `4h` / `1d` / `today` / `yesterday`，默认 `1h`）。**查证书必须传 `kind=cert`**。用户说「查 COS」时必须调用 `kind=cos` **且可以不带 region**，对话卡默认选中广州（`ap-guangzhou`）并列出该地域存储桶，顶部 `#ci-cos-region` 仍可输入补全改选。清空后回到「请输入并选择地域」。禁止把中文名或自由文本当 region，也禁止用 Ask question 代替卡内补全。未配置腾讯云密钥时卡片置顶提示去 **设置 → 插件 → 云资源**，不会把鉴权失败画成「该地域下没有存储桶」。查 TKE 用 `kind=cluster` 并传入运行时 `region`（如 `ap-guangzhou`）。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。查询、切地域、写操作都不会改 `cloud-infra.json`。
 
 COS 对话卡对齐控制台两页：顶部地域补全默认广州，仍可用中文名 / GZ / `ap-guangzhou` 改选（含硅谷、法兰克福、金融区等官方枚举）→ 存储桶列表（名称 / 地域 / 创建时间 / 访问权限只读，桶名搜索 300ms 防抖）→ 点名称进入文件列表（当前层短名 + 面包屑下钻）。一层对象过多时用「上一页 / 下一页」按 `nextMarker` 翻页，搜索仅过滤当前页。访问权限、CORS、生命周期等桶设置不在对话卡内改。地域选择与上传/删除等操作只留在对话卡内存，不写插件设置。重命名走官方 `x-cos-copy-source`（`<桶>.cos.<地域>.myqcloud.com/<编码后的 Key>`）；删文件夹使用批量删除，失败会提示已删/剩余数量。
 
@@ -118,6 +128,8 @@ COS 对话卡对齐控制台两页：顶部地域补全默认广州，仍可用�
 - 保存密钥时留空表示保持原值
 - 新模块出现在「产品模块」勾选列表，设置页不增加地域多选或电源按钮
 - COS 地域与当前目录只存在于对话卡，`query` / `detail` / `action` 不会调用设置保存
+- Region 不是腾讯云必填凭证。未指定地域时当次 CLS 请求默认广州（`ap-guangzhou`）
+- 对话里切地域、改时间、检索**不会**触发 config 保存（覆盖文件不增加 `clsRegion`）
 
 ## 如何加一个云厂商
 
@@ -127,7 +139,7 @@ Host / Query 仍不按厂商名分支。新增厂商：
 2. 新建 `src/providers/<id>/products/<kind>.ts`：实现 `ResourceModule`，把该云 API 映射为统一的 `ResourceCard` / 详情分区（域名用 `DnsRecord`，对象存储用当前层 `entries`）
 3. 在 [`src/providers/index.ts`](src/providers/index.ts) 增加一行 `import './<id>/index.js'`
 
-新增产品 kind（如 `cluster`）时，可在客户端增加独立视图（TKE 使用 `ClusterConsole`，不要复用域名 `DetailView`）。运行时 `region` 经 query/detail/action 透传，禁止为此改设置 schema。若新产品需要独立控制台皮肤（例如密表 vs 卡片），在 `src/client.js` 按 **kind** 分支，不要按厂商名分支。
+新产品类型（如 CLS）需要扩展工具参数、系统提示和对话卡片视图，可参考 [`src/providers/tencent/products/cls.ts`](src/providers/tencent/products/cls.ts)。新增产品 kind（如 `cluster`）时，可在客户端增加独立视图（TKE 使用 `ClusterConsole`，不要复用域名 `DetailView`）。运行时 `region` 经 query/detail/action 透传，禁止为此改设置 schema。若新产品需要独立控制台皮肤（例如密表 vs 卡片），在 `src/client.js` 按 **kind** 分支，不要按厂商名分支。
 
 设置表单和对话列表会自动出现新厂商。可参考 [`src/providers/tencent/`](src/providers/tencent/) 与测试里注册的假厂商。
 
@@ -155,6 +167,8 @@ pnpm build
 - **未选地域**：TKE 列表不会暗默写设置；查询集群时默认广州
 - **凭证进对话**：kubeconfig 只出现在集群详情 APIServer 区块，请勿让 Agent 复述
 - **查服务器却只看到域名**：确认对话调用了 `kind=cvm` / `lighthouse` / `auto`，而不是缺省的 `domain`
+- **当前地域没有主题**：卡片顶部换一个地域；不会改设置
+- **主题名重名**：指定主题 ID 或日志集后再检索
 
 ## 许可证
 

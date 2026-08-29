@@ -225,3 +225,27 @@ export function cvmCall<T>(
 ): Promise<T> {
   return serviceCall('cvm', 'cvm.tencentcloudapi.com', '2017-03-12', action, payload, creds, opts)
 }
+
+export const CLS_HOST = 'cls.tencentcloudapi.com'
+export const CLS_VERSION = '2020-10-16'
+
+export function clsCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext & { region: string },
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'cls',
+    host: CLS_HOST,
+    version: CLS_VERSION,
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    region: opts.region,
+    fetchImpl: opts.fetchImpl,
+  })
+}

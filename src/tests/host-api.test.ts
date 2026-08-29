@@ -69,6 +69,12 @@ test('handleApi rejects untrusted query and write, keeps meta public', async () 
   assert.equal(blocked.out.status, 403)
   assert.match(blocked.out.body, /不受信任/)
 
+  const blockedSearch = res()
+  await handleApi(req({ host: '127.0.0.1:3091' }, {
+    body: JSON.stringify({ method: 'search', kind: 'cls' }),
+  }), blockedSearch.response, cfg)
+  assert.equal(blockedSearch.out.status, 403)
+
   const getUrl = req({
     host: '127.0.0.1:3091',
     origin: 'http://127.0.0.1:3091',
@@ -85,6 +91,7 @@ test('handleApi rejects untrusted query and write, keeps meta public', async () 
   }), meta.response, cfg)
   assert.equal(meta.out.status, 200)
   assert.match(meta.out.body, /"ok":true/)
+  assert.match(meta.out.body, /tencent\.cls/)
 })
 
 test('handleApi action returns registrar business errors on HTTP 400', async () => {

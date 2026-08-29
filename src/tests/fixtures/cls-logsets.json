@@ -1,0 +1,8 @@
+{
+  "Logsets": [
+    { "LogsetId": "4d07fba0-b71e-4c11-9aa0-0f6d8e2aa001", "LogsetName": "prod-web" },
+    { "LogsetId": "75f531f6-3644-45e5-8717-af1dc294cc93", "LogsetName": "prod-app" },
+    { "LogsetId": "ops-logset-0001", "LogsetName": "ops" }
+  ],
+  "TotalCount": 3
+}
