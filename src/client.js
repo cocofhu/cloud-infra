@@ -64,12 +64,20 @@ window.__ModuleLoader__.load({
 .ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
 .ci-sec-t{font-size:13px;font-weight:650}
 .ci-root .ci-table-wrap,.ci-panel .ci-table-wrap,.ci-image .ci-table-wrap,.ci-table-wrap{width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:auto}
-.ci-table{width:max-content;min-width:720px;border-collapse:collapse;font-size:13px}
-.ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle;white-space:nowrap;word-break:normal}
-.ci-table th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px}
+.ci-table{width:100%;min-width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.ci-table th,.ci-table td{text-align:left;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle;white-space:nowrap;word-break:normal}
+.ci-table th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px;background:var(--dsw-alias-bg-layer-2);border-top:0;padding:8px 12px}
+.ci-table th:first-child{border-radius:8px 0 0 8px}
+.ci-table th:last-child{border-radius:0 8px 8px 0;text-align:right}
 .ci-table td{color:var(--dsw-alias-label-secondary)}
-.ci-table td.ci-ops-cell{white-space:nowrap;word-break:normal}
+.ci-table td.ci-ops-cell,.ci-table th.ci-ops-cell{text-align:right;white-space:nowrap;word-break:normal}
 .ci-table tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-table .ci-ver{font-weight:600;color:var(--dsw-alias-label-primary)}
+.ci-table .ci-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--dsw-alias-label-tertiary);max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.ci-table .ci-muted{color:var(--dsw-alias-label-caption)}
+.ci-act{height:26px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-brand-primary);cursor:pointer;font:inherit;font-size:12px}
+.ci-act:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-act.danger{color:var(--dsw-alias-state-error-primary)}
 .ci-rec-page{margin:0}
 .ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
 .ci-mini.primary{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border-color:transparent}
@@ -146,7 +154,15 @@ html[data-theme=dark] .ci-image,.ci-image[data-theme=dark]{--ci-title:#f7f8fb}
 .ci-tabs{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--dsw-alias-border-l1)}
 .ci-tab{height:30px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--ci-muted);font:inherit;font-size:13px;line-height:30px;font-weight:400;cursor:pointer}
 .ci-tab.on{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);color:var(--dsw-alias-brand-primary);font-weight:600}
-.ci-image-body{padding:16px;min-width:0;overflow-x:auto}
+.ci-image-body{padding:14px 16px 16px;min-width:0;overflow-x:auto}
+.ci-image-body>.ci-empty,.ci-image .ci-empty{border-top:0;padding:28px 8px}
+.ci-image .ci-crumb{padding:0;border:0;margin:0 0 12px;gap:10px;min-width:0}
+.ci-image .ci-back{height:28px;padding:0 10px;font-size:12px;color:var(--ci-title);flex:none}
+.ci-detail-titles{min-width:0;flex:1}
+.ci-detail-meta{margin:2px 0 0;font-size:12px;line-height:18px;color:var(--ci-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-copied{display:flex;align-items:flex-start;gap:8px;margin:0 0 12px;padding:8px 10px;border-radius:8px;background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary);font-size:12px;line-height:18px;word-break:break-all}
+.ci-copied b{font-weight:600;flex:none}
+.ci-copied code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;font-weight:400}
 .ci-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media(max-width:640px){.ci-grid{grid-template-columns:1fr}}
 .ci-ic{text-align:left;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:14px;padding:14px;cursor:pointer;min-height:124px;color:var(--ci-text);width:100%;font:inherit}
@@ -162,7 +178,6 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
 .ci-tag.blue{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);border-color:transparent;color:var(--dsw-alias-brand-primary)}
 .ci-ic-meta{font-size:12px;color:var(--ci-muted);word-break:break-all}
 .ci-warn{padding:10px 12px;border-radius:10px;background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label);font-size:12px;line-height:1.5;margin:0 0 4px}
-.ci-copied{margin:8px 0 0;color:var(--dsw-alias-state-success-primary);font-size:12px}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -763,6 +778,17 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return values.some((v) => String(v || "").toLowerCase().includes(q));
     }
 
+    function prettyCell(value) {
+      const text = String(value == null ? "" : value).trim();
+      return !text || text === "-" ? "—" : text;
+    }
+
+    function prettyTime(value) {
+      const text = prettyCell(value);
+      if (text === "—") return text;
+      return text.replace(/\s+\+\d{4}(\s+[A-Z]{2,5})?$/, "").replace("T", " ").slice(0, 19);
+    }
+
     function ImageIcon() {
       return h("div", { className: "ci-ic-ico", "aria-hidden": "true" },
         h("svg", { width: 18, height: 18, viewBox: "0 0 18 18", fill: "none" },
@@ -801,6 +827,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [truncated, setTruncated] = useState(!!payload?.hasMore);
       const seq = useRef(0);
       const debounce = useRef(0);
+      const copyTimer = useRef(0);
       const current = (Array.isArray(instances) ? instances : []).find((item) => item && item.id === instanceId) || instances[0];
 
       const toolSig = `${payload?.region || ""}|${(fromTool || []).map((i) => i.id).join(",")}|${(payload?.errors || []).length}|${args.kind || payload?.resourceKind || ""}`;
@@ -816,7 +843,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         }
         loadInstances(payload?.region || region);
       }, [toolSig]);
-      useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
+      useEffect(() => () => {
+        if (debounce.current) clearTimeout(debounce.current);
+        if (copyTimer.current) clearTimeout(copyTimer.current);
+      }, []);
 
       const loadInstances = async (nextRegion, keepId) => {
         const n = ++seq.current;
@@ -956,6 +986,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         } catch {
           setCopied(cmd);
         }
+        if (copyTimer.current) clearTimeout(copyTimer.current);
+        copyTimer.current = setTimeout(() => setCopied(""), 2800);
       };
 
       const runDelete = async (payload) => {
@@ -1039,15 +1071,18 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         }
         if (view === "detail") {
           const rows = (tags || []).filter((row) => hitKw(draftQ, row.cells?.version, row.cells?.digest));
+          const meta = [...new Set((fields || [])
+            .filter((row) => row && row.value && !["仓库", "命名空间", "说明"].includes(row.label))
+            .map((row) => row.value))].join(" · ");
           return [
-            h("div", { key: "crumb", className: "ci-crumb", style: { padding: 0, border: 0, marginBottom: 14 } },
+            h("div", { key: "crumb", className: "ci-crumb" },
               h("button", { type: "button", className: "ci-back", onClick: () => { setRepo(null); setDraftQ(""); changeView("repo"); } }, "返回"),
-              h("span", { className: "ci-head-t" }, repo?.full || "版本管理"),
+              h("div", { className: "ci-detail-titles" },
+                h("div", { className: "ci-head-t" }, repo?.full || "版本管理"),
+                meta ? h("div", { className: "ci-detail-meta", title: meta }, meta) : null,
+              ),
             ),
-            fields.length ? h("div", { key: "chips", className: "ci-chips", style: { padding: 0 } },
-              fields.map((row) => h("span", { key: row.label, className: "ci-chip" }, row.label, h("b", null, row.value))),
-            ) : null,
-            copied ? h("p", { key: "copied", className: "ci-copied" }, "已复制：" + copied) : null,
+            copied ? h("div", { key: "copied", className: "ci-copied" }, h("b", null, "已复制"), h("code", null, copied)) : null,
             trunc,
             rows.length ? h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
               h("thead", null, h("tr", null,
@@ -1055,16 +1090,16 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                 h("th", null, "镜像ID"),
                 h("th", null, "大小"),
                 h("th", null, "更新时间"),
-                h("th", null, "操作"),
+                h("th", { className: "ci-ops-cell" }, "操作"),
               )),
               h("tbody", null, rows.map((row) => h("tr", { key: row.id },
-                h("td", null, row.cells?.version || row.id),
-                h("td", null, row.cells?.digest || "-"),
-                h("td", null, row.cells?.size || "-"),
-                h("td", null, row.cells?.updated || "-"),
+                h("td", { className: "ci-ver" }, prettyCell(row.cells?.version || row.id)),
+                h("td", { className: row.cells?.digest ? "ci-mono" : "ci-muted", title: row.cells?.digest || "" }, prettyCell(row.cells?.digest)),
+                h("td", { className: !row.cells?.size || row.cells.size === "0 B" ? "ci-muted" : "" }, prettyCell(row.cells?.size)),
+                h("td", null, prettyTime(row.cells?.updated)),
                 h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
-                  h("button", { type: "button", className: "ci-link", onClick: () => copyPull(row.cells?.version || row.id) }, "拉取指令"),
-                  h("button", { type: "button", className: "ci-link danger", onClick: () => askDelete(row) }, "删除"),
+                  h("button", { type: "button", className: "ci-act", onClick: () => copyPull(row.cells?.version || row.id) }, "拉取指令"),
+                  h("button", { type: "button", className: "ci-act danger", onClick: () => askDelete(row) }, "删除"),
                 )),
               ))),
             )) : h("div", { key: "empty", className: "ci-empty" }, "没有匹配的镜像版本"),
@@ -1088,8 +1123,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               h("td", null, row.cells?.namespace || ""),
               h("td", null, h("span", { className: "ci-tag" }, row.cells?.access || "私有")),
               h("td", null, row.cells?.tags || "-"),
-              h("td", null, row.cells?.created || "-"),
-              h("td", null, row.cells?.updated || "-"),
+              h("td", null, prettyTime(row.cells?.created)),
+              h("td", null, prettyTime(row.cells?.updated)),
             ))),
           )),
         ];
