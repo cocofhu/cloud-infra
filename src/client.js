@@ -210,8 +210,10 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-wiz-step.done .ci-wiz-n{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
 .ci-wiz-line{flex:1;height:1px;background:var(--dsw-alias-border-l1);margin:0 10px;min-width:12px}
 .ci-wiz-body{padding:18px 24px;overflow:auto;flex:1;min-height:280px}
-.ci-wiz-foot{padding:12px 24px 18px;border-top:1px solid var(--dsw-alias-border-l1);display:flex;justify-content:flex-end;gap:8px;flex:none}
+.ci-wiz-foot{padding:12px 24px 18px;border-top:1px solid var(--dsw-alias-border-l1);display:flex;justify-content:flex-end;align-items:center;gap:8px;flex:none}
 .ci-wiz-foot .ci-mini{height:34px;padding:0 16px}
+.ci-wiz-foot .ci-foot-back{width:34px;height:34px;padding:0;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;flex-shrink:0}
+.ci-wiz-foot .ci-foot-back:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-wiz-sec{font-size:13px;font-weight:650;margin:16px 0 8px;color:var(--dsw-alias-label-primary)}
 .ci-wiz-sec:first-child{margin-top:0}
 .ci-opt{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-top:1px solid var(--dsw-alias-border-l1);cursor:pointer}
@@ -393,7 +395,7 @@ html[data-theme=dark] .ci-image,.ci-image[data-theme=dark]{--ci-title:#f7f8fb;co
 .ci-image-body{padding:14px 16px 16px;min-width:0;overflow-x:auto}
 .ci-image-body>.ci-empty,.ci-image .ci-empty{border-top:0;padding:28px 8px}
 .ci-image .ci-crumb{padding:0;border:0;margin:0 0 12px;gap:10px;min-width:0}
-.ci-image .ci-back{height:28px;padding:0 10px;font-size:12px;color:var(--ci-title);flex:none}
+.ci-image .ci-back{height:28px;padding:0;font-size:12px;color:var(--ci-title);flex:none}
 .ci-detail-titles{min-width:0;flex:1}
 .ci-detail-meta{margin:2px 0 0;font-size:12px;line-height:18px;color:var(--ci-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ci-copied{display:flex;align-items:flex-start;gap:8px;margin:0 0 12px;padding:8px 10px;border-radius:8px;background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary);font-size:12px;line-height:18px;word-break:break-all}
@@ -563,6 +565,19 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           strokeLinejoin: "round",
         }),
       );
+    }
+
+    // 统一的返回按钮：纯 ChevronLeft 图标，语义由 title/aria-label 承载；
+    // rest 透传 disabled/key 等额外属性，className 固定在 ci-back 之上。
+    function BackButton({ onClick, className, ...rest }) {
+      return h("button", {
+        type: "button",
+        className: ("ci-back" + (className ? " " + className : "")).trim(),
+        title: "返回",
+        "aria-label": "返回",
+        onClick,
+        ...rest,
+      }, h(ChevronLeft));
     }
 
     function statusText(status) {
@@ -1449,7 +1464,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t", title: item.title }, "证书详情 · " + item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -1548,7 +1563,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack, title: "返回", "aria-label": "返回" }, h(ChevronLeft)),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t", title: item.title }, item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -2137,7 +2152,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const showFiles = !!(session && (session.detail || (session.entries || []).length) && (!session.loading || (session.entries || []).length));
       return [
         session ? h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: () => { setSession(null); setDraftQ(""); setErr(""); } }, "返回"),
+          h(BackButton, { onClick: () => { setSession(null); setDraftQ(""); setErr(""); } }),
           h("span", { className: "ci-head-t" }, session.item.title),
         ) : null,
         session ? h("div", { key: "path", className: "ci-crumbs" },
@@ -2821,7 +2836,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       })();
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t" }, item.title),
           h("span", { className: "ci-sub" }, `${item.description || ""} · ${regionName(region)}`),
         ),
@@ -2955,7 +2970,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (!session) {
         return [
           h("div", { key: "crumb", className: "ci-crumb" },
-            h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+            h(BackButton, { onClick: onBack }),
             h("span", { className: "ci-head-t" }, "登录数据库（DMC）"),
           ),
           h("div", { key: "login", className: "ci-login-box" },
@@ -2979,7 +2994,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       }
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t" }, "SQL 窗口"),
           h("span", { className: "ci-sub" }, `${item.title} · ${session.user}`),
           h("button", { type: "button", className: "ci-mini", onClick: () => run("dmc.logout", {}).then(() => setSession(null)) }, "退出登录"),
@@ -3276,7 +3291,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack, title: "返回", "aria-label": "返回" }, h(ChevronLeft)),
+          h(BackButton, { onClick: onBack }),
           h("div", { className: "ci-crumb-meta" },
             h("span", { className: "ci-head-t", title: card.title }, card.title),
             h(StatusCell, { status: card.status, label: card.stateLabel }),
@@ -3561,7 +3576,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           ),
         ];
         foot = [
-          h("button", { key: "back", type: "button", className: "ci-mini", disabled: busy, onClick: onBackCart }, "返回购物车"),
+          h(BackButton, { key: "back", className: "ci-foot-back", disabled: busy, onClick: onBackCart }),
           h("button", {
             key: "next",
             type: "button",
@@ -3590,7 +3605,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           h("div", { className: "ci-kv-v" }, "将从账户余额扣费。不支持微信 / QQ 钱包 / 网银。"),
         );
         foot = [
-          h("button", { key: "back", type: "button", className: "ci-mini", disabled: busy, onClick: onBackSubmit }, "返回"),
+          h(BackButton, { key: "back", className: "ci-foot-back", disabled: busy, onClick: onBackSubmit }),
           h("button", {
             key: "pay",
             type: "button",
@@ -3674,7 +3689,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t", title: item.title }, item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -3988,7 +4003,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t" }, "新建 · " + (CREATE_TYPES.find((x) => x.id === createType)?.title || "")),
         ),
         h("div", { key: "steps", className: "ci-steps" }, steps.map((label, idx) => h("span", {
@@ -4084,7 +4099,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t" }, "删除集群 · " + item.title),
         ),
         h("div", { key: "wiz", className: "ci-wizard" },
@@ -4158,7 +4173,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       });
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t", title: item.title }, item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -4654,7 +4669,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           }) : null,
           screen === "create" && !createType ? [
             h("div", { key: "crumb", className: "ci-crumb" },
-              h("button", { type: "button", className: "ci-back", onClick: () => setScreen("list") }, "返回"),
+              h(BackButton, { onClick: () => setScreen("list") }),
               h("span", { className: "ci-head-t" }, "选择集群类型"),
             ),
             h("div", { key: "cards", className: "ci-type-grid" }, CREATE_TYPES.map((card) => h("button", {
@@ -5043,7 +5058,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         return h("div", { className: "ci-root ci-tool ci-cls" }, h("div", { className: "ci-panel" },
           h("div", { className: "ci-search-bar" },
             h("div", { className: "ci-search-bar-main" },
-              h("button", { type: "button", className: "ci-back", onClick: () => { setView("list"); setTopic(null); } }, "返回主题"),
+              h(BackButton, { onClick: () => { setView("list"); setTopic(null); } }),
               h("div", { className: "ci-search-meta" },
                 h("div", { className: "ci-bar-title" }, "检索分析"),
                 h("div", { className: "ci-search-sub", title: topicCaption(topic, region, regions) }, topicCaption(topic, region, regions)),
@@ -5577,7 +5592,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             .map((row) => row.value))].join(" · ");
           return [
             h("div", { key: "crumb", className: "ci-crumb" },
-              h("button", { type: "button", className: "ci-back", onClick: () => { setRepo(null); setDraftQ(""); changeView("repo"); } }, "返回"),
+              h(BackButton, { onClick: () => { setRepo(null); setDraftQ(""); changeView("repo"); } }),
               h("div", { className: "ci-detail-titles" },
                 h("div", { className: "ci-head-t" }, repo?.full || "版本管理"),
                 meta ? h("div", { className: "ci-detail-meta", title: meta }, meta) : null,
