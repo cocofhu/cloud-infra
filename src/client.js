@@ -155,7 +155,6 @@ window.__ModuleLoader__.load({
 .ci-f b{display:block;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:550;margin-top:2px}
 .ci-sec-t{font-size:13px;font-weight:650;padding:12px 16px 4px}
 .ci-power{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
-.ci-foot-note{padding:8px 14px;color:var(--dsw-alias-label-caption);font-size:12px;border-top:1px solid var(--dsw-alias-border-l1)}
 .ci-tabs{display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--dsw-alias-border-l1);padding:0 10px;overflow-x:auto;background:var(--dsw-alias-bg-layer-1)}
 .ci-tab{border:0;background:none;padding:10px 14px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-secondary);border-bottom:2px solid transparent;white-space:nowrap;flex:none}
 .ci-tab:hover{color:var(--dsw-alias-brand-primary)}
@@ -925,7 +924,6 @@ window.__ModuleLoader__.load({
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
         )) : h("div", { key: "empty", className: "ci-empty" }, emptyHint || (qValue ? `没有匹配「${qValue}」的实例` : "没有匹配的实例")),
-        h("div", { key: "note", className: "ci-foot-note" }, "官方还可自定义监控、IPv6、网络计费、标签、项目 — 本期进详情，不挤进对话表。"),
       ];
     }
 
