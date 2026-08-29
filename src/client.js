@@ -55,8 +55,8 @@ window.__ModuleLoader__.load({
 .ci-st.pause{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
 .ci-st.error{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-label-primary-foreground)}
 .ci-crumb{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.ci-back{height:28px;padding:0 10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:8px;cursor:pointer;font:inherit;color:inherit}
-.ci-back:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-back{border:0;background:none;padding:0;height:auto;border-radius:0;cursor:pointer;font:inherit;font-size:13px;line-height:22px;color:var(--dsw-alias-brand-primary);flex:none}
+.ci-back:hover{background:none;text-decoration:underline}
 .ci-head-t{font-weight:650;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ci-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 4px}
 .ci-chip{font-size:12px;padding:4px 8px;border-radius:7px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-caption)}
@@ -977,7 +977,7 @@ window.__ModuleLoader__.load({
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
           h("span", { className: "ci-head-t", title: card.title }, card.title),
           h(StatusCell, { status: card.status, label: card.stateLabel }),
           h("div", { className: "ci-power" },
