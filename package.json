@@ -53,7 +53,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "rm -rf lib && tsc -p tsconfig.json && mkdir -p lib/tests/fixtures && cp src/client.js lib/client.js && cp src/tests/fixtures/* lib/tests/fixtures/",
+    "build": "rm -rf lib && tsc -p tsconfig.json && mkdir -p lib/tests/fixtures && cp src/tests/fixtures/* lib/tests/fixtures/ && node scripts/bundle-client.mjs",
     "prepare": "npm run build",
     "test": "npm run build && node --test lib/tests/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -71,6 +71,7 @@
     }
   },
   "dependencies": {
+    "echarts": "^6.1.0",
     "mysql2": "^3.24.2"
   },
   "peerDependencies": {
@@ -84,6 +85,8 @@
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
     "@deepseek-ai/schemastery": "^3.18.1",
     "@types/node": "^26.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^7.0.2"
   }
 }

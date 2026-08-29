@@ -943,6 +943,33 @@ test('g4.3 README documents chat card, region-first and TCR CAM', () => {
   assert.match(readme, /不在设置页增加地域/)
 })
 
+test('monitor charts: MonitorPanel/MonitorChart shared by CDB and instance detail', () => {
+  const client = read('src/client.js')
+  assert.match(client, /function MonitorChart\(/)
+  assert.match(client, /function MonitorPanel\(/)
+  assert.match(client, /MONITOR_RANGES/)
+  assert.match(client, /"1h"/)
+  assert.match(client, /"6h"/)
+  assert.match(client, /"24h"/)
+  // echarts 由构建期打包进 lib/client.js,不允许出现任何运行时 CDN 注入
+  assert.doesNotMatch(client, /cdn\.jsdelivr\.net/)
+  assert.doesNotMatch(client, /createElement\("script"\)/)
+  assert.doesNotMatch(client, /ECHARTS_URL/)
+  assert.match(client, /chart\.dispose\(\)/)
+  assert.match(client, /暂无监控数据/)
+  assert.match(client, /ci-monitor-grid/)
+  // CDB 与 CVM/轻量都走同一个 MonitorPanel
+  assert.equal(client.split('h(MonitorPanel').length - 1 >= 2, true)
+  // 实例详情带「实例详情 / 实例监控」两个 Tab
+  assert.match(client, /\["实例详情", "实例监控"\]/)
+  // 时间窗切换走 reload(tab, { range })
+  assert.match(client, /onRangeChange: \(range\) => onReload\("实例监控", \{ range \}\)/)
+  // seriesMap 由 buildMonitorSeriesMap 统一构造,以 MetricDef.key 为键
+  assert.match(client, /function buildMonitorSeriesMap\(/)
+  assert.equal(client.split('buildMonitorSeriesMap(tabData.metrics, tabData.series)').length - 1, 2)
+  assert.match(client, /map\[m\.key\]/)
+})
+
 test('region pickers unify on RegionCombo with grouping and 全部地域 support', () => {
   const client = read('src/client.js')
   assert.match(client, /function RegionCombo\(/)

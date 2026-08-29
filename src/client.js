@@ -91,6 +91,22 @@ window.__ModuleLoader__.load({
 .ci-list-body .ci-load{min-height:160px;box-sizing:border-box}
 .ci-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:ci-spin .7s linear infinite;vertical-align:-1px;margin-right:6px}
 @keyframes ci-spin{to{transform:rotate(360deg)}}
+.ci-monitor{border-top:1px solid var(--dsw-alias-border-l1);padding:10px 14px 14px;min-width:0}
+.ci-monitor-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ci-monitor-title{font-size:13px;font-weight:650;color:var(--dsw-alias-label-primary)}
+.ci-monitor-ranges{display:inline-flex;gap:4px;padding:2px;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;background:var(--dsw-alias-bg-layer-2)}
+.ci-monitor-range{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;line-height:20px;padding:2px 10px;border-radius:7px;cursor:pointer}
+.ci-monitor-range:hover{color:var(--dsw-alias-label-primary)}
+.ci-monitor-range.active{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}
+.ci-monitor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.ci-monitor-chart{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:10px 12px 6px;min-width:0;box-sizing:border-box}
+.ci-monitor-chart-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px;min-width:0}
+.ci-monitor-chart-t{font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-monitor-chart-v{font-size:13px;font-weight:650;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ci-monitor-chart-v i{font-style:normal;font-size:11px;font-weight:400;color:var(--dsw-alias-label-tertiary);margin-left:2px}
+.ci-monitor-chart-box{width:100%;height:180px;min-width:0}
+.ci-monitor-empty{display:flex;align-items:center;justify-content:center;height:180px;color:var(--dsw-alias-label-caption);font-size:12px}
+.ci-monitor-note{padding:16px 4px;text-align:center;color:var(--dsw-alias-label-caption);font-size:13px}
 .ci-modal-mask{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--dsw-alias-bg-mask-3);box-sizing:border-box}
 .ci-modal-mask.stacked{z-index:41}
 .ci-modal{width:min(400px,100%);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:14px;padding:16px;box-shadow:var(--dsw-alias-shadow);box-sizing:border-box}
@@ -457,6 +473,207 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const rd = require("react-dom");
       if (rd && typeof rd.createPortal === "function") createPortal = rd.createPortal;
     } catch { /* overlay still works without portal */ }
+
+    // echarts 由构建期全量打包进本文件(见 scripts/bundle-client.mjs),
+    // 构建产物在加载本 module 前会把 echarts UMD 挂到 window.echarts / globalThis.echarts。
+    // 这里只做解析与缓存,不做任何运行时网络加载。
+    const echartsGlobal = () => {
+      if (typeof window !== "undefined" && window.echarts && typeof window.echarts.init === "function") return window.echarts;
+      if (typeof globalThis !== "undefined" && globalThis.echarts && typeof globalThis.echarts.init === "function") return globalThis.echarts;
+      return null;
+    };
+    let echartsPromise = null;
+    function loadEcharts() {
+      const lib = echartsGlobal();
+      if (lib) return Promise.resolve(lib);
+      if (echartsPromise) return echartsPromise;
+      // 兼容极端场景(echarts 段在本模块之后异步注入):轮询一个短窗口后失败兜底
+      echartsPromise = new Promise((resolve, reject) => {
+        let waited = 0;
+        const tick = () => {
+          const found = echartsGlobal();
+          if (found) {
+            echartsPromise = Promise.resolve(found);
+            resolve(found);
+            return;
+          }
+          waited += 50;
+          if (waited >= 3000) {
+            const err = new Error("echarts 未打包进构建产物");
+            echartsPromise = null;
+            reject(err);
+            return;
+          }
+          setTimeout(tick, 50);
+        };
+        tick();
+      });
+      return echartsPromise;
+    }
+
+    function fmtMonitorTime(ts, range) {
+      const d = new Date(Number(ts) * 1000);
+      if (!Number.isFinite(d.getTime())) return "";
+      const p = (n) => String(n).padStart(2, "0");
+      const hm = `${p(d.getHours())}:${p(d.getMinutes())}`;
+      if (range === "24h") return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${hm}`;
+      return hm;
+    }
+
+    function fmtMonitorValue(value, unit) {
+      if (value == null || !Number.isFinite(Number(value))) return "-";
+      const n = Number(value);
+      const abs = Math.abs(n);
+      const text = abs >= 1000 ? String(Math.round(n * 10) / 10) : String(Math.round(n * 100) / 100);
+      return unit ? `${text} ${unit}` : text;
+    }
+
+    function MonitorChart({ title, unit, series, color, height, range }) {
+      const box = useRef(null);
+      const chartRef = useRef(null);
+      const [failed, setFailed] = useState(false);
+      const points = (series && Array.isArray(series.timestamps) ? series.timestamps : [])
+        .map((ts, i) => [Number(ts) * 1000, series.values ? series.values[i] : null])
+        .filter((row) => Number.isFinite(row[0]));
+      const latest = series && Array.isArray(series.values)
+        ? [...series.values].reverse().find((v) => v != null && Number.isFinite(Number(v)))
+        : null;
+      useEffect(() => {
+        let dead = false;
+        let chart = chartRef.current;
+        if (!box.current) return;
+        if (!points.length) {
+          if (chart) { chart.dispose(); chartRef.current = null; }
+          return;
+        }
+        loadEcharts().then((lib) => {
+          if (dead || !box.current) return;
+          chart = chartRef.current;
+          if (!chart) {
+            chart = lib.init(box.current);
+            chartRef.current = chart;
+          }
+          chart.setOption({
+            animation: false,
+            grid: { left: 8, right: 10, top: 12, bottom: 4, containLabel: true },
+            tooltip: {
+              trigger: "axis",
+              valueFormatter: (v) => fmtMonitorValue(v, unit),
+            },
+            xAxis: {
+              type: "time",
+              axisLabel: {
+                fontSize: 10,
+                hideOverlap: true,
+                formatter: (ms) => fmtMonitorTime(ms / 1000, range),
+              },
+              axisLine: { lineStyle: { color: "rgba(128,128,128,.35)" } },
+            },
+            yAxis: {
+              type: "value",
+              scale: true,
+              splitLine: { lineStyle: { color: "rgba(128,128,128,.18)" } },
+              axisLabel: { fontSize: 10, formatter: (v) => fmtMonitorValue(v, "") },
+            },
+            series: [{
+              type: "line",
+              name: title,
+              showSymbol: false,
+              smooth: true,
+              connectNulls: true,
+              lineStyle: { width: 1.6, color },
+              itemStyle: { color },
+              areaStyle: { opacity: 0.08, color },
+              data: points,
+            }],
+          }, { notMerge: true });
+        }).catch(() => { if (!dead) setFailed(true); });
+        const onResize = () => { try { chartRef.current && chartRef.current.resize(); } catch { /* keep */ } };
+        window.addEventListener("resize", onResize);
+        return () => {
+          dead = true;
+          window.removeEventListener("resize", onResize);
+        };
+      }, [title, unit, color, range, points.length, points.length ? points[0][0] : 0, points.length ? points[points.length - 1][0] : 0]);
+      useEffect(() => () => {
+        if (chartRef.current) { try { chartRef.current.dispose(); } catch { /* keep */ } chartRef.current = null; }
+      }, []);
+      return h("div", { className: "ci-monitor-chart" },
+        h("div", { className: "ci-monitor-chart-h" },
+          h("span", { className: "ci-monitor-chart-t", title }, title),
+          h("span", { className: "ci-monitor-chart-v" },
+            latest != null ? fmtMonitorValue(latest, "") : "-",
+            unit ? h("i", null, unit) : null,
+          ),
+        ),
+        failed
+          ? h("div", { className: "ci-monitor-empty" }, "图表组件加载失败")
+          : !points.length
+            ? h("div", { className: "ci-monitor-empty" }, "暂无监控数据")
+            : h("div", { className: "ci-monitor-chart-box", ref: box, style: height ? { height } : undefined }),
+      );
+    }
+
+    const MONITOR_RANGES = [
+      { id: "1h", label: "1小时" },
+      { id: "6h", label: "6小时" },
+      { id: "24h", label: "24小时" },
+    ];
+
+    // 后端 series[].key 与 MetricDef.key 对齐(经 fetchMonitorSeries 回填),
+    // 这里以 key 为主键挂载,同时按 metricName 反查兼容旧结构,保证 MonitorPanel 取 map[m.key] 一定能命中。
+    function buildMonitorSeriesMap(metrics, series) {
+      const map = {};
+      const defs = Array.isArray(metrics) ? metrics : [];
+      const rows = Array.isArray(series) ? series : [];
+      for (const row of rows) {
+        if (!row) continue;
+        if (row.key) {
+          map[String(row.key)] = row;
+          continue;
+        }
+        const def = defs.find((m) => m && (m.metricName === row.metric || m.key === row.metric));
+        if (def) map[String(def.key)] = row;
+        else if (row.metric) map[String(row.metric)] = row;
+      }
+      return map;
+    }
+
+    function MonitorPanel({ metrics, seriesMap, range, onRangeChange, note }) {
+      const cur = MONITOR_RANGES.some((row) => row.id === range) ? range : "1h";
+      const list = Array.isArray(metrics) ? metrics : [];
+      const map = seriesMap && typeof seriesMap === "object" ? seriesMap : {};
+      const empty = !list.length || list.every((m) => {
+        const s = map[m.key];
+        return !s || !Array.isArray(s.timestamps) || !s.timestamps.length;
+      });
+      return h("div", { className: "ci-monitor" },
+        h("div", { className: "ci-monitor-bar" },
+          h("span", { className: "ci-monitor-title" }, "实例监控"),
+          h("span", { className: "ci-monitor-ranges" }, MONITOR_RANGES.map((row) =>
+            h("button", {
+              key: row.id,
+              type: "button",
+              className: "ci-monitor-range" + (row.id === cur ? " active" : ""),
+              onClick: () => { if (row.id !== cur && onRangeChange) onRangeChange(row.id); },
+            }, row.label),
+          )),
+        ),
+        note ? h("div", { className: "ci-monitor-note" }, note) : null,
+        !note && empty ? h("div", { className: "ci-monitor-note" }, "暂无监控数据") : null,
+        !note && !empty ? h("div", { className: "ci-monitor-grid" }, list.map((m) =>
+          h(MonitorChart, {
+            key: m.key,
+            title: m.label || m.key,
+            unit: m.unit || "",
+            color: m.color || "#3a7bff",
+            range: cur,
+            series: map[m.key] || { timestamps: [], values: [] },
+          }),
+        )) : null,
+      );
+    }
+
 
     const PLUGIN_SCRIPT_PATH = "/plugins/@cocofhu/cloud-infra/client.js";
     const CONFIG_EVENT = "cloud-infra-config";
@@ -2813,16 +3030,14 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           ];
         }
         if (tab === "实例监控") {
-          const rows = [
-            ["CPU", tabData.cpu],
-            ["内存", tabData.memory],
-            ["磁盘", tabData.disk],
-            ["连接数", tabData.connections],
-          ];
-          return h("div", { className: "ci-kv" }, rows.flatMap(([label, value]) => [
-            h("div", { key: label + "k", className: "ci-k" }, label),
-            h("div", { key: label + "v" }, value == null || value === "" ? "-" : String(value)),
-          ]));
+          const seriesMap = buildMonitorSeriesMap(tabData.metrics, tabData.series);
+          return h(MonitorPanel, {
+            metrics: Array.isArray(tabData.metrics) ? tabData.metrics : [],
+            seriesMap,
+            range: tabData.range || "1h",
+            note: tabData.note || (extra.tabError && !tabData.series ? "无法拉取监控数据，请检查 CAM 云监控权限" : ""),
+            onRangeChange: (range) => onReload("实例监控", { range }),
+          });
         }
         if (tab === "账号管理") {
           const accounts = tabData.accounts || [];
@@ -3362,13 +3577,16 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       );
     }
 
-    function InstanceDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
+    function InstanceDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onTab, tab, onSkipConfirm }) {
       const [confirm, setConfirm] = useState(null);
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState("");
       const card = detail?.card || item;
       const groups = detail?.groups || [];
       const power = instancePower(card);
+      const extra = detail?.extra || {};
+      const tabData = extra.tabData || {};
+      const activeTab = tab || "实例详情";
       const run = async (actionId) => {
         setBusy(true);
         setErr("");
@@ -3431,10 +3649,29 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             }, "重启"),
           ),
         ),
+        h("div", { key: "tabs", className: "ci-tabs" }, ["实例详情", "实例监控"].map((name) =>
+          h("button", {
+            key: name,
+            type: "button",
+            className: "ci-tab" + (name === activeTab ? " on" : ""),
+            onClick: () => { if (name !== activeTab && onTab) onTab(name); },
+          }, name),
+        )),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
         !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
         err ? h("p", { key: "err", className: "ci-err" }, err) : null,
-        !loading && detail ? groups.map((group) => [
+        !loading && detail && activeTab === "实例监控" ? (() => {
+          const seriesMap = buildMonitorSeriesMap(tabData.metrics, tabData.series);
+          return h(MonitorPanel, {
+            key: "monitor",
+            metrics: Array.isArray(tabData.metrics) ? tabData.metrics : [],
+            seriesMap,
+            range: tabData.range || "1h",
+            note: tabData.note || "",
+            onRangeChange: (range) => onReload("实例监控", { range }),
+          });
+        })() : null,
+        !loading && detail && activeTab !== "实例监控" ? groups.map((group) => [
           h("div", { key: group.title + "-t", className: "ci-sec-t" }, group.title),
           h("div", { key: group.title + "-g", className: "ci-grid" },
             (group.fields || []).map((row) => h("div", { key: row.label, className: "ci-f" },
@@ -6434,7 +6671,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         }
         const nextTab = tab || "实例详情";
         const isCdbItem = item.kind === "cdb";
-        setSession({ item, loading: true, detail: null, mode: "manage", tab: nextTab });
+        const isInstance = isInstanceKind(item.kind);
+        setSession({ item, loading: true, detail: null, mode: "manage", tab: nextTab, range: "1h" });
         refreshSkip();
         try {
           const detail = await api("detail", {
@@ -6442,13 +6680,14 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             id: item.id,
             title: item.title,
             region: isCdbItem ? cdbMeta(item).region : item.region,
-            tab: isCdbItem ? nextTab : undefined,
+            tab: (isCdbItem || isInstance) ? nextTab : undefined,
+            range: (isCdbItem || isInstance) ? "1h" : undefined,
           });
           if (n !== detailSeq.current) return;
-          setSession({ item, loading: false, detail, mode: "manage", tab: nextTab });
+          setSession({ item, loading: false, detail, mode: "manage", tab: nextTab, range: "1h" });
         } catch (e) {
           if (n !== detailSeq.current) return;
-          setSession({ item, loading: false, detail: null, error: publicErrorMessage(e), mode: "manage", tab: nextTab });
+          setSession({ item, loading: false, detail: null, error: publicErrorMessage(e), mode: "manage", tab: nextTab, range: "1h" });
         } finally {
           if (n === detailSeq.current) setPendingId("");
         }
@@ -6457,7 +6696,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         setMoreId("");
         setSession({ item, mode: "dmc", database });
       };
-      const reload = async (tab) => {
+      const reload = async (tab, opts) => {
         if (!session?.item) return;
         const n = ++detailSeq.current;
         if (session.item.kind === "dbbrain") {
@@ -6480,21 +6719,24 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           return;
         }
         const nextTab = tab || session.tab || "实例详情";
+        const nextRange = (opts && opts.range) || session.range || "1h";
         const isCdbItem = session.item.kind === "cdb";
-        setSession((cur) => cur ? { ...cur, loading: true, tab: nextTab } : cur);
+        const isInstance = isInstanceKind(session.item.kind);
+        setSession((cur) => cur ? { ...cur, loading: true, tab: nextTab, range: nextRange } : cur);
         try {
           const detail = await api("detail", {
             moduleId: session.item.moduleId,
             id: session.item.id,
             title: session.item.title,
             region: isCdbItem ? cdbMeta(session.item).region : session.item.region,
-            tab: isCdbItem ? nextTab : undefined,
+            tab: (isCdbItem || isInstance) ? nextTab : undefined,
+            range: (isCdbItem || isInstance) && nextTab === "实例监控" ? nextRange : undefined,
           });
           if (n !== detailSeq.current) return;
-          setSession((cur) => cur ? { ...cur, detail, loading: false, error: "", tab: nextTab } : cur);
+          setSession((cur) => cur ? { ...cur, detail, loading: false, error: "", tab: nextTab, range: nextRange } : cur);
         } catch (e) {
           if (n !== detailSeq.current) return;
-          setSession((cur) => cur ? { ...cur, loading: false, error: publicErrorMessage(e), tab: nextTab } : cur);
+          setSession((cur) => cur ? { ...cur, loading: false, error: publicErrorMessage(e), tab: nextTab, range: nextRange } : cur);
         }
       };
       const selectedItems = rows.filter((item) => selected[item.id]);
@@ -6858,6 +7100,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             loading: session.loading,
             error: session.error,
             skipConfirm,
+            tab: session.tab || "实例详情",
+            onTab: (name) => reload(name),
             onBack: () => setSession(null),
             onReload: reload,
             onSkipConfirm: setSkipConfirm,
@@ -7715,6 +7959,6 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ));
     }
 
-    return { inject, apply, SearchToolView, ConfigCard };
+    return { inject, apply, SearchToolView, ConfigCard, __monitorInternals: { buildMonitorSeriesMap, MonitorPanel, MonitorChart } };
   },
 });
