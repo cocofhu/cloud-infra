@@ -13,14 +13,18 @@ import {
   SLOW_RANGES,
   createDbbrainModule,
   encodeInstanceRef,
+  hasReportTab,
   mapInstanceItem,
   parseInstanceRef,
+  readableDiagText,
   requireRegion,
   resolveTab,
   tabsForProduct,
   timeRange,
+  toIso8601,
   type InstanceInfo,
 } from '../providers/tencent/products/dbbrain.js'
+import { DBBRAIN_REGIONS } from '../providers/tencent/products/dbbrain-catalog.js'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const fixture = (name: string) => JSON.parse(readFileSync(join(dir, 'fixtures', name), 'utf8')) as Record<string, unknown>
@@ -108,6 +112,10 @@ test('same-card detail carries instance region, not list Guangzhou (g1.2 g2.1 g4
   const diag = calls.find((row) => row.action === 'DescribeDBDiagEvents' || row.action === 'DescribeDBDiagHistory')
   assert.equal(diag?.region, 'ap-shanghai')
   assert.notEqual(diag?.region, LIST_REGION)
+  assert.equal(diag?.action, 'DescribeDBDiagEvents')
+  assert.deepEqual(diag?.payload.InstanceIds, ['cdb-sh'])
+  assert.equal(diag?.payload.InstanceId, undefined)
+  assert.match(String(diag?.payload.StartTime), /\+08:00$/)
   assert.equal(detail?.card.openLabel, '诊断优化')
 })
 
@@ -136,10 +144,21 @@ test('MySQL tabs, Redis/Mongo console names, Kill always confirms (g2.2 g2.3)', 
   for (const label of ['异常诊断', '慢SQL分析', '空间分析', '实时会话', '健康报告', 'SQL优化', '自治中心']) {
     assert.ok(mysql.includes(label), label)
   }
+  assert.deepEqual(tabsForProduct('cynosdb').map((tab) => tab.id), tabsForProduct('mysql').map((tab) => tab.id))
+  const mariadb = tabsForProduct('mariadb').map((tab) => tab.label)
+  assert.deepEqual(mariadb, ['异常诊断', '实时会话', '慢SQL分析', '健康报告'])
+  assert.ok(!mariadb.includes('自治中心'))
+  assert.ok(!mariadb.includes('死锁可视化'))
+  assert.deepEqual(tabsForProduct('dcdb').map((tab) => tab.id), tabsForProduct('mariadb').map((tab) => tab.id))
+  assert.deepEqual(tabsForProduct('dbbrain-mysql').map((tab) => tab.id), tabsForProduct('mariadb').map((tab) => tab.id))
   assert.deepEqual(tabsForProduct('redis').map((tab) => tab.label), ['内存分析', '访问分析', '慢日志分析'])
   assert.deepEqual(tabsForProduct('mongodb').map((tab) => tab.label), ['索引推荐', '会话'])
   assert.equal(resolveTab('redis', 'diag'), 'memory')
   assert.equal(resolveTab('mysql', 'report'), 'report')
+  assert.equal(resolveTab('redis', 'report'), 'memory')
+  assert.equal(hasReportTab('mysql'), true)
+  assert.equal(hasReportTab('redis'), false)
+  assert.equal(hasReportTab('mongodb'), false)
   const module = createDbbrainModule((async () => ({})) as never)
   assert.equal(module.actions?.find((item) => item.id === 'session.kill')?.confirm, 'always')
   assert.equal(module.actions?.find((item) => item.id === 'report.delete')?.confirm, 'always')
@@ -151,12 +170,18 @@ test('slow SQL shortcuts include today through custom (g2.2)', () => {
   const five = timeRange('5m')
   assert.match(five.start, /^\d{4}-\d{2}-\d{2} /)
   assert.match(five.end, /^\d{4}-\d{2}-\d{2} /)
+  const today = timeRange('today')
+  assert.match(today.start, / 00:00:00$/)
+  assert.match(toIso8601(five.start), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00$/)
 })
 
-test('Kill execute uses instance region and does not write overlay (g2.2 g3.2 g4.1)', async () => {
+test('Kill execute uses Prepare/Commit, instance region, and does not write overlay (g2.2 g3.2 g4.1)', async () => {
   const calls: Array<{ action: string; region: string; payload: Record<string, unknown> }> = []
   const call = async (action: string, payload: unknown, _creds: unknown, opts: { region: string }) => {
     calls.push({ action, region: opts.region, payload: payload as Record<string, unknown> })
+    if (action === 'KillMySqlThreads' && (payload as { Stage?: string }).Stage === 'Prepare') {
+      return { SqlExecId: 'exec-9' }
+    }
     return {}
   }
   const module = createDbbrainModule(call as never)
@@ -167,8 +192,14 @@ test('Kill execute uses instance region and does not write overlay (g2.2 g3.2 g4
     instanceId: 'cdb-sh',
   }, ctx({ id: 'tencent.dbbrain:mysql:ap-shanghai:cdb-sh' }))
   assert.equal(killed?.ok, true)
+  assert.equal(calls.length, 2)
   assert.equal(calls[0].action, 'KillMySqlThreads')
   assert.equal(calls[0].region, 'ap-shanghai')
+  assert.equal(calls[0].payload.Stage, 'Prepare')
+  assert.deepEqual(calls[0].payload.Threads, [123])
+  assert.equal(calls[0].payload.SessionIds, undefined)
+  assert.equal(calls[1].payload.Stage, 'Commit')
+  assert.equal(calls[1].payload.SqlExecId, 'exec-9')
   const src = readFileSync(join(dir, '../../src/providers/tencent/products/dbbrain.ts'), 'utf8')
   assert.doesNotMatch(src, /writeOverlay/)
 })
@@ -256,3 +287,160 @@ test('handleApi query/detail pass filters; action does not save overlay (g3.2 g4
     rmSync(dirName, { recursive: true, force: true })
   }
 })
+
+test('report.create sends SendMailFlag 0 as ISO8601 without contacts (g2.2 g4.1)', async () => {
+  const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
+  const call = async (action: string, payload: unknown) => {
+    calls.push({ action, payload: payload as Record<string, unknown> })
+    return {}
+  }
+  const module = createDbbrainModule(call as never)
+  const created = await module.execute?.('report.create', {
+    product: 'mysql',
+    region: 'ap-shanghai',
+    instanceId: 'cdb-sh',
+    range: '24h',
+  }, ctx({ id: 'tencent.dbbrain:mysql:ap-shanghai:cdb-sh' }))
+  assert.equal(created?.ok, true)
+  assert.equal(calls[0].action, 'CreateDBDiagReportTask')
+  assert.equal(calls[0].payload.SendMailFlag, 0)
+  assert.equal(calls[0].payload.ContactPerson, undefined)
+  assert.equal(calls[0].payload.ContactGroup, undefined)
+  assert.match(String(calls[0].payload.StartTime), /^\d{4}-\d{2}-\d{2}T.+\+08:00$/)
+  assert.match(String(calls[0].payload.EndTime), /^\d{4}-\d{2}-\d{2}T.+\+08:00$/)
+})
+
+test('event.ignore uses integer Status (g2.2 g4.1)', async () => {
+  const calls: Array<{ payload: Record<string, unknown> }> = []
+  const call = async (_action: string, payload: unknown) => {
+    calls.push({ payload: payload as Record<string, unknown> })
+    return {}
+  }
+  const module = createDbbrainModule(call as never)
+  const ignored = await module.execute?.('event.ignore', {
+    eventId: 9,
+    product: 'mysql',
+    region: 'ap-shanghai',
+    instanceId: 'cdb-sh',
+  }, ctx({ id: 'tencent.dbbrain:mysql:ap-shanghai:cdb-sh' }))
+  assert.equal(ignored?.ok, true)
+  assert.equal(calls[0].payload.Status, 2)
+  assert.equal(typeof calls[0].payload.Status, 'number')
+})
+
+test('Mongo kill uses CreateMongoDBKillTask official fields (g2.3 g4.1)', async () => {
+  const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
+  const call = async (action: string, payload: unknown) => {
+    calls.push({ action, payload: payload as Record<string, unknown> })
+    return { Status: 1 }
+  }
+  const module = createDbbrainModule(call as never)
+  const killed = await module.execute?.('session.kill', {
+    sessionId: '61',
+    host: '10.0.0.1',
+    product: 'mongodb',
+    region: 'ap-beijing',
+    instanceId: 'cmgo-1',
+  }, ctx({ id: 'tencent.dbbrain:mongodb:ap-beijing:cmgo-1' }))
+  assert.equal(killed?.ok, true)
+  assert.equal(calls[0].action, 'CreateMongoDBKillTask')
+  assert.equal(calls[0].payload.Product, 'mongodb')
+  assert.equal(calls[0].payload.Duration, 10)
+  assert.equal(calls[0].payload.Host, '10.0.0.1')
+  assert.equal(calls[0].payload.SessionIds, undefined)
+})
+
+test('history diagnosis clamps 3d window to two days (g2.1 g4.1)', async () => {
+  const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
+  const call = async (action: string, payload: unknown) => {
+    calls.push({ action, payload: payload as Record<string, unknown> })
+    return { Events: [] }
+  }
+  const module = createDbbrainModule(call as never)
+  await module.detail?.(ctx({
+    id: 'tencent.dbbrain:mysql:ap-shanghai:cdb-sh',
+    title: 'pay-core',
+    filters: { tab: 'diag', subTab: 'history', range: '3d', product: 'mysql', region: 'ap-shanghai' },
+  }))
+  const history = calls.find((row) => row.action === 'DescribeDBDiagHistory')
+  assert.ok(history)
+  const start = Date.parse(toIso8601(String(history?.payload.StartTime)))
+  const end = Date.parse(toIso8601(String(history?.payload.EndTime)))
+  assert.ok(end - start <= 2 * 24 * 60 * 60 * 1000 + 1000)
+})
+
+test('empty range after tab switch does not keep slow 3d on live diag (g2.1 g4.1)', async () => {
+  const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
+  const call = async (action: string, payload: unknown) => {
+    calls.push({ action, payload: payload as Record<string, unknown> })
+    return { Events: [] }
+  }
+  const module = createDbbrainModule(call as never)
+  await module.detail?.(ctx({
+    id: 'tencent.dbbrain:mysql:ap-shanghai:cdb-sh',
+    title: 'pay-core',
+    filters: { tab: 'diag', product: 'mysql', region: 'ap-shanghai', range: '' },
+  }))
+  const live = calls.find((row) => row.action === 'DescribeDBDiagEvents')
+  assert.ok(live)
+  const start = Date.parse(String(live?.payload.StartTime))
+  const end = Date.parse(String(live?.payload.EndTime))
+  assert.ok(end - start <= 3 * 60 * 60 * 1000 + 2000)
+})
+
+test('MySQL autonomy does not call redis-only API (g2.2 g4.1)', async () => {
+  const calls: string[] = []
+  const call = async (action: string) => {
+    calls.push(action)
+    return {}
+  }
+  const module = createDbbrainModule(call as never)
+  const detail = await module.detail?.(ctx({
+    id: 'tencent.dbbrain:mysql:ap-shanghai:cdb-sh',
+    title: 'pay-core',
+    filters: { tab: 'autonomy', product: 'mysql', region: 'ap-shanghai' },
+  }))
+  assert.equal(calls.includes('DescribeDBAutonomyEvents'), false)
+  assert.ok(detail?.hints?.some((hint) => hint.includes('当前产品线') && hint.includes('自治中心')))
+})
+
+test('event detail flattens Problem/Suggestions JSON (g2.2 g4.1)', async () => {
+  const call = async (action: string) => {
+    if (action === 'DescribeDBDiagEvents') {
+      return { Items: [{ EventId: 9, Severity: 3, DiagItem: '慢SQL' }] }
+    }
+    if (action === 'DescribeDBDiagEvent') {
+      return {
+        Outline: '发现1个问题',
+        Problem: '[{"DataType":"title","Data":{"Name":"会话快照"}}]',
+        Suggestions: '[{"DataType":"title","Data":{"Name":"SQL优化"}}]',
+      }
+    }
+    return {}
+  }
+  const module = createDbbrainModule(call as never)
+  const detail = await module.detail?.(ctx({
+    id: 'tencent.dbbrain:mysql:ap-shanghai:cdb-sh',
+    title: 'pay-core',
+    filters: { tab: 'diag', eventId: '9', product: 'mysql', region: 'ap-shanghai' },
+  }))
+  const cause = detail?.tables?.find((table) => table.id === 'cause')
+  const advice = detail?.tables?.find((table) => table.id === 'advice')
+  assert.equal(cause?.rows[0]?.内容, '会话快照')
+  assert.equal(advice?.rows[0]?.内容, 'SQL优化')
+  assert.equal(readableDiagText('[{"DataType":"title","Data":{"Name":"会话快照"}}]'), '会话快照')
+})
+
+test('shared region catalog covers finance and overseas ids (g1.1)', () => {
+  const ids = DBBRAIN_REGIONS.map((item) => item.id)
+  for (const id of ['ap-shanghai-fsi', 'ap-shenzhen-fsi', 'ap-beijing-fsi', 'ap-qingdao', 'ap-hangzhou', 'ap-jakarta']) {
+    assert.ok(ids.includes(id), id)
+  }
+  const client = readFileSync(join(dir, '../../src/client.js'), 'utf8')
+  for (const region of DBBRAIN_REGIONS) {
+    if (!region.id) continue
+    assert.ok(client.includes(region.id), region.id)
+    assert.ok(client.includes(region.label), region.label)
+  }
+})
+

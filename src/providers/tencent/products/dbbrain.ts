@@ -11,37 +11,16 @@ import type {
   ResourceStatus,
 } from '../../../core/types.js'
 import { dbbrainCall } from '../client.js'
+import { DBBRAIN_PRODUCTS, DBBRAIN_REGIONS } from './dbbrain-catalog.js'
+
+export { DBBRAIN_PRODUCTS, DBBRAIN_REGIONS } from './dbbrain-catalog.js'
 
 export const LIST_REGION = 'ap-guangzhou'
 export const MISSING_REGION = '缺少实例地域，无法发起诊断。不会默认使用广州。'
 export const MODULE_ID = 'tencent.dbbrain'
-
-export const DBBRAIN_PRODUCTS: DetailTab[] = [
-  { id: 'mysql', label: 'MySQL' },
-  { id: 'cynosdb', label: 'TDSQL-C' },
-  { id: 'mariadb', label: 'MariaDB' },
-  { id: 'dcdb', label: 'TDSQL MySQL' },
-  { id: 'redis', label: 'Redis' },
-  { id: 'mongodb', label: 'MongoDB' },
-  { id: 'postgres', label: 'PostgreSQL' },
-  { id: 'dbbrain-mysql', label: '自建 MySQL' },
-]
-
-export const DBBRAIN_REGIONS: DetailTab[] = [
-  { id: '', label: '全地域' },
-  { id: 'ap-guangzhou', label: '广州' },
-  { id: 'ap-shanghai', label: '上海' },
-  { id: 'ap-beijing', label: '北京' },
-  { id: 'ap-chengdu', label: '成都' },
-  { id: 'ap-chongqing', label: '重庆' },
-  { id: 'ap-nanjing', label: '南京' },
-  { id: 'ap-hongkong', label: '香港' },
-  { id: 'ap-singapore', label: '新加坡' },
-  { id: 'ap-tokyo', label: '东京' },
-  { id: 'na-siliconvalley', label: '硅谷' },
-  { id: 'na-ashburn', label: '弗吉尼亚' },
-  { id: 'eu-frankfurt', label: '法兰克福' },
-]
+export const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000
+export const DIAG_HISTORY_MAX_MS = 2 * 24 * 60 * 60 * 1000
+export const IGNORE_EVENT_STATUS = 2
 
 export const SLOW_RANGES: DetailTab[] = [
   { id: 'today', label: '今天' },
@@ -73,7 +52,10 @@ const DIAG_SUBTABS: DetailTab[] = [
   { id: 'history', label: '历史' },
 ]
 
+const MYSQL_FULL = new Set(['mysql', 'cynosdb'])
+const MYSQL_CORE = new Set(['mariadb', 'dcdb', 'dbbrain-mysql'])
 const MYSQL_LIKE = new Set(['mysql', 'cynosdb', 'mariadb', 'dcdb', 'dbbrain-mysql'])
+const AUTONOMY_PRODUCTS = new Set(['redis'])
 
 const ACTIONS: ResourceAction[] = [
   { id: 'session.kill', label: 'Kill 会话', confirm: 'always' },
@@ -190,6 +172,26 @@ export function mapInstanceItem(item: InstanceInfo, product: string, moduleId = 
   }
 }
 
+const MYSQL_FULL_TABS: DetailTab[] = [
+  { id: 'diag', label: '异常诊断' },
+  { id: 'trend', label: '性能趋势' },
+  { id: 'session', label: '实时会话' },
+  { id: 'slow', label: '慢SQL分析' },
+  { id: 'space', label: '空间分析' },
+  { id: 'sqlopt', label: 'SQL优化' },
+  { id: 'autonomy', label: '自治中心' },
+  { id: 'deadlock', label: '死锁可视化' },
+  { id: 'notify', label: '事件通知' },
+  { id: 'report', label: '健康报告' },
+]
+
+const MYSQL_CORE_TABS: DetailTab[] = [
+  { id: 'diag', label: '异常诊断' },
+  { id: 'session', label: '实时会话' },
+  { id: 'slow', label: '慢SQL分析' },
+  { id: 'report', label: '健康报告' },
+]
+
 export function tabsForProduct(product: string): DetailTab[] {
   const id = normalizeProduct(product)
   if (id === 'redis') {
@@ -212,18 +214,21 @@ export function tabsForProduct(product: string): DetailTab[] {
       { id: 'report', label: '健康报告' },
     ]
   }
-  return [
-    { id: 'diag', label: '异常诊断' },
-    { id: 'trend', label: '性能趋势' },
-    { id: 'session', label: '实时会话' },
-    { id: 'slow', label: '慢SQL分析' },
-    { id: 'space', label: '空间分析' },
-    { id: 'sqlopt', label: 'SQL优化' },
-    { id: 'autonomy', label: '自治中心' },
-    { id: 'deadlock', label: '死锁可视化' },
-    { id: 'notify', label: '事件通知' },
-    { id: 'report', label: '健康报告' },
-  ]
+  if (MYSQL_FULL.has(id)) return MYSQL_FULL_TABS
+  if (MYSQL_CORE.has(id)) return MYSQL_CORE_TABS
+  return MYSQL_FULL_TABS
+}
+
+export function hasReportTab(product: string): boolean {
+  return tabsForProduct(product).some((tab) => tab.id === 'report')
+}
+
+export function defaultRangeForTab(tab: string, subTab?: string): string {
+  if (tab === 'slow') return '1h'
+  if (tab === 'diag' && subTab === 'history') return '24h'
+  if (tab === 'diag') return '3h'
+  if (tab === 'autonomy') return '24h'
+  return '1h'
 }
 
 export function resolveTab(product: string, wanted?: string): string {
@@ -236,25 +241,60 @@ export function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
 
+export function shanghaiWall(ms = Date.now()): Date {
+  return new Date(ms + SHANGHAI_OFFSET_MS)
+}
+
 export function formatTs(date: Date): string {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
+  const wall = shanghaiWall(date.getTime())
+  return `${wall.getUTCFullYear()}-${pad2(wall.getUTCMonth() + 1)}-${pad2(wall.getUTCDate())} ${pad2(wall.getUTCHours())}:${pad2(wall.getUTCMinutes())}:${pad2(wall.getUTCSeconds())}`
+}
+
+export function toIso8601(ts: string): string {
+  const value = String(ts || '').trim()
+  if (!value) return value
+  if (/[zZ]$|[+-]\d{2}:\d{2}$/.test(value)) return value.includes('T') ? value : value.replace(' ', 'T')
+  const withT = value.includes('T') ? value : value.replace(' ', 'T')
+  return `${withT}+08:00`
+}
+
+export function formatIso8601(date: Date): string {
+  return toIso8601(formatTs(date))
+}
+
+export function parseShanghaiTs(ts: string): number {
+  const iso = toIso8601(ts)
+  const ms = Date.parse(iso)
+  return Number.isFinite(ms) ? ms : Date.now()
+}
+
+export function clampWindow(
+  window: { start: string; end: string },
+  maxMs: number,
+): { start: string; end: string } {
+  const endMs = parseShanghaiTs(window.end)
+  const startMs = parseShanghaiTs(window.start)
+  if (endMs - startMs <= maxMs) return window
+  return { start: formatTs(new Date(endMs - maxMs)), end: window.end }
 }
 
 export function timeRange(key: string, custom?: { start?: string; end?: string }): { start: string; end: string } {
   if (key === 'custom' && custom?.start && custom?.end) {
     return { start: custom.start, end: custom.end }
   }
-  const end = new Date()
-  const start = new Date(end.getTime())
-  if (key === '5m') start.setMinutes(start.getMinutes() - 5)
-  else if (key === '10m') start.setMinutes(start.getMinutes() - 10)
-  else if (key === '1h') start.setHours(start.getHours() - 1)
-  else if (key === '3h') start.setHours(start.getHours() - 3)
-  else if (key === '24h') start.setHours(start.getHours() - 24)
-  else if (key === '3d') start.setDate(start.getDate() - 3)
-  else if (key === 'today') start.setHours(0, 0, 0, 0)
-  else start.setHours(start.getHours() - 1)
-  return { start: formatTs(start), end: formatTs(end) }
+  const endMs = Date.now()
+  let startMs = endMs
+  if (key === '5m') startMs = endMs - 5 * 60 * 1000
+  else if (key === '10m') startMs = endMs - 10 * 60 * 1000
+  else if (key === '1h') startMs = endMs - 60 * 60 * 1000
+  else if (key === '3h') startMs = endMs - 3 * 60 * 60 * 1000
+  else if (key === '24h') startMs = endMs - 24 * 60 * 60 * 1000
+  else if (key === '3d') startMs = endMs - 3 * 24 * 60 * 60 * 1000
+  else if (key === 'today') {
+    const wall = shanghaiWall(endMs)
+    startMs = Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate()) - SHANGHAI_OFFSET_MS
+  } else startMs = endMs - 60 * 60 * 1000
+  return { start: formatTs(new Date(startMs)), end: formatTs(new Date(endMs)) }
 }
 
 export function requireRegion(ctx: ModuleContext, payload?: Record<string, unknown>): string {
@@ -284,6 +324,50 @@ function cell(value: unknown): string {
   if (Array.isArray(value)) return value.map((item) => cell(item)).filter(Boolean).join(' / ')
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
+}
+
+function flattenDiagJson(node: unknown): string {
+  if (node == null || node === '') return ''
+  if (typeof node === 'string' || typeof node === 'number' || typeof node === 'boolean') return String(node)
+  if (Array.isArray(node)) return node.map(flattenDiagJson).filter(Boolean).join('\n')
+  if (typeof node === 'object') {
+    const rec = node as Record<string, unknown>
+    const data = rec.Data
+    if (typeof data === 'object' && data) {
+      const inner = data as Record<string, unknown>
+      if (inner.Name) return String(inner.Name)
+      if (Array.isArray(inner.Data)) return flattenDiagJson(inner.Data)
+    }
+    if (rec.Name) return String(rec.Name)
+    if (rec.Text) return String(rec.Text)
+    return Object.values(rec).map(flattenDiagJson).filter(Boolean).join(' ')
+  }
+  return ''
+}
+
+export function readableDiagText(value: unknown): string {
+  if (value == null || value === '') return ''
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if ((trimmed.startsWith('[') || trimmed.startsWith('{')) && (trimmed.endsWith(']') || trimmed.endsWith('}'))) {
+      try {
+        return flattenDiagJson(JSON.parse(trimmed)) || trimmed
+      } catch {
+        return trimmed
+      }
+    }
+    return trimmed
+  }
+  return flattenDiagJson(value) || cell(value)
+}
+
+function unsupportedHint(product: string, page: string): string {
+  const name = productLabel(product) || product
+  return `当前产品线（${name}）不支持「${page}」页。`
+}
+
+function looksUnsupported(message: string): boolean {
+  return message === '云厂商操作失败' || message === '请求参数无效' || message === '云厂商请求失败'
 }
 
 function severityLabel(raw: unknown): string {
@@ -367,7 +451,9 @@ export function createDbbrainModule(call: DbbrainCaller = dbbrainCall): Resource
       const region = requireRegion(ctx)
       if (!instanceId) throw new Error('缺少实例')
       const tab = resolveTab(product, ctx.filters?.tab)
-      const rangeKey = ctx.filters?.range || (tab === 'diag' ? '1h' : '1h')
+      const subTab = ctx.filters?.subTab
+      const requestedRange = String(ctx.filters?.range || '').trim()
+      const rangeKey = requestedRange || defaultRangeForTab(tab, subTab)
       const window = timeRange(rangeKey, { start: ctx.filters?.startTime, end: ctx.filters?.endTime })
       const card = mapInstanceItem({
         InstanceId: instanceId,
@@ -407,10 +493,33 @@ export function createDbbrainModule(call: DbbrainCaller = dbbrainCall): Resource
           const sessionId = String(payload.sessionId || payload.SessionId || '').trim()
           if (!sessionId) return { ok: false, error: '缺少会话' }
           if (product === 'mongodb') {
-            await call('KillMongoDBThreads', { ...base, SessionIds: [sessionId] }, creds(ctx), callOpts(ctx, region))
-          } else {
-            await call('KillMySqlThreads', { ...base, SessionIds: [sessionId] }, creds(ctx), callOpts(ctx, region))
+            const host = String(payload.host || payload.Host || '').trim()
+            const mongoPayload: Record<string, unknown> = {
+              InstanceId: instanceId,
+              Product: 'mongodb',
+              Duration: 10,
+            }
+            if (host) mongoPayload.Host = host
+            await call('CreateMongoDBKillTask', mongoPayload, creds(ctx), callOpts(ctx, region))
+            return { ok: true }
           }
+          const threadId = Number(sessionId)
+          if (!Number.isInteger(threadId) || threadId <= 0) return { ok: false, error: '缺少会话' }
+          const killProduct = product === 'cynosdb' ? 'cynosdb' : 'mysql'
+          const prepared = await call<{ SqlExecId?: string }>(
+            'KillMySqlThreads',
+            { InstanceId: instanceId, Product: killProduct, Stage: 'Prepare', Threads: [threadId] },
+            creds(ctx),
+            callOpts(ctx, region),
+          )
+          const sqlExecId = String(prepared?.SqlExecId || '').trim()
+          if (!sqlExecId) return { ok: false, error: 'Kill 预提交未返回执行凭证' }
+          await call(
+            'KillMySqlThreads',
+            { InstanceId: instanceId, Product: killProduct, Stage: 'Commit', SqlExecId: sqlExecId },
+            creds(ctx),
+            callOpts(ctx, region),
+          )
           return { ok: true }
         }
         if (actionId === 'report.create') {
@@ -419,9 +528,11 @@ export function createDbbrainModule(call: DbbrainCaller = dbbrainCall): Resource
             end: String(payload.endTime || ''),
           })
           await call('CreateDBDiagReportTask', {
-            ...base,
-            StartTime: window.start,
-            EndTime: window.end,
+            InstanceId: instanceId,
+            Product: product,
+            StartTime: toIso8601(window.start),
+            EndTime: toIso8601(window.end),
+            SendMailFlag: 0,
           }, creds(ctx), callOpts(ctx, region))
           return { ok: true }
         }
@@ -437,7 +548,7 @@ export function createDbbrainModule(call: DbbrainCaller = dbbrainCall): Resource
           await call('UpdateDiagEventStatus', {
             ...base,
             EventId: eventId,
-            Status: String(payload.status || 'ignored'),
+            Status: Number(payload.status ?? IGNORE_EVENT_STATUS),
           }, creds(ctx), callOpts(ctx, region))
           return { ok: true }
         }
@@ -505,16 +616,31 @@ async function loadDiag(
 ): Promise<TabLoad> {
   const live = subTab !== 'history'
   const action = live ? 'DescribeDBDiagEvents' : 'DescribeDBDiagHistory'
+  const historyWindow = live ? window : clampWindow(window, DIAG_HISTORY_MAX_MS)
   const payload = live
-    ? { ...base, StartTime: window.start, EndTime: window.end }
-    : { InstanceId: base.InstanceId, Product: base.Product, StartTime: window.start, EndTime: window.end }
+    ? {
+      StartTime: toIso8601(window.start),
+      EndTime: toIso8601(window.end),
+      InstanceIds: [String(base.InstanceId || '')],
+      Product: base.Product,
+      Limit: 50,
+    }
+    : {
+      InstanceId: base.InstanceId,
+      Product: base.Product,
+      StartTime: historyWindow.start,
+      EndTime: historyWindow.end,
+    }
   const data = await safeCall<Record<string, unknown>>(call, action, payload, ctx, region)
   if (isErr(data)) {
+    const hint = looksUnsupported(data.error)
+      ? unsupportedHint(String(base.Product || ''), live ? '实时诊断' : '历史诊断')
+      : data.error
     return {
       subTabs: DIAG_SUBTABS,
       activeSubTab: live ? 'live' : 'history',
-      hints: [data.error],
-      tables: [table('events', live ? '实时诊断' : '历史诊断', ['等级', '诊断项', '开始', '最后发生'], [], data.error)],
+      hints: [hint],
+      tables: [table('events', live ? '实时诊断' : '历史诊断', ['等级', '诊断项', '开始', '最后发生'], [], hint)],
     }
   }
   const list = data.Events || data.Items || data.List || []
@@ -535,7 +661,8 @@ async function loadDiag(
   }
   if (!eventId) return extra
   const detail = await safeCall<Record<string, unknown>>(call, 'DescribeDBDiagEvent', {
-    ...base,
+    InstanceId: base.InstanceId,
+    Product: base.Product,
     EventId: Number(eventId) || eventId,
   }, ctx, region)
   if (isErr(detail)) {
@@ -544,9 +671,9 @@ async function loadDiag(
   }
   extra.tables = [
     ...(extra.tables || []),
-    table('phenomenon', '现象', ['内容'], [{ 内容: cell(detail.Outline ?? detail.Problem ?? detail.DiagItem ?? detail.Metric) }]),
-    table('cause', '原因', ['内容'], [{ 内容: cell(detail.Reason ?? detail.Cause ?? detail.Explanation ?? detail.DiagType) }]),
-    table('advice', '建议', ['内容'], [{ 内容: cell(detail.Suggestion ?? detail.Advice ?? detail.Solution ?? detail.Explanation) }]),
+    table('phenomenon', '现象', ['内容'], [{ 内容: readableDiagText(detail.Outline) }]),
+    table('cause', '原因', ['内容'], [{ 内容: readableDiagText(detail.Problem ?? detail.Explanation ?? detail.Reason) }]),
+    table('advice', '建议', ['内容'], [{ 内容: readableDiagText(detail.Suggestions ?? detail.Suggestion ?? detail.Advice) }]),
   ]
   extra.fields = [
     { label: '事件', value: eventId },
@@ -598,17 +725,21 @@ async function loadSession(
   const action = product === 'mongodb' ? 'DescribeMongoDBProcessList' : product === 'redis' ? 'DescribeRedisProcessList' : 'DescribeMySqlProcessList'
   const data = await safeCall<Record<string, unknown>>(call, action, { ...base, Limit: 50 }, ctx, region)
   if (isErr(data)) {
+    const hint = looksUnsupported(data.error)
+      ? unsupportedHint(product, '实时会话')
+      : data.error
     return {
       subTabs: product === 'mongodb' ? undefined : SESSION_SUBTABS,
       activeSubTab: subTab,
-      hints: [data.error],
-      tables: [table('sessions', '实时会话', ['会话ID', '用户', '耗时'], [], data.error)],
+      hints: [hint],
+      tables: [table('sessions', '实时会话', ['会话ID', '用户', '耗时'], [], hint)],
     }
   }
   const list = data.ProcessList || data.Sessions || data.Items || []
   const rows = pickRows(list, (item) => ({
-    sessionId: cell(item.Id ?? item.SessionId ?? item.ProcessId ?? item.Tid),
-    会话ID: cell(item.Id ?? item.SessionId ?? item.ProcessId ?? item.Tid),
+    sessionId: cell(item.Id ?? item.SessionId ?? item.ProcessId ?? item.Tid ?? item.ID),
+    host: cell(item.Host ?? item.Address ?? item.Client),
+    会话ID: cell(item.Id ?? item.SessionId ?? item.ProcessId ?? item.Tid ?? item.ID),
     用户: cell(item.User ?? item.UserName),
     来源: cell(item.Host ?? item.Address ?? item.Client),
     库: cell(item.DB ?? item.Namespace),
@@ -815,13 +946,23 @@ async function loadAutonomy(
   base: Record<string, unknown>,
   window: { start: string; end: string },
 ): Promise<TabLoad> {
+  const product = String(base.Product || '')
+  if (!AUTONOMY_PRODUCTS.has(product)) {
+    const hint = unsupportedHint(product, '自治中心')
+    return {
+      hints: [hint],
+      tables: [table('autonomy', '自治事件', ['事件', '类型', '状态', '原因', '时间'], [], hint)],
+    }
+  }
   const data = await safeCall<Record<string, unknown>>(call, 'DescribeDBAutonomyEvents', {
-    ...base,
-    StartTime: window.start,
-    EndTime: window.end,
+    InstanceId: base.InstanceId,
+    Product: 'redis',
+    StartTime: toIso8601(window.start),
+    EndTime: toIso8601(window.end),
   }, ctx, region)
   if (isErr(data)) {
-    return { hints: [data.error, '自治中心与 SQL 限流分开，不合并展示。'] }
+    const hint = looksUnsupported(data.error) ? unsupportedHint(product, '自治中心') : data.error
+    return { hints: [hint, '自治中心与 SQL 限流分开，不合并展示。'] }
   }
   const rows = pickRows(data.Events || data.Items || data.Actions, (item) => ({
     事件: cell(item.EventId ?? item.ActionId ?? item.Id),
@@ -844,8 +985,11 @@ async function loadDeadlock(
 ): Promise<TabLoad> {
   const data = await safeCall<Record<string, unknown>>(call, 'DescribeDeadLockTrxSqls', base, ctx, region)
   if (isErr(data)) {
+    const hint = looksUnsupported(data.error)
+      ? unsupportedHint(String(base.Product || ''), '死锁可视化')
+      : data.error
     return {
-      hints: ['死锁可视化拓扑图不在对话卡片内绘制。上游未返回时显示空态。', data.error],
+      hints: ['死锁可视化拓扑图不在对话卡片内绘制。上游未返回时显示空态。', hint],
       tables: [table('deadlock', '死锁 SQL', ['事务', 'SQL'], [], '暂无死锁数据')],
     }
   }

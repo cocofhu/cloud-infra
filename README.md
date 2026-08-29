@@ -47,7 +47,8 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 插件向 Agent 提供 `cloud_infra_query`。查询完成后对话中会显示可翻页列表：
 
 - 域名：点击域名或「解析」配置解析记录
-- DBbrain：`kind=dbbrain`，点击实例名 / 告警 /「诊断优化」进入异常诊断，点击健康分进入健康报告。筛选和详情都留在这张对话卡片里
+- DBbrain：`kind=dbbrain`，点击实例名 / 告警 /「诊断优化」进入异常诊断；有健康报告页的产品线可点健康分进入健康报告，Redis / MongoDB 没有该页则不跳转。筛选和详情都留在这张对话卡片里
+- Kill 会话：MySQL / TDSQL-C 按官方两阶段 `Prepare(Threads)` → `Commit(SqlExecId)`；MongoDB 走 `CreateMongoDBKillTask`。生成健康报告不发送邮件（`SendMailFlag=0`）
 
 地域约定：
 

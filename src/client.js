@@ -696,21 +696,40 @@ window.__ModuleLoader__.load({
       ["postgres", "PostgreSQL"],
       ["dbbrain-mysql", "自建 MySQL"],
     ];
+    // Keep in sync with src/providers/tencent/products/dbbrain-catalog.ts
     const DBBRAIN_REGIONS = [
       ["", "全地域"],
       ["ap-guangzhou", "广州"],
+      ["ap-qingyuan", "清远"],
+      ["ap-shenzhen", "深圳"],
       ["ap-shanghai", "上海"],
+      ["ap-nanjing", "南京"],
+      ["ap-hangzhou", "杭州"],
+      ["ap-qingdao", "青岛"],
       ["ap-beijing", "北京"],
+      ["ap-tianjin", "天津"],
       ["ap-chengdu", "成都"],
       ["ap-chongqing", "重庆"],
-      ["ap-nanjing", "南京"],
+      ["ap-zhongwei", "中卫"],
       ["ap-hongkong", "香港"],
+      ["ap-taipei", "台北"],
+      ["ap-shanghai-fsi", "上海金融"],
+      ["ap-shenzhen-fsi", "深圳金融"],
+      ["ap-beijing-fsi", "北京金融"],
       ["ap-singapore", "新加坡"],
+      ["ap-jakarta", "雅加达"],
+      ["ap-bangkok", "曼谷"],
+      ["ap-seoul", "首尔"],
       ["ap-tokyo", "东京"],
       ["na-siliconvalley", "硅谷"],
       ["na-ashburn", "弗吉尼亚"],
+      ["sa-saopaulo", "圣保罗"],
       ["eu-frankfurt", "法兰克福"],
     ];
+
+    function hasReportTab(product) {
+      return product !== "redis" && product !== "mongodb";
+    }
 
     function instanceIdentity(item) {
       return {
@@ -749,8 +768,9 @@ window.__ModuleLoader__.load({
           h("div", { className: "ci-cell" }, h("button", {
             type: "button",
             className: "ci-score",
-            disabled: pendingId === item.id,
-            onClick: () => onOpen(item, "report"),
+            disabled: pendingId === item.id || !hasReportTab(item.product),
+            title: hasReportTab(item.product) ? "打开健康报告" : "当前产品线没有健康报告页",
+            onClick: () => hasReportTab(item.product) && onOpen(item, "report"),
           }, cellValue(item, "健康分") || "-")),
           h("div", { className: "ci-cell num" }, h("button", {
             type: "button",
@@ -845,7 +865,7 @@ window.__ModuleLoader__.load({
             className: "ci-link danger",
             onClick: () => request(
               { id: "session.kill", label: "Kill 会话", confirm: "always" },
-              { sessionId: row.sessionId },
+              { sessionId: row.sessionId, host: row.host || row.来源 || "" },
               `确定 Kill 会话 ${row.sessionId}？此操作不可撤销。`,
             ),
           }, "Kill"));
@@ -904,7 +924,7 @@ window.__ModuleLoader__.load({
               key: tab.id,
               type: "button",
               className: "ci-tab" + (tab.id === detail.activeTab ? " on" : ""),
-              onClick: () => onReload(filtersOf({ tab: tab.id, subTab: "", eventId: "" })),
+              onClick: () => onReload(filtersOf({ tab: tab.id, subTab: "", eventId: "", range: "" })),
             }, tab.label)),
           ),
           h(ChipRow, { key: "sub", items: detail.subTabs, active: detail.activeSubTab, onPick: (id) => onReload(filtersOf({ subTab: id, eventId: "" })) }),
