@@ -32,6 +32,13 @@ export interface ResourceCard {
   columns?: ResourceColumn[]
   openLabel?: string
   expiresAt?: string
+  meta?: Record<string, string>
+  region?: string
+  regionName?: string
+  stateLabel?: string
+  instanceId?: string
+  privateIp?: string
+  publicIp?: string
 }
 
 export interface DnsRecord {
@@ -44,6 +51,11 @@ export interface DnsRecord {
   mx?: number
   status?: string
   remark?: string
+}
+
+export interface FieldGroup {
+  title: string
+  fields: Array<{ label: string; value: string }>
 }
 
 export interface DetailPage {
@@ -70,7 +82,9 @@ export interface DetailCard {
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
+  groups?: FieldGroup[]
   records?: DnsRecord[]
+  extra?: Record<string, unknown>
   pages?: DetailPage[]
   blocks?: DetailBlock[]
   cards?: Record<string, DetailCard[]>
@@ -89,6 +103,9 @@ export interface ListResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  warnings?: string[]
+  errors?: ModuleError[]
+  regions?: string[]
 }
 
 export interface ModuleError {
@@ -105,6 +122,7 @@ export interface QueryResult {
   offset?: number
   hasMore?: boolean
   region?: string
+  regions?: string[]
 }
 
 export interface ModuleContext {
@@ -117,10 +135,11 @@ export interface ModuleContext {
   id?: string
   title?: string
   region?: string
+  tab?: string
   filters?: Record<string, string>
 }
 
-export type ActionResult = { ok: true; data?: Record<string, unknown> } | { ok: false; error: string }
+export type ActionResult = { ok: true; data?: unknown } | { ok: false; error: string }
 
 export interface ResourceModule {
   id: string

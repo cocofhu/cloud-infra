@@ -4,7 +4,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import Schema from '@deepseek-ai/schemastery'
 import { assignConfig, publicConfig, readOverlay, sanitizePatch, withDefaults, writeOverlay } from './core/config-store.js'
 import { queryResources, renderQuery } from './core/query.js'
-import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, SETTINGS_HINT, supportedKinds } from './core/registry.js'
+import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, resolveModuleId, SETTINGS_HINT, supportedKinds } from './core/registry.js'
 import { publicErrorMessage } from './core/safe-error.js'
 import { isPost, trustedUiRequest } from './core/trusted-request.js'
 import type { PluginConfig, QueryResult } from './core/types.js'
@@ -28,12 +28,12 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates / TKE clusters as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/TKE/集群/容器服务. Pass kind=domain for domains, kind=cluster for TKE clusters. For clusters, pass region if the user names one; if omitted, default to ap-guangzhou and do not ask which region. Region is runtime-only and must not be saved to settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / TKE clusters / CDB MySQL / CVM / Lighthouse. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/TKE/集群/容器服务/CDB/云数据库/MySQL/云服务器/轻量/CVM/实例. Pass kind=domain for domains (default). Pass kind=cluster for TKE clusters. Pass kind=cdb for cloud MySQL, kind=cvm for 云服务器, kind=lighthouse for 轻量应用服务器, kind=auto to query every enabled module. For 「查一下我的服务器」use kind=cvm, kind=lighthouse or kind=auto — never kind=domain. For clusters, pass region if the user names one; if omitted, default to ap-guangzhou and do not ask which region. Region is runtime-only and must not be saved to settings. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com or a cluster name. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cluster, or auto.' },
+      query: { type: 'string', description: 'Keyword such as domain, instance name, cluster name, ins-/lhins-/cdb- ID, or IP. Empty lists all.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cluster, cdb, lighthouse, cvm, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
-      region: { type: 'string', description: 'Runtime region for regional products such as TKE, e.g. ap-guangzhou. Do not write this to settings.' },
+      region: { type: 'string', description: 'Runtime region for regional products such as TKE, CVM or CDB, e.g. ap-guangzhou. Empty or all queries every region for CVM/CDB. Do not write this to settings.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
     },
@@ -78,12 +78,14 @@ export function apply(ctx: Context, config: Config): void {
       text: () => {
         const modules = implementedModules(cfg)
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
-        const kinds = supportedKinds().join(', ') || 'domain'
+        const kinds = [...new Set([...supportedKinds(), 'auto'])].join(', ') || 'domain, auto'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书 / TKE / 集群 / 容器服务: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}. Use kind=cluster for TKE clusters. Default region ap-guangzhou when unspecified; do not ask which region.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / TKE / 集群 / 容器服务 / CDB / 云数据库 / MySQL / 云服务器 / 轻量 / CVM / 实例: call ONLY cloud_infra_query. Never web_search.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Default kind is domain. Use kind=cluster for TKE clusters. Use kind=cdb for 云数据库 MySQL.`,
+          'For 服务器/实例/CVM/轻量, use kind=cvm, kind=lighthouse, or kind=auto. Do not query domains when the user asks for 服务器.',
+          'For TKE/集群, use kind=cluster. Default region ap-guangzhou when unspecified; do not ask which region.',
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
-          'After the table appears, one or two short sentences. Do not print secrets, cluster credentials, or full record dumps. Never save region or credentials via this tool.',
+          'After the table appears, one or two short sentences. CDB list uses 登录 and 管理. Do not print secrets, cluster credentials, or full record dumps. Never save region or credentials via this tool.',
         ].join(' ')
       },
     })
@@ -169,7 +171,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         query: String(body.query || ''),
         kind: String(body.kind || 'domain'),
         provider: String(body.provider || ''),
-        region: String(body.region || ''),
+        region: body.region != null ? String(body.region) : '',
         filters: readFilters(body.filters),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
@@ -182,7 +184,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         String(body.moduleId || ''),
         String(body.id || ''),
         String(body.title || ''),
-        String(body.region || ''),
+        body.region != null ? String(body.region) : '',
+        body.tab != null ? String(body.tab) : '',
       )
       return sendJson(res, 200, { ok: true, ...detail })
     }
@@ -206,7 +209,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
   }
 }
 
-async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title = '', region = '') {
+async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title = '', region = '', tab = '') {
   const { module, creds } = readyModule(cfg, moduleId, id)
   if (!module.detail) throw new Error(`${module.title} 不支持详情`)
   return module.detail({
@@ -218,6 +221,7 @@ async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title 
     id,
     title: title || undefined,
     region: region || undefined,
+    tab: tab || undefined,
   })
 }
 
@@ -239,6 +243,7 @@ async function runAction(
     timeoutMs: cfg.timeoutMs,
     id,
     region: region || (typeof payload.region === 'string' ? payload.region : undefined),
+    tab: typeof payload.tab === 'string' ? payload.tab : undefined,
   })
 }
 
@@ -252,13 +257,6 @@ function readFilters(raw: unknown): Record<string, string> | undefined {
     out[name] = text
   }
   return Object.keys(out).length ? out : undefined
-}
-
-function resolveModuleId(moduleId: string, id: string): string {
-  if (moduleId) return moduleId
-  const first = String(id || '').split(':')[0] || ''
-  if (first.includes('.')) return first
-  return id.includes(':') ? id.slice(0, id.lastIndexOf(':')) : ''
 }
 
 function readyModule(cfg: PluginConfig, moduleId: string, id: string) {

@@ -60,6 +60,7 @@ export async function queryResources(
 
   const lists: ResourceCard[][] = []
   const errors: ModuleError[] = []
+  const regions: string[] = []
   let total = 0
   let hasMore = false
 
@@ -93,6 +94,18 @@ export async function queryResources(
       if (result.total != null) total += result.total
       else total += result.items?.length || 0
       if (result.hasMore) hasMore = true
+      for (const message of result.warnings || []) {
+        errors.push({ moduleId: module.id, message })
+      }
+      for (const name of result.regions || []) {
+        if (name && !regions.includes(name)) regions.push(name)
+      }
+      for (const item of result.errors || []) {
+        errors.push({
+          moduleId: item.moduleId || module.id,
+          message: item.message,
+        })
+      }
     } catch (err) {
       errors.push({ moduleId: module.id, message: publicErrorMessage(err) })
     }
@@ -100,7 +113,17 @@ export async function queryResources(
 
   const items = lists.flat()
   if (!total) total = items.length
-  return { query, kind, items, errors, total, offset, hasMore, region: region || undefined }
+  return {
+    query,
+    kind,
+    items,
+    errors,
+    total,
+    offset,
+    hasMore,
+    region: region || undefined,
+    regions: regions.length ? regions : undefined,
+  }
 }
 
 function selectModules(kind: string, provider: string, config: PluginConfig, source: Registry): ResourceModule[] {
@@ -136,9 +159,17 @@ export function renderQuery(result: QueryResult): string {
     ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}${result.region ? `，region=${result.region}` : ''}，offset=${shown}。`
     : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
-  const hint = result.kind === 'cluster'
+  const cluster = result.kind === 'cluster' || result.items.some((item) => item.kind === 'cluster')
+  const cdb = result.kind === 'cdb' || result.items.some((item) => item.kind === 'cdb')
+  const instance = result.kind === 'cvm' || result.kind === 'lighthouse'
+    || result.items.some((item) => item.kind === 'cvm' || item.kind === 'lighthouse')
+  const hint = cluster
     ? '用一两句话概括即可，列表默认广州，用户可在顶栏切换地域并点击集群 ID 进入配置。不要询问地域、不要打印密钥或集群凭证，不要套用域名解析页。'
-    : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
+    : cdb
+      ? '用一两句话概括即可，请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。不要打印密钥。'
+      : instance
+        ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
+        : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
   return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
 }
 

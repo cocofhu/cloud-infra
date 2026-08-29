@@ -15,6 +15,27 @@ export interface TencentCallOptions {
   region?: string
 }
 
+export interface TencentCreds {
+  secretId: string
+  secretKey: string
+}
+
+export interface TencentCallContext {
+  timeoutMs: number
+  signal?: AbortSignal
+  fetchImpl?: typeof fetch
+  region?: string
+}
+
+export type TencentServiceOpts = TencentCallContext
+
+export type TencentProductCall = <T = unknown>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+) => Promise<T>
+
 export class TencentApiError extends Error {
   constructor(
     message: string,
@@ -72,16 +93,19 @@ export async function callTencentApi<T = unknown>(options: TencentCallOptions): 
   }
 }
 
-export function dnspodCall<T>(
+function serviceCall<T>(
+  service: string,
+  host: string,
+  version: string,
   action: string,
   payload: unknown,
-  creds: { secretId: string; secretKey: string },
-  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch },
+  creds: TencentCreds,
+  opts: TencentCallContext,
 ): Promise<T> {
   return callTencentApi<T>({
-    service: 'dnspod',
-    host: 'dnspod.tencentcloudapi.com',
-    version: '2021-03-23',
+    service,
+    host,
+    version,
     action,
     payload,
     secretId: creds.secretId,
@@ -89,14 +113,24 @@ export function dnspodCall<T>(
     timeoutMs: opts.timeoutMs,
     signal: opts.signal,
     fetchImpl: opts.fetchImpl,
+    region: opts.region,
   })
+}
+
+export function dnspodCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('dnspod', 'dnspod.tencentcloudapi.com', '2021-03-23', action, payload, creds, opts)
 }
 
 export function tkeCall<T>(
   action: string,
   payload: unknown,
-  creds: { secretId: string; secretKey: string },
-  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch; region: string; version?: string },
+  creds: TencentCreds,
+  opts: TencentCallContext & { region: string; version?: string },
 ): Promise<T> {
   const region = String(opts.region || '').trim()
   if (!region) throw new TencentApiError('缺少地域')
@@ -113,4 +147,40 @@ export function tkeCall<T>(
     fetchImpl: opts.fetchImpl,
     region,
   })
+}
+
+export function cdbCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('cdb', 'cdb.tencentcloudapi.com', '2017-03-20', action, payload, creds, opts)
+}
+
+export function monitorCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('monitor', 'monitor.tencentcloudapi.com', '2018-07-24', action, payload, creds, opts)
+}
+
+export function lighthouseCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('lighthouse', 'lighthouse.tencentcloudapi.com', '2020-03-24', action, payload, creds, opts)
+}
+
+export function cvmCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return serviceCall('cvm', 'cvm.tencentcloudapi.com', '2017-03-12', action, payload, creds, opts)
 }

@@ -307,8 +307,11 @@ test('g2.3 create wizard rejects missing fields, SLA, and elastic/independent', 
   assert.equal((specCall?.payload as { ClusterId?: string }).ClusterId, 'cls-ext00001')
   assert.equal((specCall?.payload as { ClusterName?: string }).ClusterName, undefined)
   assert.equal((specCall?.payload as { IsExtranet?: boolean }).IsExtranet, false)
-  assert.ok(registered && 'data' in registered && registered.data?.spec)
-  assert.equal(registered && 'data' in registered ? registered.data?.clusterId : '', 'cls-ext00001')
+  const registeredData = registered && 'data' in registered && registered.data && typeof registered.data === 'object'
+    ? registered.data as { spec?: string; clusterId?: string }
+    : undefined
+  assert.ok(registeredData?.spec)
+  assert.equal(registeredData?.clusterId, 'cls-ext00001')
 })
 
 test('g2.4 delete wizard closes protection, rejects nodes, requires risk ack', async () => {
@@ -354,7 +357,10 @@ test('g2.5 master/node upgrade and kubeconfig stay off the detail card', async (
   assert.equal((upgrade?.payload as { UpgradeType?: string }).UpgradeType, 'inPlaceUpgrade')
   const kube = await module.execute?.('cluster.kubeconfig', {}, ctx({ id: 'tencent.tke:ap-guangzhou:cls-abc12345' }))
   assert.equal(kube?.ok, true)
-  assert.ok(kube && 'data' in kube && kube.data?.kubeconfig)
+  const kubeData = kube && 'data' in kube && kube.data && typeof kube.data === 'object'
+    ? kube.data as { kubeconfig?: string }
+    : undefined
+  assert.ok(kubeData?.kubeconfig)
   const detail = await module.detail?.(ctx({ id: 'tencent.tke:ap-guangzhou:cls-abc12345' }))
   assert.doesNotMatch(JSON.stringify(detail), /kind: Config/)
 })
