@@ -1,0 +1,10 @@
+{
+  "DomainName": "example.com",
+  "Available": true,
+  "Reason": "",
+  "Premium": false,
+  "Price": 35,
+  "BlackWord": false,
+  "RealPrice": 35,
+  "Period": 1
+}

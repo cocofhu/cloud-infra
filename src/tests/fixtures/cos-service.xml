@@ -1,0 +1,20 @@
+<ListAllMyBucketsResult>
+  <Owner><ID>qcs::cam::uin/100000:uin/100000</ID></Owner>
+  <Buckets>
+    <Bucket>
+      <Name>assets-1250000000</Name>
+      <Location>ap-guangzhou</Location>
+      <CreationDate>2024-03-12T10:21:08Z</CreationDate>
+    </Bucket>
+    <Bucket>
+      <Name>cdn-1250000000</Name>
+      <Location>ap-guangzhou</Location>
+      <CreationDate>2025-01-08T14:02:11Z</CreationDate>
+    </Bucket>
+    <Bucket>
+      <Name>logs-1250000000</Name>
+      <Location>ap-beijing</Location>
+      <CreationDate>2024-08-01T00:00:00Z</CreationDate>
+    </Bucket>
+  </Buckets>
+</ListAllMyBucketsResult>

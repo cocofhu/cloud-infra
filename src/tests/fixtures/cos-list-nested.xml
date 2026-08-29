@@ -1,0 +1,12 @@
+<ListBucketResult>
+  <Name>assets-1250000000</Name>
+  <Prefix>images/</Prefix>
+  <Delimiter>/</Delimiter>
+  <IsTruncated>false</IsTruncated>
+  <Contents>
+    <Key>images/logo.png</Key>
+    <LastModified>2025-02-02T08:00:00Z</LastModified>
+    <Size>2048</Size>
+    <StorageClass>STANDARD_IA</StorageClass>
+  </Contents>
+</ListBucketResult>
