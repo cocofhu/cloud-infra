@@ -761,6 +761,41 @@ window.__ModuleLoader__.load({
       ), document.body);
     }
 
+    function ReplaceCertDialog({ item, verifyType, busy, err, onCancel, onSubmit }) {
+      const initial = String(verifyType || certMeta(item).verifyType || "DNS").toUpperCase();
+      const [draft, setDraft] = useState({
+        verifyType: initial === "FILE" || initial === "DNS" || initial === "DNS_AUTO" ? initial : "DNS",
+      });
+      const box = useOverlayKeys(true, busy, onCancel, false);
+      return createPortal(h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "重颁发证书"),
+          h("p", null, "请确认验证方式。默认沿用当前证书的验证方式，不要在无提示时改用自动 DNS。"),
+          h(FieldInput, {
+            label: "验证方式",
+            type: "select",
+            value: draft.verifyType,
+            onChange: (value) => setDraft({ ...draft, verifyType: value }),
+            placeholder: [
+              { value: "DNS_AUTO", label: "自动 DNS" },
+              { value: "DNS", label: "手动 DNS" },
+              { value: "FILE", label: "文件验证" },
+            ],
+            disabled: busy,
+          }),
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
+            h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: () => onSubmit(draft) }, busy ? "提交中" : "确定重颁发"),
+          ),
+        ),
+      ), document.body);
+    }
+
     function UploadCertDialog({ busy, err, onCancel, onSubmit }) {
       const [draft, setDraft] = useState({
         standard: "intl",
@@ -1296,7 +1331,9 @@ window.__ModuleLoader__.load({
           return askConfirm(item, row, "温馨提示：删除后不可恢复。已关联云资源或待验证证书可能无法删除。确定删除该证书？");
         }
         if (row.id === "cert.revoke") return askConfirm(item, row, "确定吊销该证书？吊销后不可继续部署。");
-        if (row.id === "cert.replace") return askConfirm(item, row, "确定重颁发该证书？");
+        if (row.id === "cert.replace") {
+          return setWizard({ type: "replace", item, verifyType: certMeta(item).verifyType || "DNS" });
+        }
         if (row.id === "cert.cancel") return askConfirm(item, row, "确定取消审核？取消后可删除该申请。");
         if (row.id === "cert.renew") return askConfirm(item, row, "确定对免费证书执行快速续期？");
         if (row.id === "cert.verify") {
@@ -1487,6 +1524,28 @@ window.__ModuleLoader__.load({
                 await runCertAction(wizard.item, { id: "cert.complete" }, {});
                 setWizard({ ...wizard, status: "已提交完成审核。" });
                 await fetchList(0, String(activeQ || "").trim());
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+          }) : null,
+          wizard && wizard.type === "replace" && wizard.item ? h(ReplaceCertDialog, {
+            key: "replace",
+            item: wizard.item,
+            verifyType: wizard.verifyType || certMeta(wizard.item).verifyType,
+            busy: wizardBusy,
+            err: wizardErr,
+            onCancel: () => { if (!wizardBusy) setWizard(null); },
+            onSubmit: async (draft) => {
+              setWizardBusy(true);
+              setWizardErr("");
+              try {
+                await runCertAction(wizard.item, { id: "cert.replace" }, { verifyType: draft.verifyType });
+                setWizard(null);
+                await fetchList(offset, String(activeQ || "").trim());
+                if (session?.item) await reload();
               } catch (e) {
                 setWizardErr(publicErrorMessage(e));
               } finally {

@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import {
+  boundProductTypes,
   buildCertSections,
   canDeleteDirectly,
   canRenew,
@@ -11,6 +12,7 @@ import {
   checkDnspodHosted,
   chainSummary,
   createCertModule,
+  DEPLOYED_RESOURCE_TYPES,
   DNSPOD_AUTO_DNS_HINT,
   isDomainVerificationPassed,
   isFreeDomainValid,
@@ -18,7 +20,9 @@ import {
   needsCancelBeforeDelete,
   normalizeHostInstances,
   parseCertRef,
+  parseDeployedResources,
   stripPem,
+  toDeployedResourceType,
   type CertificatesItem,
 } from '../providers/tencent/products/cert.js'
 import { renderQuery } from '../core/query.js'
@@ -62,6 +66,9 @@ test('parseCertRef and free-domain guards', () => {
   assert.deepEqual(parseCertRef('tencent.cert:QL8k2m'), { moduleId: 'tencent.cert', certificateId: 'QL8k2m' })
   assert.equal(isFreeDomainValid('www.example.com'), '')
   assert.match(isFreeDomainValid('1.2.3.4'), /不支持 IP/)
+  assert.match(isFreeDomainValid('2001:db8::1'), /不支持 IP/)
+  assert.match(isFreeDomainValid('::1'), /不支持 IP/)
+  assert.match(isFreeDomainValid('[2001:db8::1]'), /不支持 IP/)
   assert.match(isFreeDomainValid('*.example.com'), /泛域名/)
   assert.match(isFreeDomainValid(''), /缺少绑定域名/)
 })
@@ -112,6 +119,12 @@ test('buildCertSections covers full console blocks', () => {
     bound: [],
   })
   assert.ok(applying.some((section) => section.id === 'validation'))
+  const applyingDeploy = applying.find((section) => section.id === 'basic')?.fields?.find((row) => row.label === '是否可部署')
+  assert.equal(applyingDeploy?.value, '否')
+  const issuedDeploy = basic?.fields?.find((row) => row.label === '是否可部署')
+  assert.equal(issuedDeploy?.value, '是')
+  const blocked = buildCertSections({ item: { ...issued, Deployable: false }, bound: [] })
+  assert.equal(blocked.find((section) => section.id === 'basic')?.fields?.find((row) => row.label === '是否可部署')?.value, '否')
   assert.doesNotMatch(JSON.stringify(sections), /-----BEGIN /)
 })
 
@@ -122,7 +135,15 @@ test('createCertModule list/detail/actions talk SSL APIs without writing setting
     if (action === 'DescribeCertificates') return fixture('cert-list.json')
     if (action === 'DescribeCertificateDetail' || action === 'DescribeCertificate') return fixture('cert-detail.json')
     if (action === 'DescribeDeployedResources') {
-      return { DeployedResources: [{ ResourceType: 'cdn', ResourceIdList: ['www.example.com'] }] }
+      const body = payload as { CertificateIds?: string[]; ResourceType?: string; CertificateId?: string }
+      if (body.CertificateId) throw new Error('DescribeDeployedResources must use CertificateIds array')
+      if (!Array.isArray(body.CertificateIds) || !body.CertificateIds.includes('QL8k2m')) {
+        throw new Error('DescribeDeployedResources requires CertificateIds')
+      }
+      if (body.ResourceType === 'cdn') {
+        return { DeployedResources: [{ CertificateId: 'QL8k2m', Type: 'cdn', Resources: ['www.example.com'], ResourceIds: ['www.example.com'], Count: 1 }] }
+      }
+      return { DeployedResources: [] }
     }
     if (action === 'ApplyCertificate') return { CertificateId: 'NEWfree' }
     if (action === 'UploadCertificate') return { CertificateId: 'UPsm' }
@@ -156,6 +177,18 @@ test('createCertModule list/detail/actions talk SSL APIs without writing setting
   assert.doesNotMatch(JSON.stringify(detail), /-----BEGIN /)
   assert.doesNotMatch(JSON.stringify(detail), /SHOULDNEVERLEAK/)
   assert.ok((detail.sections || []).find((section) => section.id === 'chain')?.fields?.some((row) => row.label === '颁发者'))
+  const boundSection = (detail.sections || []).find((section) => section.id === 'bound')
+  assert.ok(boundSection?.fields?.some((row) => row.label === 'CDN' && row.value === 'www.example.com'))
+  const deployedCalls = calls.filter((row) => row.action === 'DescribeDeployedResources')
+  assert.equal(deployedCalls.length, DEPLOYED_RESOURCE_TYPES.length)
+  assert.ok(deployedCalls.every((row) => {
+    const body = row.payload as { CertificateIds?: string[]; CertificateId?: unknown; ResourceType?: string }
+    return Array.isArray(body.CertificateIds) && body.CertificateIds[0] === 'QL8k2m' && body.CertificateId == null
+  }))
+  assert.deepEqual(
+    deployedCalls.map((row) => (row.payload as { ResourceType: string }).ResourceType).sort(),
+    [...DEPLOYED_RESOURCE_TYPES].sort(),
+  )
 
   const applyBad = await module.execute?.('cert.apply', { domain: '*.x.com' }, { ...ctx })
   assert.equal(applyBad?.ok, false)
@@ -215,11 +248,22 @@ test('createCertModule list/detail/actions talk SSL APIs without writing setting
     assert.equal(downloaded.data?.content, 'UEsA')
   }
 
-  for (const action of ['cert.revoke', 'cert.replace', 'cert.delete', 'cert.cancel', 'cert.deploy.retry']) {
+  for (const action of ['cert.revoke', 'cert.delete', 'cert.cancel', 'cert.deploy.retry']) {
     const payload = action === 'cert.deploy.retry' ? { deployRecordId: 9 } : { certificateId: 'QL8k2m' }
     const result = await module.execute?.(action, payload, { ...ctx, id: 'tencent.cert:QL8k2m' })
     assert.equal(result?.ok, true, action)
   }
+  const replaceMiss = await module.execute?.('cert.replace', { certificateId: 'QL8k2m' }, { ...ctx, id: 'tencent.cert:QL8k2m' })
+  assert.equal(replaceMiss?.ok, false)
+  if (!replaceMiss?.ok) assert.match(replaceMiss.error, /验证方式/)
+  const replaced = await module.execute?.('cert.replace', {
+    certificateId: 'QL8k2m',
+    verifyType: 'DNS',
+    domain: 'www.example.com',
+  }, { ...ctx, id: 'tencent.cert:QL8k2m' })
+  assert.equal(replaced?.ok, true)
+  const replaceCall = calls.find((row) => row.action === 'ReplaceCertificate')?.payload as { ValidType?: string }
+  assert.equal(replaceCall.ValidType, 'DNS')
 
   const src = readFileSync(join(dir, '../../src/providers/tencent/products/cert.ts'), 'utf8')
   assert.doesNotMatch(src, /writeOverlay|assignConfig|sanitizePatch/)
@@ -322,23 +366,70 @@ test('delete of applying cert requires cancel; verify completes manual DNS', asy
   assert.equal(isDomainVerificationPassed({ VerificationResults: [{ StatusName: '失败' }] }), false)
 })
 
-test('detail prefers BoundResource and skips 12-way DescribeDeployedResources', async () => {
-  const calls: string[] = []
+test('detail treats BoundResource as product filter and parses official DescribeDeployedResources fields', async () => {
+  assert.equal(toDeployedResourceType('ddos'), 'antiddos')
+  assert.equal(toDeployedResourceType('clb'), 'clb')
+  assert.equal(toDeployedResourceType('cdn-www.example.com'), null)
+  assert.deepEqual(boundProductTypes(['clb', 'ddos', 'cdn-www.example.com']), ['clb', 'antiddos'])
+  assert.deepEqual(
+    parseDeployedResources({
+      DeployedResources: [{ Type: 'clb', Resources: ['lb-8kdm7xxx'], ResourceIds: ['lb-8kdm7xxx'] }],
+    }, 'clb'),
+    [{ resourceType: 'clb', instanceId: 'lb-8kdm7xxx' }],
+  )
+
+  const calls: Array<{ action: string; payload: unknown }> = []
   const raw = fixture('cert-detail.json') as CertificatesItem
-  const call = (async (action: string) => {
-    calls.push(action)
+  const call = (async (action: string, payload: unknown) => {
+    calls.push({ action, payload })
     if (action === 'DescribeCertificateDetail' || action === 'DescribeCertificate') {
-      return { ...raw, BoundResource: ['cdn-www.example.com'] }
+      return { ...raw, BoundResource: ['clb'] }
+    }
+    if (action === 'DescribeDeployedResources') {
+      const body = payload as { CertificateIds?: string[]; ResourceType?: string; CertificateId?: string }
+      assert.deepEqual(body.CertificateIds, ['QL8k2m'])
+      assert.equal(body.CertificateId, undefined)
+      assert.equal(body.ResourceType, 'clb')
+      return {
+        DeployedResources: [{
+          CertificateId: 'QL8k2m',
+          Type: 'clb',
+          Resources: ['lb-8kdm7xxx'],
+          ResourceIds: ['lb-8kdm7xxx'],
+          Count: 1,
+        }],
+      }
     }
     throw new Error('unexpected ' + action)
   }) as never
   const detail = await createCertModule(call).detail?.({ ...ctx, id: 'tencent.cert:QL8k2m', title: 'QL8k2m' })
   assert.ok(detail)
-  assert.ok(!calls.includes('DescribeDeployedResources'))
+  const boundCalls = calls.filter((row) => row.action === 'DescribeDeployedResources')
+  assert.equal(boundCalls.length, 1)
   const bound = (detail?.sections || []).find((section) => section.id === 'bound')
-  assert.ok(bound?.fields?.some((row) => row.value === 'cdn-www.example.com'))
+  assert.ok(bound?.fields?.some((row) => row.label === 'CLB' && row.value === 'lb-8kdm7xxx'))
+  assert.ok(!bound?.fields?.some((row) => /clb/i.test(row.value) && row.value.length <= 4))
   const failed = buildCertSections({ item: raw, bound: [], boundFailed: true })
   assert.ok(failed.find((section) => section.id === 'bound')?.empty?.includes('可重试'))
+})
+
+test('invalid BoundResource is not treated as instance id', async () => {
+  const types: string[] = []
+  const raw = fixture('cert-detail.json') as CertificatesItem
+  const call = (async (action: string, payload: unknown) => {
+    if (action === 'DescribeCertificateDetail' || action === 'DescribeCertificate') {
+      return { ...raw, BoundResource: ['cdn-www.example.com'] }
+    }
+    if (action === 'DescribeDeployedResources') {
+      types.push(String((payload as { ResourceType?: string }).ResourceType || ''))
+      return { DeployedResources: [] }
+    }
+    throw new Error('unexpected ' + action)
+  }) as never
+  const detail = await createCertModule(call).detail?.({ ...ctx, id: 'tencent.cert:QL8k2m', title: 'QL8k2m' })
+  assert.deepEqual(types.sort(), [...DEPLOYED_RESOURCE_TYPES].sort())
+  const bound = (detail?.sections || []).find((section) => section.id === 'bound')
+  assert.ok(!bound?.fields?.some((row) => row.value === 'cdn-www.example.com'))
 })
 
 test('renderQuery for cert does not guide 解析 or settings', () => {
@@ -361,6 +452,17 @@ test('renderQuery for cert does not guide 解析 or settings', () => {
   assert.doesNotMatch(text, /解析/)
   assert.doesNotMatch(text, /设置页/)
   assert.doesNotMatch(text, /PEM/)
+  const emptyCert = renderQuery({
+    query: '',
+    kind: 'cert',
+    items: [],
+    errors: [{ moduleId: 'tencent.cert', message: '腾讯云 未配置 SecretId、SecretKey。请使用已有腾讯云 SecretId/SecretKey' }],
+    total: 0,
+    hasMore: false,
+  })
+  assert.doesNotMatch(emptyCert, /设置页/)
+  assert.doesNotMatch(emptyCert, /请到设置/)
+  assert.match(emptyCert, /已有腾讯云 SecretId\/SecretKey/)
   const domainText = renderQuery({
     query: '',
     kind: 'domain',

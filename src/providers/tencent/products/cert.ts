@@ -194,9 +194,15 @@ export function verifyTypeLabel(value?: string): string {
 export function isFreeDomainValid(domain: string): string {
   const name = domain.trim().toLowerCase()
   if (!name) return '缺少绑定域名'
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(name)) return '免费证书仅支持单域名，不支持 IP 与泛域名'
+  if (looksLikeIp(name)) return '免费证书仅支持单域名，不支持 IP 与泛域名'
   if (name.includes('*')) return '免费证书仅支持单域名，不支持 IP 与泛域名'
   return ''
+}
+
+function looksLikeIp(name: string): boolean {
+  const host = name.replace(/^\[/, '').replace(/\]$/, '')
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true
+  return host.includes(':')
 }
 
 export function candidateZones(domain: string): string[] {
@@ -415,7 +421,7 @@ export function buildCertSections(input: {
       { label: '状态说明', value: item.StatusMsg || '—' },
       { label: '来源', value: sourceLabel(item.From) || '—' },
       { label: '项目', value: item.ProjectInfo?.ProjectName || item.ProjectId || '—' },
-      { label: '是否可部署', value: item.Deployable === false ? '否' : '是' },
+      { label: '是否可部署', value: canDeploy(item) ? '是' : '否' },
       { label: '申请时间', value: item.InsertTime || '—' },
       { label: '生效时间', value: item.CertBeginTime || '—' },
       { label: '过期时间', value: item.CertEndTime || '—' },
@@ -471,7 +477,7 @@ export function buildCertSections(input: {
     id: 'bound',
     title: '关联云资源',
     fields: (bound && bound.length)
-      ? bound.map((row) => ({ label: row.resourceType.toUpperCase(), value: row.instanceId || '—' }))
+      ? bound.map((row) => ({ label: boundTypeLabel(row.resourceType), value: row.instanceId || '—' }))
       : undefined,
     empty: boundFailed ? '暂无（加载失败，可重试）' : '暂无',
   })
@@ -629,9 +635,19 @@ export function createCertModule(call: SslCall = sslCall, dnsCall: DnsCall = dns
           return { ok: true }
         }
         if (actionId === 'cert.replace') {
+          const rawType = String(payload.verifyType || payload.ValidType || '').trim()
+          if (!rawType) return { ok: false, error: '请选择验证方式' }
+          const method = normalizeVerify(rawType)
+          if (method === 'DNS_AUTO') {
+            const domain = String(payload.domain || '').trim()
+            if (domain) {
+              const hosted = await checkDnspodHosted(dnsCall, domain, creds(ctx), opts(ctx))
+              if (hosted === false) return { ok: false, error: DNSPOD_AUTO_DNS_HINT }
+            }
+          }
           await call('ReplaceCertificate', {
             CertificateId: certificateId,
-            ValidType: normalizeVerify(String(payload.verifyType || payload.ValidType || 'DNS_AUTO')),
+            ValidType: method,
             CsrType: String(payload.csrType || 'Original'),
             Reason: String(payload.reason || ''),
           }, creds(ctx), opts(ctx))
@@ -719,33 +735,72 @@ async function loadDetail(call: SslCall, moduleId: string, ctx: ModuleContext): 
 const BOUND_CONCURRENCY = 3
 const BOUND_CALL_TIMEOUT_MS = 3000
 
+/** Official DescribeDeployedResources ResourceType enum. ddos maps to antiddos. */
+export const DEPLOYED_RESOURCE_TYPES = ['clb', 'cdn', 'live', 'vod', 'waf', 'antiddos', 'teo'] as const
+
+export function toDeployedResourceType(raw: string): string | null {
+  const value = String(raw || '').trim().toLowerCase()
+  if (!value) return null
+  if (value === 'ddos') return 'antiddos'
+  if (value === 'edgeone') return 'teo'
+  return (DEPLOYED_RESOURCE_TYPES as readonly string[]).includes(value) ? value : null
+}
+
+export function boundProductTypes(bound?: string[]): string[] {
+  return [...new Set((bound || []).map(toDeployedResourceType).filter((item): item is string => Boolean(item)))]
+}
+
+export function parseDeployedResources(
+  data: {
+    DeployedResources?: Array<{
+      Type?: string
+      ResourceType?: string
+      Resources?: string[]
+      ResourceIds?: string[]
+    }>
+  },
+  fallbackType: string,
+): Array<{ resourceType: string; instanceId: string }> {
+  const rows: Array<{ resourceType: string; instanceId: string }> = []
+  for (const item of data.DeployedResources || []) {
+    const resourceType = toDeployedResourceType(String(item.Type || item.ResourceType || fallbackType)) || fallbackType
+    const ids = [...(item.Resources || []), ...(item.ResourceIds || [])]
+      .map((id) => String(id || '').trim())
+      .filter(Boolean)
+    for (const instanceId of [...new Set(ids)]) rows.push({ resourceType, instanceId })
+  }
+  return rows
+}
+
+function boundTypeLabel(resourceType: string): string {
+  const api = toDeployedResourceType(resourceType) || resourceType
+  if (api === 'antiddos') return 'DDoS'
+  const product = HOST_PRODUCTS.find((item) => item.id === api)
+  return product?.label || api.toUpperCase()
+}
+
 async function loadBound(
   call: SslCall,
   certificateId: string,
   raw: CertificatesItem,
   ctx: ModuleContext,
 ): Promise<{ rows: Array<{ resourceType: string; instanceId: string }>; failed: boolean }> {
-  const fromDetail = (raw.BoundResource || [])
-    .map((instanceId) => String(instanceId || '').trim())
-    .filter(Boolean)
-    .map((instanceId) => ({ resourceType: 'bound', instanceId }))
-  if (fromDetail.length) return { rows: fromDetail, failed: false }
-
+  const filtered = boundProductTypes(raw.BoundResource)
+  const types = filtered.length ? filtered : [...DEPLOYED_RESOURCE_TYPES]
   const rows: Array<{ resourceType: string; instanceId: string }> = []
   let failed = false
-  const types = HOST_PRODUCTS.map((item) => item.id)
   await mapPool(types, BOUND_CONCURRENCY, async (resourceType) => {
     try {
       const data = await call<{
-        DeployedResources?: Array<{ ResourceType?: string; ResourceIdList?: string[]; Domain?: string }>
-      }>('DescribeDeployedResources', { CertificateId: certificateId, ResourceType: resourceType }, creds(ctx), {
+        DeployedResources?: Array<{ Type?: string; Resources?: string[]; ResourceIds?: string[] }>
+      }>('DescribeDeployedResources', {
+        CertificateIds: [certificateId],
+        ResourceType: resourceType,
+      }, creds(ctx), {
         ...opts(ctx),
         timeoutMs: Math.min(BOUND_CALL_TIMEOUT_MS, ctx.timeoutMs || BOUND_CALL_TIMEOUT_MS),
       })
-      for (const item of data.DeployedResources || []) {
-        const ids = item.ResourceIdList?.filter(Boolean) || (item.Domain ? [item.Domain] : [])
-        for (const instanceId of ids) rows.push({ resourceType: item.ResourceType || resourceType, instanceId })
-      }
+      rows.push(...parseDeployedResources(data, resourceType))
     } catch {
       failed = true
     }

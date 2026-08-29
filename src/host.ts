@@ -4,7 +4,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import Schema from '@deepseek-ai/schemastery'
 import { assignConfig, publicConfig, readOverlay, sanitizePatch, withDefaults, writeOverlay } from './core/config-store.js'
 import { queryResources, renderQuery } from './core/query.js'
-import { credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, SETTINGS_HINT, supportedKinds } from './core/registry.js'
+import { credentialHint, credentialMap, implementedModules, missingCredentialKeys, publicMeta, registry, supportedKinds } from './core/registry.js'
 import { publicErrorMessage } from './core/safe-error.js'
 import { isPost, trustedUiRequest } from './core/trusted-request.js'
 import type { PluginConfig, QueryResult } from './core/types.js'
@@ -246,6 +246,6 @@ function readyModule(cfg: PluginConfig, moduleId: string, id: string) {
   const provider = registry.getProvider(module.provider)
   if (!provider) throw new Error('未知云厂商')
   const missing = missingCredentialKeys(provider, cfg.providers[module.provider])
-  if (missing.length) throw new Error(`${provider.title} 未配置 ${missing.join('、')}。${SETTINGS_HINT}`)
+  if (missing.length) throw new Error(`${provider.title} 未配置 ${missing.join('、')}。${credentialHint(module.kind)}`)
   return { module, creds: credentialMap(provider, cfg.providers[module.provider]) }
 }

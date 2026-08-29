@@ -4,7 +4,7 @@ import {
   isModuleEnabled,
   isProviderEnabled,
   missingCredentialKeys,
-  SETTINGS_HINT,
+  credentialHint,
   type Registry,
   registry,
 } from './registry.js'
@@ -72,7 +72,7 @@ export async function queryResources(
     }
     const missing = missingCredentialKeys(providerDef, config.providers[module.provider])
     if (missing.length) {
-      errors.push({ moduleId: module.id, message: `${providerDef.title} 未配置 ${missing.join('、')}。${SETTINGS_HINT}` })
+      errors.push({ moduleId: module.id, message: `${providerDef.title} 未配置 ${missing.join('、')}。${credentialHint(module.kind)}` })
       return
     }
     try {
