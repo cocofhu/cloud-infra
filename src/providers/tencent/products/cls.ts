@@ -383,9 +383,14 @@ async function listTopics(
         ...item,
         LogsetName: item.LogsetName || names.get(String(item.LogsetId || '')) || '',
       }))
-      return { items, total: Number(retry.TotalCount) || items.length }
+      // 本地按 BizType 过滤后 items 可能少于上游 TotalCount;取较小值保持「总数与列表」口径一致
+      const retryTotal = Number(retry.TotalCount)
+      return { items, total: Number.isFinite(retryTotal) ? Math.min(retryTotal, items.length) : items.length }
     }
-    return { items, total: Number(topics.TotalCount) || items.length }
+    // 上游 TotalCount 是过滤前总数;本地 BizType/关键字过滤后用「上游总数与本页实际位置」取小,
+    // 保证「共 N 条」与列表行数、hasMore 口径一致,不会把已过滤掉的条目计入总数
+    const total = Number(topics.TotalCount)
+    return { items, total: Number.isFinite(total) ? Math.min(total, ctx.offset + items.length) : items.length }
   } catch (err) {
     throw wrapClsError(err)
   }

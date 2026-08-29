@@ -3,7 +3,7 @@ window.__ModuleLoader__.load({
   factory: (require) => {
     const React = require("react");
     const h = React.createElement;
-    const { useEffect, useState, useRef } = React;
+    const { useEffect, useMemo, useState, useRef } = React;
 
     const CSS = `
 .ci-root,.ci-tool{font-family:inherit;color:var(--dsw-alias-label-primary);width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:2px 0 6px}
@@ -172,7 +172,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-modal.wide{width:min(560px,100%)}
 .ci-renew{margin-left:6px}
 .ci-select{height:32px;width:auto;max-width:180px;flex:none;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;font:inherit;font-size:13px;background:var(--dsw-alias-bg-layer-2);color:inherit;box-sizing:border-box}
-.ci-select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-bar-left .ci-select{display:none}
+.ci-select:focus,.ci-cls-filter .ci-combo input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-ghost{height:30px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:8px;padding:0 10px;cursor:pointer;font:inherit;color:inherit}
 .ci-ghost.on{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}
 .ci-id{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
@@ -226,8 +227,10 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-wiz-step.done .ci-wiz-n{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
 .ci-wiz-line{flex:1;height:1px;background:var(--dsw-alias-border-l1);margin:0 10px;min-width:12px}
 .ci-wiz-body{padding:18px 24px;overflow:auto;flex:1;min-height:280px}
-.ci-wiz-foot{padding:12px 24px 18px;border-top:1px solid var(--dsw-alias-border-l1);display:flex;justify-content:flex-end;gap:8px;flex:none}
+.ci-wiz-foot{padding:12px 24px 18px;border-top:1px solid var(--dsw-alias-border-l1);display:flex;justify-content:flex-end;align-items:center;gap:8px;flex:none}
 .ci-wiz-foot .ci-mini{height:34px;padding:0 16px}
+.ci-wiz-foot .ci-foot-back{width:34px;height:34px;padding:0;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;flex-shrink:0}
+.ci-wiz-foot .ci-foot-back:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-wiz-sec{font-size:13px;font-weight:650;margin:16px 0 8px;color:var(--dsw-alias-label-primary)}
 .ci-wiz-sec:first-child{margin-top:0}
 .ci-opt{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-top:1px solid var(--dsw-alias-border-l1);cursor:pointer}
@@ -312,10 +315,13 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-combo{position:relative;width:240px;flex:none}
 .ci-combo input{height:32px;width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;font:inherit;font-size:13px;line-height:32px;background:var(--dsw-alias-bg-layer-1);color:inherit;box-sizing:border-box}
 .ci-combo input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
-.ci-combo-list{position:absolute;left:0;right:0;top:36px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;max-height:200px;overflow:auto;z-index:3;margin:0;padding:4px 0;list-style:none}
+.ci-combo-list{position:absolute;left:0;right:0;top:36px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;max-height:200px;overflow:auto;z-index:6;margin:0;padding:4px 0;list-style:none}
 .ci-combo-list li{padding:6px 10px;cursor:pointer;font-size:13px}
+.ci-combo-list li.ci-combo-group{padding:4px 10px;cursor:default;font-size:12px;font-weight:600;color:var(--dsw-alias-label-tertiary)}
+.ci-combo-list li.ci-combo-group:hover,.ci-combo-list li.ci-combo-group.on{background:transparent;color:var(--dsw-alias-label-tertiary)}
 .ci-combo-list li.on,.ci-combo-list li:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-brand-primary)}
 .ci-combo-id{color:var(--dsw-alias-label-tertiary);margin-left:8px;font-size:12px}
+.ci-combo input{border-radius:inherit}
 .ci-tool-left{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:none}
 .ci-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:8px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);font-size:13px;color:var(--dsw-alias-label-secondary)}
 .ci-crumbs button{background:none;border:0;padding:0;font:inherit;color:var(--dsw-alias-brand-primary);cursor:pointer}
@@ -334,7 +340,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-query-side{display:flex;flex-direction:column;gap:6px;min-width:0}
 .ci-query .ci-tiny{margin:0 0 6px}
 .ci-cql{width:100%;min-height:72px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;resize:vertical;box-sizing:border-box}
-.ci-cql:focus,.ci-cls .ci-region:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-cql:focus,.ci-cls .ci-region:focus,.ci-cls-filter .ci-combo input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-hist{display:flex;align-items:flex-end;gap:2px;height:56px;padding:8px 12px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l1)}
 .ci-hist i{flex:1;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 42%,transparent);border-radius:2px 2px 0 0;min-height:2px}
 .ci-split{display:grid;grid-template-columns:minmax(108px,140px) minmax(0,1fr);min-width:0}
@@ -359,7 +365,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-cls .ci-mini.primary{background:var(--cls-blue);color:var(--dsw-alias-label-primary-foreground);border-radius:3px;height:32px;padding:0 16px;font-size:14px;border:0}
 .ci-cls .ci-mini.primary:hover:not(:disabled){background:var(--cls-blue-h)}
 .ci-cls .ci-back{border-radius:3px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1);height:32px}
-.ci-cls .ci-region,.ci-cls .ci-search{border-radius:3px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1)}
+.ci-cls .ci-region,.ci-cls-filter .ci-combo,.ci-cls .ci-search{border-radius:8px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1)}
 .ci-cls .ci-cql{border-radius:3px;border-color:var(--cls-line);background:var(--dsw-alias-bg-layer-1);min-height:64px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
 .ci-cls-mode{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
 .ci-cls-tag{height:22px;padding:0 8px;border:1px solid var(--cls-line);border-radius:3px;font-size:12px;line-height:20px;color:#111;background:var(--dsw-alias-bg-layer-1)}
@@ -390,6 +396,10 @@ html[data-theme=dark] .ci-image,.ci-image[data-theme=dark]{--ci-title:#f7f8fb;co
 .ci-image-sub{margin:4px 0 12px;color:var(--ci-muted);font-size:12px}
 .ci-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .ci-chip-sel{height:32px;padding:0 10px 0 12px;border-radius:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--ci-title);font:inherit;display:flex;align-items:center;gap:8px}
+.ci-chip-sel .ci-combo{position:relative;width:200px;flex:1;min-width:0}
+.ci-chip-sel .ci-combo input{height:30px;border:0;background:transparent;box-shadow:none;padding:0;color:var(--ci-title)}
+.ci-chip-sel .ci-combo input:focus{border:0;box-shadow:none;outline:none}
+.ci-chip-sel:focus-within{border-color:var(--dsw-alias-brand-primary)}
 .ci-chip-sel span{color:var(--ci-muted);font-size:12px}
 .ci-chip-sel select{border:0;background:transparent;color:var(--ci-title);font:inherit;outline:none;max-width:200px;color-scheme:inherit}
 .ci-chip-sel select option,.ci-field select option,.ci-root select option{background-color:Field;color:FieldText}
@@ -409,7 +419,7 @@ html[data-theme=dark] .ci-image,.ci-image[data-theme=dark]{--ci-title:#f7f8fb;co
 .ci-image-body{padding:14px 16px 16px;min-width:0;overflow-x:auto}
 .ci-image-body>.ci-empty,.ci-image .ci-empty{border-top:0;padding:28px 8px}
 .ci-image .ci-crumb{padding:0;border:0;margin:0 0 12px;gap:10px;min-width:0}
-.ci-image .ci-back{height:28px;padding:0 10px;font-size:12px;color:var(--ci-title);flex:none}
+.ci-image .ci-back{height:28px;padding:0;font-size:12px;color:var(--ci-title);flex:none}
 .ci-detail-titles{min-width:0;flex:1}
 .ci-detail-meta{margin:2px 0 0;font-size:12px;line-height:18px;color:var(--ci-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ci-copied{display:flex;align-items:flex-start;gap:8px;margin:0 0 12px;padding:8px 10px;border-radius:8px;background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary);font-size:12px;line-height:18px;word-break:break-all}
@@ -430,6 +440,18 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
 .ci-tag.blue{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);border-color:transparent;color:var(--dsw-alias-brand-primary)}
 .ci-ic-meta{font-size:12px;color:var(--ci-muted);word-break:break-all}
 .ci-warn{padding:10px 12px;border-radius:10px;background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label);font-size:12px;line-height:1.5;margin:0 0 4px}
+.ci-score{border:0;background:none;padding:0;cursor:pointer;font:inherit;font-weight:600;color:var(--dsw-alias-state-warn-label)}
+.ci-score:hover{text-decoration:underline}
+.ci-nav{border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-nav .ci-groups{display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px 6px;border-bottom:0}
+.ci-nav .ci-group{height:28px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;font-size:13px;margin:0;border-bottom:0;font-weight:inherit}
+.ci-nav .ci-group.on{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:600}
+.ci-nav .ci-tabs{border-bottom:0;padding:0 8px 6px}
+.ci-chip-btn{height:28px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;font-size:12px;cursor:pointer}
+.ci-chip-btn.on{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}
+.ci-chip-btn:disabled{opacity:.45;cursor:wait}
+.ci-filter{height:32px;max-width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;font-size:13px}
+.ci-filter:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -722,9 +744,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (node.kind === "cls" || node.resourceKind === "cls" || Array.isArray(node.logs)) return true;
       if (!Array.isArray(node.items)) return false;
       if (node.kind === "cloud-infra-query" || node.kind === "image" || node.resourceKind === "image") return true;
-      if (node.resourceKind === "cert" || node.resourceKind === "domain" || node.resourceKind === "auto" || node.resourceKind === "cls") return true;
+      if (node.resourceKind === "cert" || node.resourceKind === "domain" || node.resourceKind === "auto" || node.resourceKind === "cls" || node.resourceKind === "dbbrain") return true;
       if (node.items[0] && node.items[0].moduleId) return true;
-      if (Array.isArray(node.errors) && node.errors.length) return true;
+      if (Array.isArray(node.errors) && (node.errors.length || node.kind === "cert" || node.kind === "domain" || node.kind === "auto" || node.kind === "cls" || node.kind === "dbbrain")) return true;
       return false;
     }
 
@@ -780,6 +802,19 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           strokeLinejoin: "round",
         }),
       );
+    }
+
+    // 统一的返回按钮：纯 ChevronLeft 图标，语义由 title/aria-label 承载；
+    // rest 透传 disabled/key 等额外属性，className 固定在 ci-back 之上。
+    function BackButton({ onClick, className, ...rest }) {
+      return h("button", {
+        type: "button",
+        className: ("ci-back" + (className ? " " + className : "")).trim(),
+        title: "返回",
+        "aria-label": "返回",
+        onClick,
+        ...rest,
+      }, h(ChevronLeft));
     }
 
     function statusText(status) {
@@ -917,21 +952,196 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return list.find((name) => /广州/.test(name) || name === "ap-guangzhou") || list[0] || "华南地区（广州）";
     }
 
-    function RegionSelect({ regions, value, onChange }) {
-      const names = Array.from(new Set((Array.isArray(regions) ? regions : []).filter(Boolean)));
-      const current = value || defaultRegionName(names);
-      return h("select", {
-        className: "ci-select",
-        value: current,
-        onChange: (e) => onChange && onChange(e.target.value),
-      },
-        h("option", { value: "all" }, "全部地域"),
-        names.map((name) => h("option", { key: name, value: name }, name)),
+    const REGION_ALL_ID = "__all__";
+
+    // 统一地域组合框:聚焦展开完整列表、输入按名称/ID 即时过滤、↑↓ 高亮、Enter 选中、
+    // Esc 关闭、失焦延时收起、支持分组标题与『全部地域』首项,供全部 5 处地域选择点复用。
+    function RegionCombo({ items, groups, value, display, onDisplay, placeholder, allowAll, disabled, style, inputId, chosenText, onChange }) {
+      const [open, setOpen] = useState(false);
+      const [highlight, setHighlight] = useState(0);
+      const visibleGroups = useMemo(() => {
+        const all = allowAll ? [{ id: REGION_ALL_ID, label: "全部地域", aliases: ["all"] }] : [];
+        const source = Array.isArray(groups) && groups.length
+          ? groups.map((group) => ({ title: group.title, items: (Array.isArray(group.items) ? group.items : []).filter(Boolean) }))
+          : [{ title: "", items: (Array.isArray(items) ? items : []).filter(Boolean) }];
+        // 输入恰为已选项展示文本时视为未输入,展示全量(沿用旧 comboNeedle 语义)
+        let comboNeedle = String(display || "");
+        if (value && value.id !== REGION_ALL_ID) {
+          const chosen = source.flatMap((group) => group.items).find((item) => item.id === value.id);
+          if (chosen && (comboNeedle === `${chosen.label}（${chosen.id}）` || comboNeedle === chosen.label)) comboNeedle = "";
+        }
+        const hitGroups = source.map((group) => ({
+          title: group.title,
+          items: matchRegionItems(group.items, comboNeedle),
+        })).filter((group) => group.items.length);
+        if (allowAll && matchRegionItems(all, comboNeedle).length) hitGroups.unshift({ title: "", items: all });
+        return hitGroups;
+      }, [items, groups, display, value, allowAll]);
+      const flat = useMemo(() => visibleGroups.flatMap((group) => group.items), [visibleGroups]);
+      const placeholderText = placeholder || (allowAll ? "全部地域" : "输入地域名称或 ID 补全");
+      // 选中项回显格式:默认 label（id)(COS 视觉),ById 薄封装传 label-only,保证失焦/Esc 与 pick 后一致
+      const formatChosen = (item) => {
+        if (!item) return "";
+        if (typeof chosenText === "function") return chosenText(item);
+        return item.id === REGION_ALL_ID ? item.label : `${item.label}（${item.id}）`;
+      };
+      const pick = (item) => {
+        if (!item) return;
+        const next = item.id === REGION_ALL_ID ? { id: item.id, label: item.label } : item;
+        onDisplay(formatChosen(item));
+        setOpen(false);
+        onChange && onChange(next);
+      };
+      const close = () => {
+        setOpen(false);
+        onDisplay(value ? formatChosen(value) : String(display || ""));
+      };
+      return h("div", { className: "ci-combo", style },
+        h("input", {
+          type: "text",
+          placeholder: placeholderText,
+          autoComplete: "off",
+          disabled,
+          "aria-label": "地域",
+          value: display,
+          id: inputId || undefined,
+          key: inputId ? `${inputId}:root` : undefined,
+          onChange: (e) => { onDisplay(e.target.value); setHighlight(0); if (!open) setOpen(true); },
+          onFocus: (e) => {
+            if (disabled) return;
+            const idx = value ? flat.findIndex((item) => item.id === value.id) : 0;
+            setHighlight(Math.max(0, idx));
+            setOpen(true);
+            if (e.target && e.target.select) e.target.select();
+          },
+          onBlur: () => setTimeout(close, 150),
+          onKeyDown: (e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              if (!open) setOpen(true);
+              setHighlight(Math.min(flat.length - 1, highlight + 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setHighlight(Math.max(0, highlight - 1));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              const hit = flat[highlight] || flat[0];
+              if (hit) pick(hit);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setOpen(false);
+              onDisplay(value ? formatChosen(value) : "");
+            }
+          },
+        }),
+        open && flat.length ? h("ul", { className: "ci-combo-list", role: "listbox" },
+          visibleGroups.map((group) => [
+            group.title ? h("li", { key: "g:" + group.title, className: "ci-combo-group" }, group.title) : null,
+            group.items.map((item) => {
+              const idx = flat.indexOf(item);
+              return h("li", {
+                key: item.id,
+                className: idx === highlight ? "on" : "",
+                onMouseDown: (e) => { e.preventDefault(); pick(item); },
+              }, item.label, item.id === REGION_ALL_ID ? null : h("span", { className: "ci-combo-id" }, item.id));
+            }),
+          ]),
+        ) : null,
       );
     }
 
-    function KindTabs({ showCvm, showLh, value, onChange }) {
-      if (!(showCvm && showLh)) return null;
+    // 旧地域 select 的薄封装:仅靠 id 解析选项;内部自持文本状态,输入仅更新文本与过滤、不清空选中,
+    // 仅在选中新项/清空时经 onChange 回调,供服务器/TCR/CLS/CDB 等 Caller 复用。
+    function RegionComboById({ options, groups, value, text, onText, placeholder, allowAll, disabled, style, onChange }) {
+      const list = Array.isArray(groups) && groups.length
+        ? groups.flatMap((group) => (Array.isArray(group.items) ? group.items : []).filter(Boolean))
+        : (Array.isArray(options) ? options : []).filter(Boolean);
+      const hit = list.find((item) => item.id === value) || null;
+      const isAll = allowAll && value === REGION_ALL_ID;
+      const allItem = isAll ? { id: REGION_ALL_ID, label: "全部地域" } : null;
+      // null 表示跟随外部 value;输入时接管,选中/外部 value 变化时复位
+      const [inner, setInner] = useState(null);
+      const derived = hit ? hit.label : (allItem ? allItem.label : (value ? String(value) : ""));
+      const shown = text !== undefined ? text : (inner !== null ? inner : derived);
+      const setShown = (next) => {
+        if (onText) onText(next);
+        else setInner(next);
+      };
+      useEffect(() => { setInner(null); }, [value]);
+      return h(RegionCombo, {
+        items: list,
+        groups,
+        value: hit || allItem,
+        display: shown,
+        onDisplay: setShown,
+        placeholder,
+        allowAll,
+        disabled,
+        style,
+        chosenText: (item) => (item && item.label) || "",
+        onChange: (item) => { setShown(item.label); onChange && onChange(item.id); },
+      });
+    }
+
+    // 常见 city 短名 → 控制台全称;数据源已返回全称时按原样匹配,否则把「广州」此类短名归一。
+    const REGION_CITY_TO_DISPLAY = [
+      ["广州", "华南地区（广州）"],
+      ["上海", "华东地区（上海）"],
+      ["北京", "华北地区（北京）"],
+      ["成都", "西南地区（成都）"],
+      ["重庆", "西南地区（重庆）"],
+      ["南京", "华东地区（南京）"],
+      ["香港", "港澳台地区（中国香港）"],
+      ["新加坡", "亚太东南（新加坡）"],
+      ["东京", "亚太东北（东京）"],
+      ["硅谷", "美国西部（硅谷）"],
+      ["弗吉尼亚", "美国东部（弗吉尼亚）"],
+      ["法兰克福", "欧洲地区（法兰克福）"],
+      ["雅加达", "亚太东南（雅加达）"],
+      ["孟买", "亚太南部（孟买）"],
+      ["首尔", "亚太东北（首尔）"],
+      ["曼谷", "亚太东南（曼谷）"],
+      ["深圳", "华南地区（深圳）"],
+      ["金融", "华南地区（深圳金融）"],
+    ];
+    function canonicalRegionName(name) {
+      const raw = String(name || "").trim();
+      if (!raw) return "";
+      // 已是「xx地区（城市）/xx（城市）」形式视为控制台全称,仅统一全角括号。
+      if (/（[^）]+）/.test(raw) || /\([^)]+\)/.test(raw)) {
+        return raw.replace(/\(/g, "（").replace(/\)/g, "）");
+      }
+      // 官方 region id(如 ap-guangzhou)直接保留,供服务端按 id 过滤。
+      if (/^(ap|eu|na|sa|in|jp)-[a-z-]+$/.test(raw)) return raw;
+      for (const [city, display] of REGION_CITY_TO_DISPLAY) {
+        if (raw === city) return display;
+      }
+      return raw;
+    }
+
+    // 服务器 CVM/轻量地域选择:统一改用 RegionCombo,并按控制台全称归一去重。
+    function RegionSelect({ regions, value, onChange }) {
+      const raw = (Array.isArray(regions) ? regions : []).filter(Boolean);
+      const seen = new Set();
+      const names = [];
+      for (const item of raw) {
+        const canonical = canonicalRegionName(item);
+        if (canonical && !seen.has(canonical)) {
+          seen.add(canonical);
+          names.push(canonical);
+        }
+      }
+      const items = names.map((name) => ({ id: name, label: name }));
+      const current = canonicalRegionName(value) || defaultRegionName(names);
+      return h(RegionComboById, {
+        options: items,
+        value: current === "all" ? REGION_ALL_ID : current,
+        allowAll: true,
+        onChange: (next) => onChange && onChange(next === REGION_ALL_ID ? "all" : next),
+      });
+    }
+
+    function KindTabs({ value, onChange }) {
       return h("div", { className: "ci-tabs" },
         h("button", {
           type: "button",
@@ -1666,7 +1876,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t", title: item.title }, "证书详情 · " + item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -1765,7 +1975,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack, title: "返回", "aria-label": "返回" }, h(ChevronLeft)),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t", title: item.title }, item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -1902,6 +2112,14 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         .filter(Boolean);
     }
 
+    // 统一过滤:RegionCombo 依据名称/ID/别名即时补全,空串返回全量。
+    function matchRegionItems(items, needle) {
+      const q = normRegion(needle);
+      const list = (Array.isArray(items) ? items : []).filter(Boolean);
+      if (!q) return list;
+      return list.filter((item) => regionTokens(item).some((token) => token.includes(q)));
+    }
+
     function isPresignStat(stat) {
       return !!(stat && (stat.copied === true || (stat.copied === false && stat.expiresSec)));
     }
@@ -1988,48 +2206,20 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       });
     }
 
-    function CosRegionCombo({ regions, input, selected, open, highlight, onInput, onPick, onOpen, onHighlight }) {
-      const comboNeedle = selected && input === displayRegion(selected) ? "" : input;
-      const items = (regions || []).filter((region) => matchCosRegion(region, comboNeedle));
+    // COS 地域选择:收敛复用统一 RegionCombo,保留默认地域与 region 提示解析。
+    function CosRegionCombo({ regions, input, selected, onInput, onPick }) {
       return h("div", { className: "ci-regionbar" },
         h("label", { htmlFor: "ci-cos-region" }, "地域"),
-        h("div", { className: "ci-combo" },
-          h("input", {
-            id: "ci-cos-region",
-            type: "text",
-            placeholder: "输入地域名称或 ID 补全",
-            autoComplete: "off",
-            value: selected && !open ? displayRegion(selected) : input,
-            onChange: (e) => onInput(e.target.value),
-            onFocus: (e) => {
-              const idx = selected ? items.findIndex((region) => region.id === selected.id) : 0;
-              onHighlight(Math.max(0, idx));
-              onOpen(true);
-              if (e.target && e.target.select) e.target.select();
-            },
-            onBlur: () => setTimeout(() => onOpen(false), 150),
-            onKeyDown: (e) => {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                onHighlight(Math.min(items.length - 1, highlight + 1));
-              } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                onHighlight(Math.max(0, highlight - 1));
-              } else if (e.key === "Enter") {
-                e.preventDefault();
-                const hit = items[highlight] || items[0];
-                if (hit) onPick(hit);
-              } else if (e.key === "Escape") onOpen(false);
-            },
-          }),
-          open && items.length ? h("ul", { className: "ci-combo-list", role: "listbox" },
-            items.map((region, idx) => h("li", {
-              key: region.id,
-              className: idx === highlight ? "on" : "",
-              onMouseDown: (e) => { e.preventDefault(); onPick(region); },
-            }, region.label, h("span", { className: "ci-combo-id" }, region.id))),
-          ) : null,
-        ),
+        h(RegionCombo, {
+          id: "ci-cos-region",
+          inputId: "ci-cos-region",
+          items: regions,
+          value: selected,
+          display: input,
+          onDisplay: onInput,
+          placeholder: "输入地域名称或 ID 补全",
+          onChange: onPick,
+        }),
       );
     }
 
@@ -2112,8 +2302,6 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [regions, setRegions] = useState(COS_REGION_FALLBACK);
       const [input, setInput] = useState(() => displayRegion(defaultCosRegion(COS_REGION_FALLBACK)));
       const [selected, setSelected] = useState(() => defaultCosRegion(COS_REGION_FALLBACK));
-      const [open, setOpen] = useState(false);
-      const [highlight, setHighlight] = useState(0);
       const [rows, setRows] = useState([]);
       const [total, setTotal] = useState(0);
       const [offset, setOffset] = useState(0);
@@ -2216,19 +2404,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         fileSeq.current += 1;
         setSelected(region);
         setInput(displayRegion(region));
-        setOpen(false);
         setSession(null);
         fetchBuckets(region, 0, "");
       };
       const onRegionInput = (value) => {
         fileSeq.current += 1;
         setInput(value);
-        setSelected(null);
         setRows([]);
         setTotal(0);
         setSession(null);
-        setOpen(true);
-        setHighlight(0);
       };
       const loadFiles = async (item, prefix, opts) => {
         const n = ++fileSeq.current;
@@ -2354,7 +2538,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const showFiles = !!(session && (session.detail || (session.entries || []).length) && (!session.loading || (session.entries || []).length));
       return [
         session ? h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: () => { setSession(null); setDraftQ(""); setErr(""); } }, "返回"),
+          h(BackButton, { onClick: () => { setSession(null); setDraftQ(""); setErr(""); } }),
           h("span", { className: "ci-head-t" }, session.item.title),
         ) : null,
         session ? h("div", { key: "path", className: "ci-crumbs" },
@@ -2372,12 +2556,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             regions,
             input,
             selected,
-            open,
-            highlight,
             onInput: onRegionInput,
             onPick: pickRegion,
-            onOpen: setOpen,
-            onHighlight: setHighlight,
           }),
           h("div", { className: "ci-tool-left" },
             session ? [
@@ -3036,7 +3216,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       })();
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t" }, item.title),
           h("span", { className: "ci-sub" }, `${item.description || ""} · ${regionName(region)}`),
         ),
@@ -3170,7 +3350,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (!session) {
         return [
           h("div", { key: "crumb", className: "ci-crumb" },
-            h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+            h(BackButton, { onClick: onBack }),
             h("span", { className: "ci-head-t" }, "登录数据库（DMC）"),
           ),
           h("div", { key: "login", className: "ci-login-box" },
@@ -3194,7 +3374,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       }
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回实例列表"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t" }, "SQL 窗口"),
           h("span", { className: "ci-sub" }, `${item.title} · ${session.user}`),
           h("button", { type: "button", className: "ci-mini", onClick: () => run("dmc.logout", {}).then(() => setSession(null)) }, "退出登录"),
@@ -3338,44 +3518,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ];
     }
 
-    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery, onSubmit, busy }) {
-      const [localRegion, setLocalRegion] = useState("华南地区（广州）");
-      const [localQ, setLocalQ] = useState("");
-      const regionValue = onRegion ? (region || defaultRegionName(regions)) : localRegion;
-      const qValue = onQuery ? (q || "") : localQ;
-      const regionNames = Array.from(new Set([
-        ...(Array.isArray(regions) ? regions : []),
-        ...(items || []).map((row) => row.regionName || row.region).filter(Boolean),
-      ]));
-      const rows = onRegion || onQuery
-        ? (items || [])
-        : (items || []).filter((row) => {
-          if (regionValue && (row.regionName || row.region) !== regionValue) return false;
-          return matchLocalInstance(row, qValue);
-        });
-      const setRegion = (next) => {
-        if (onRegion) onRegion(next);
-        else setLocalRegion(next);
-      };
-      const setQ = (next) => {
-        if (onQuery) onQuery(next);
-        else setLocalQ(next);
-      };
-      return [
-        h("div", { key: "bar", className: "ci-bar" },
-          h("div", { className: "ci-bar-left" },
-            h("span", { className: "ci-bar-title" }, "实例"),
-            h(RegionSelect, { regions: regionNames, value: regionValue, onChange: setRegion }),
-          ),
-          h(SearchField, {
-            value: qValue,
-            onChange: setQ,
-            onSubmit: onSubmit,
-            placeholder: "搜索 ID / 名称 / IP",
-          }),
-        ),
-        h(ListPane, { key: "body", busy },
-          rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
+    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, q, busy }) {
+      const rows = Array.isArray(items) ? items : [];
+      return h(ListPane, { busy },
+        rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
             ["ID/名称", "状态", "可用区", "实例类型", "操作系统", "实例配置", "主IPv4地址", "实例计费模式", "操作"]
               .map((label) => h("th", { key: label }, label)),
@@ -3399,32 +3545,16 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("td", null, cellValue(item, "实例计费模式") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : h("div", { className: "ci-empty" }, emptyHint || (qValue ? `没有匹配「${qValue}」的实例` : "没有匹配的实例")),
-        ),
-      ];
+        )) : h("div", { className: "ci-empty" }, emptyHint || ((q || "").trim() ? `没有匹配「${String(q).trim()}」的实例` : "没有匹配的实例")),
+      );
     }
 
-    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion, q, onQuery, onSubmit, busy }) {
-      const regionValue = region || defaultRegionName(regions);
-      const qValue = onQuery ? (q || "") : "";
+    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, q, busy }) {
       const rows = Array.isArray(items) ? items : [];
-      return [
-        h("div", { key: "bar", className: "ci-bar" },
-          h("div", { className: "ci-bar-left" },
-            h("span", { className: "ci-bar-title" }, "服务器"),
-            h(RegionSelect, { regions, value: regionValue, onChange: onRegion }),
-          ),
-          h(SearchField, {
-            value: qValue,
-            onChange: onQuery,
-            onSubmit: onSubmit,
-            placeholder: "搜索 ID / 名称 / IP",
-          }),
-        ),
-        h(ListPane, { key: "body", busy },
-          rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
+      return h(ListPane, { busy },
+        rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
-            ["ID/名称", "状态", "地域", "公网 IP", "套餐", "到期时间", "操作"].map((label) => h("th", { key: label }, label)),
+            ["ID/名称", "状态", "可用区", "套餐", "公网 IP", "到期时间", "操作"].map((label) => h("th", { key: label }, label)),
           )),
           h("tbody", null, rows.map((item) => h("tr", { key: item.id },
             h("td", null, h("div", { className: "ci-id" },
@@ -3437,15 +3567,14 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               h("span", { className: "ci-id-sub" }, item.title),
             )),
             h("td", null, h(StatusCell, { status: item.status, label: item.stateLabel })),
-            h("td", null, item.regionName || item.region || "-"),
-            h("td", null, item.publicIp || cellValue(item, "公网 IP") || "-"),
+            h("td", null, cellValue(item, "可用区") || "-"),
             h("td", null, cellValue(item, "套餐") || "-"),
+            h("td", null, item.publicIp || cellValue(item, "公网 IP") || "-"),
             h("td", null, cellValue(item, "到期时间") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : h("div", { className: "ci-empty" }, emptyHint || "没有资源"),
-        ),
-      ];
+        )) : h("div", { className: "ci-empty" }, emptyHint || ((q || "").trim() ? `没有匹配「${String(q).trim()}」的实例` : "没有匹配的实例")),
+      );
     }
 
     function InstanceDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onTab, tab, onSkipConfirm }) {
@@ -3494,7 +3623,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack, title: "返回", "aria-label": "返回" }, h(ChevronLeft)),
+          h(BackButton, { onClick: onBack }),
           h("div", { className: "ci-crumb-meta" },
             h("span", { className: "ci-head-t", title: card.title }, card.title),
             h(StatusCell, { status: card.status, label: card.stateLabel }),
@@ -3575,6 +3704,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (kind === "registrar") return "域名注册";
       if (kind === "my-domain") return "我的域名";
       if (kind === "domain") return "域名解析";
+      if (kind === "dbbrain") return "实例管理";
       return "云资源";
     }
 
@@ -3582,6 +3712,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (kind === "cert") return "搜索证书 ID / 备注 / 域名";
       if (kind === "registrar") return "请输入域名或后缀";
       if (kind === "my-domain" || kind === "domain") return "请输入域名关键字";
+      if (kind === "dbbrain") return "实例 ID / 名称";
       return "搜索";
     }
 
@@ -3798,7 +3929,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           ),
         ];
         foot = [
-          h("button", { key: "back", type: "button", className: "ci-mini", disabled: busy, onClick: onBackCart }, "返回购物车"),
+          h(BackButton, { key: "back", className: "ci-foot-back", disabled: busy, onClick: onBackCart }),
           h("button", {
             key: "next",
             type: "button",
@@ -3827,7 +3958,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           h("div", { className: "ci-kv-v" }, "将从账户余额扣费。不支持微信 / QQ 钱包 / 网银。"),
         );
         foot = [
-          h("button", { key: "back", type: "button", className: "ci-mini", disabled: busy, onClick: onBackSubmit }, "返回"),
+          h(BackButton, { key: "back", className: "ci-foot-back", disabled: busy, onClick: onBackSubmit }),
           h("button", {
             key: "pay",
             type: "button",
@@ -3911,7 +4042,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t", title: item.title }, item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -4225,7 +4356,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t" }, "新建 · " + (CREATE_TYPES.find((x) => x.id === createType)?.title || "")),
         ),
         h("div", { key: "steps", className: "ci-steps" }, steps.map((label, idx) => h("span", {
@@ -4321,7 +4452,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t" }, "删除集群 · " + item.title),
         ),
         h("div", { key: "wiz", className: "ci-wizard" },
@@ -4395,7 +4526,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       });
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h(BackButton, { onClick: onBack }),
           h("span", { className: "ci-head-t", title: item.title }, item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -4891,7 +5022,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           }) : null,
           screen === "create" && !createType ? [
             h("div", { key: "crumb", className: "ci-crumb" },
-              h("button", { type: "button", className: "ci-back", onClick: () => setScreen("list") }, "返回"),
+              h(BackButton, { onClick: () => setScreen("list") }),
               h("span", { className: "ci-head-t" }, "选择集群类型"),
             ),
             h("div", { key: "cards", className: "ci-type-grid" }, CREATE_TYPES.map((card) => h("button", {
@@ -5065,16 +5196,19 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return buckets.map((n) => Math.max(8, Math.round((n / peak) * 100)));
     }
 
+    // CLS 地域选择:统一改用 RegionCombo,沿用 clsRegionGroups 的分组(原 optgroup 语义)。
     function ClsRegionSelect({ value, regions, disabled, onChange }) {
-      return h("select", {
-        className: "ci-region",
+      const groups = clsRegionGroups(regions).map((group) => ({
+        title: group.group,
+        items: group.items.map((item) => ({ id: item.id, label: item.name })),
+      }));
+      return h(RegionComboById, {
+        groups,
         value: value || "ap-guangzhou",
         disabled,
-        "aria-label": "地域",
-        onChange: (e) => onChange(e.target.value),
-      }, clsRegionGroups(regions).map((group) => h("optgroup", { key: group.group, label: group.group },
-        group.items.map((item) => h("option", { key: item.id, value: item.id }, item.name)),
-      )));
+        placeholder: "输入地域名称或 ID 补全",
+        onChange: (next) => onChange(next),
+      });
     }
 
     function ClsTopicTable({ items, pendingId, onOpen, emptyHint }) {
@@ -5280,7 +5414,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         return h("div", { className: "ci-root ci-tool ci-cls" }, h("div", { className: "ci-panel" },
           h("div", { className: "ci-search-bar" },
             h("div", { className: "ci-search-bar-main" },
-              h("button", { type: "button", className: "ci-back", onClick: () => { setView("list"); setTopic(null); } }, "返回主题"),
+              h(BackButton, { onClick: () => { setView("list"); setTopic(null); } }),
               h("div", { className: "ci-search-meta" },
                 h("div", { className: "ci-bar-title" }, "检索分析"),
                 h("div", { className: "ci-search-sub", title: topicCaption(topic, region, regions) }, topicCaption(topic, region, regions)),
@@ -5814,7 +5948,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             .map((row) => row.value))].join(" · ");
           return [
             h("div", { key: "crumb", className: "ci-crumb" },
-              h("button", { type: "button", className: "ci-back", onClick: () => { setRepo(null); setDraftQ(""); changeView("repo"); } }, "返回"),
+              h(BackButton, { onClick: () => { setRepo(null); setDraftQ(""); changeView("repo"); } }),
               h("div", { className: "ci-detail-titles" },
                 h("div", { className: "ci-head-t" }, repo?.full || "版本管理"),
                 meta ? h("div", { className: "ci-detail-meta", title: meta }, meta) : null,
@@ -5876,9 +6010,13 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("div", { className: "ci-filters" },
               h("label", { className: "ci-chip-sel" },
                 h("span", null, "地域"),
-                h("select", { value: region, onChange: (e) => changeRegion(e.target.value) },
-                  (regions.some((item) => item.id === region) ? regions : [{ id: region, label: region }, ...regions]).map((item) => h("option", { key: item.id, value: item.id }, item.label)),
-                ),
+                h(RegionComboById, {
+                  options: regions.some((item) => item.id === region) ? regions : [{ id: region, label: region }, ...regions],
+                  value: region,
+                  placeholder: "输入地域名称或 ID 补全",
+                  style: { width: 200 },
+                  onChange: (next) => changeRegion(next),
+                }),
               ),
               h("label", { className: "ci-chip-sel" },
                 h("span", null, "实例"),
@@ -5939,13 +6077,415 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       );
     }
 
+    const DBBRAIN_PRODUCTS = [
+      ["mysql", "MySQL"],
+      ["cynosdb", "TDSQL-C"],
+      ["mariadb", "MariaDB"],
+      ["dcdb", "TDSQL MySQL"],
+      ["redis", "Redis"],
+      ["mongodb", "MongoDB"],
+      ["postgres", "PostgreSQL"],
+      ["dbbrain-mysql", "自建 MySQL"],
+    ];
+    // Keep in sync with src/providers/tencent/products/dbbrain-catalog.ts
+    const DBBRAIN_REGIONS = [
+      ["", "全地域"],
+      ["ap-guangzhou", "广州"],
+      ["ap-qingyuan", "清远"],
+      ["ap-shenzhen", "深圳"],
+      ["ap-shanghai", "上海"],
+      ["ap-nanjing", "南京"],
+      ["ap-hangzhou", "杭州"],
+      ["ap-qingdao", "青岛"],
+      ["ap-beijing", "北京"],
+      ["ap-tianjin", "天津"],
+      ["ap-chengdu", "成都"],
+      ["ap-chongqing", "重庆"],
+      ["ap-zhongwei", "中卫"],
+      ["ap-hongkong", "香港"],
+      ["ap-taipei", "台北"],
+      ["ap-shanghai-fsi", "上海金融"],
+      ["ap-shenzhen-fsi", "深圳金融"],
+      ["ap-beijing-fsi", "北京金融"],
+      ["ap-singapore", "新加坡"],
+      ["ap-jakarta", "雅加达"],
+      ["ap-bangkok", "曼谷"],
+      ["ap-seoul", "首尔"],
+      ["ap-tokyo", "东京"],
+      ["na-siliconvalley", "硅谷"],
+      ["na-ashburn", "弗吉尼亚"],
+      ["sa-saopaulo", "圣保罗"],
+      ["eu-frankfurt", "法兰克福"],
+    ];
+
+    function canKillSession(product) {
+      return product === "mysql" || product === "cynosdb";
+    }
+
+    function instanceIdentity(item) {
+      return {
+        product: item && item.product || "",
+        region: item && item.region || "",
+        instanceId: String(item && item.id || "").split(":").slice(3).join(":") || String(item && item.title || ""),
+      };
+    }
+
+    function DbbrainTable({ items, pendingId, onOpen }) {
+      const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, "没有可诊断实例");
+      const template = "minmax(120px,1.6fr) 70px 64px 56px 52px 72px";
+      return h("div", { className: "ci-list" },
+        h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
+          h("div", { className: "ci-cell" }, "实例"),
+          h("div", { className: "ci-cell" }, "状态"),
+          h("div", { className: "ci-cell" }, "健康分"),
+          h("div", { className: "ci-cell" }, "告警"),
+          h("div", { className: "ci-cell" }, "地域"),
+          h("div", { className: "ci-cell" }, "操作"),
+        ),
+        rows.map((item) => h("div", {
+          key: item.id,
+          className: "ci-row",
+          style: { gridTemplateColumns: template },
+        },
+          h("div", { className: "ci-cell" }, h("button", {
+            type: "button",
+            className: "ci-name",
+            title: item.title,
+            disabled: pendingId === item.id,
+            onClick: () => onOpen(item, "diag"),
+          }, item.title)),
+          h("div", { className: "ci-cell" }, cellValue(item, "状态") || statusText(item.status) || "-"),
+          h("div", { className: "ci-cell" }, h("button", {
+            type: "button",
+            className: "ci-score",
+            disabled: pendingId === item.id || !item.hasReport,
+            title: item.hasReport ? "打开健康报告" : "当前产品线没有健康报告页",
+            onClick: () => item.hasReport && onOpen(item, "report"),
+          }, cellValue(item, "健康分") || "-")),
+          h("div", { className: "ci-cell num" }, h("button", {
+            type: "button",
+            className: "ci-link",
+            disabled: pendingId === item.id,
+            onClick: () => onOpen(item, "diag"),
+          }, cellValue(item, "异常告警") || "0")),
+          h("div", { className: "ci-cell" }, cellValue(item, "地域") || item.region || "-"),
+          h("div", { className: "ci-cell ci-ops" }, h("button", {
+            type: "button",
+            className: "ci-link",
+            disabled: pendingId === item.id,
+            onClick: () => onOpen(item, "diag"),
+          }, pendingId === item.id ? "加载中" : (item.openLabel || "诊断优化"))),
+        )),
+      );
+    }
+
+    function ChipRow({ items, active, onPick, disabled }) {
+      if (!Array.isArray(items) || !items.length) return null;
+      return h("div", { className: "ci-subtabs" },
+        items.map((item) => h("button", {
+          key: item.id,
+          type: "button",
+          disabled: !!disabled,
+          className: "ci-chip-btn" + (item.id === active ? " on" : ""),
+          onClick: () => { if (!disabled) onPick(item.id); },
+        }, item.label)),
+      );
+    }
+
+    // MySQL: 异常诊断 / 性能趋势 / 实时会话 / 慢SQL分析 / 空间分析 / SQL优化 / 自治中心 / 死锁可视化 / 事件通知 / 健康报告
+    // Redis: 内存分析 / 访问分析 / 慢日志分析; MongoDB: 索引推荐 / 会话. No left nav.
+    const TAB_GROUPS = [
+      { id: "diag", label: "诊断", ids: ["diag", "deadlock", "notify"] },
+      { id: "perf", label: "性能", ids: ["trend", "slow", "sqlopt", "memory", "access", "index"] },
+      { id: "session", label: "会话", ids: ["session"] },
+      { id: "space", label: "空间", ids: ["space"] },
+      { id: "gov", label: "治理", ids: ["autonomy", "report"] },
+    ];
+
+    function tabGroupsOf(tabs) {
+      const byId = new Map((tabs || []).map((tab) => [tab.id, tab]));
+      return TAB_GROUPS.map((group) => ({
+        ...group,
+        tabs: group.ids.map((id) => byId.get(id)).filter(Boolean),
+      })).filter((group) => group.tabs.length);
+    }
+
+    function DbbrainNav({ tabs, active, loading, onPick }) {
+      const list = Array.isArray(tabs) ? tabs : [];
+      if (!list.length) return null;
+      const pick = (id) => {
+        if (loading || id === active) return;
+        onPick(id);
+      };
+      if (list.length <= 4) {
+        return h("div", { className: "ci-tabs" },
+          list.map((tab) => h("button", {
+            key: tab.id,
+            type: "button",
+            disabled: !!loading,
+            className: "ci-tab" + (tab.id === active ? " on" : ""),
+            onClick: () => pick(tab.id),
+          }, tab.label)),
+        );
+      }
+      const groups = tabGroupsOf(list);
+      const current = groups.find((group) => group.tabs.some((tab) => tab.id === active)) || groups[0];
+      return h("div", { className: "ci-nav" },
+        h("div", { className: "ci-groups" },
+          groups.map((group) => h("button", {
+            key: group.id,
+            type: "button",
+            disabled: !!loading,
+            className: "ci-group" + (group.id === current?.id ? " on" : ""),
+            onClick: () => {
+              if (group.tabs.some((tab) => tab.id === active)) return;
+              pick(group.tabs[0].id);
+            },
+          }, group.label)),
+        ),
+        current && current.tabs.length > 1 ? h("div", { className: "ci-tabs" },
+          current.tabs.map((tab) => h("button", {
+            key: tab.id,
+            type: "button",
+            disabled: !!loading,
+            className: "ci-tab" + (tab.id === active ? " on" : ""),
+            onClick: () => pick(tab.id),
+          }, tab.label)),
+        ) : null,
+      );
+    }
+
+    function DbbrainDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
+      // Grouped nav when many tabs (诊断/性能/会话/空间/治理). Redis/Mongo keep a short tab row.
+      const ident = instanceIdentity(item);
+      const [confirm, setConfirm] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const [sqlDraft, setSqlDraft] = useState("");
+      const [formDraft, setFormDraft] = useState({});
+      const [customStart, setCustomStart] = useState("");
+      const [customEnd, setCustomEnd] = useState("");
+      const [pendingTab, setPendingTab] = useState("");
+      useEffect(() => {
+        setSqlDraft(detail?.form?.values?.sql || "");
+        setFormDraft(detail?.form?.values || {});
+        setErr("");
+        setPendingTab("");
+      }, [item.id, detail?.activeTab, detail?.form?.id, detail?.form?.values?.sql]);
+      const filtersOf = (extra) => ({
+        product: ident.product,
+        region: ident.region,
+        tab: extra.tab != null ? extra.tab : (pendingTab || detail?.activeTab || "diag"),
+        subTab: extra.subTab != null ? extra.subTab : (detail?.activeSubTab || ""),
+        range: extra.range != null ? extra.range : (detail?.activeRange || ""),
+        eventId: extra.eventId != null ? extra.eventId : "",
+        sql: extra.sql != null ? extra.sql : sqlDraft,
+        table: extra.table != null ? extra.table : "",
+        startTime: extra.startTime != null ? extra.startTime : customStart,
+        endTime: extra.endTime != null ? extra.endTime : customEnd,
+      });
+      const pickTab = (id) => {
+        setPendingTab(id);
+        onReload(filtersOf({ tab: id, subTab: "", eventId: "", range: "" }));
+      };
+      const activeTab = pendingTab || detail?.activeTab;
+      const run = async (action, payload) => {
+        setBusy(true);
+        setErr("");
+        try {
+          await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action: action.id,
+            payload: { ...ident, ...payload },
+          });
+          setConfirm(null);
+          await onReload(filtersOf({}));
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      const request = async (action, payload, text) => {
+        let skip = skipConfirm;
+        try {
+          const d = await api("meta", {});
+          skip = !!d.skipConfirm;
+          if (onSkipConfirm) onSkipConfirm(skip);
+        } catch { /* keep last known skipConfirm */ }
+        const must = action.confirm === "always" || (action.confirm === "default" && !skip);
+        if (!must) return run(action, payload);
+        setConfirm({ action, payload, text, danger: action.confirm === "always" });
+      };
+      const rowActions = (table, row) => {
+        const nodes = [];
+        if (table.id === "sessions" && row.sessionId && canKillSession(ident.product)) {
+          nodes.push(h("button", {
+            key: "kill",
+            type: "button",
+            className: "ci-link danger",
+            onClick: () => request(
+              { id: "session.kill", label: "Kill 会话", confirm: "always" },
+              { sessionId: row.sessionId },
+              `确定 Kill 会话 ${row.sessionId}？此操作不可撤销。`,
+            ),
+          }, "Kill"));
+        }
+        if (table.id === "events" && row.eventId) {
+          nodes.push(h("button", {
+            key: "view",
+            type: "button",
+            className: "ci-link",
+            onClick: () => onReload(filtersOf({ eventId: row.eventId })),
+          }, "详情"));
+          nodes.push(h("button", {
+            key: "ignore",
+            type: "button",
+            className: "ci-link",
+            onClick: () => request(
+              { id: "event.ignore", label: "忽略", confirm: "default" },
+              { eventId: row.eventId },
+              `忽略诊断事件 ${row.eventId}？`,
+            ),
+          }, "忽略"));
+        }
+        if (table.id === "reports" && row.taskId) {
+          if (row.链接) {
+            nodes.push(h("a", { key: "open", className: "ci-link", href: row.链接, target: "_blank", rel: "noreferrer" }, "打开"));
+          }
+          nodes.push(h("button", {
+            key: "del",
+            type: "button",
+            className: "ci-link danger",
+            onClick: () => request(
+              { id: "report.delete", label: "删除报告", confirm: "always" },
+              { taskId: row.taskId },
+              `确定删除报告任务 ${row.taskId}？此操作不可撤销。`,
+            ),
+          }, "删除"));
+        }
+        return nodes.length ? h("div", { className: "ci-ops" }, nodes) : null;
+      };
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h(BackButton, { onClick: onBack }),
+          h("span", { className: "ci-head-t", title: item.title }, item.title),
+        ),
+        !detail && loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        !detail && !loading && error ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
+        detail ? [
+          h("div", { key: "chips", className: "ci-chips" },
+            (detail.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" },
+              row.label,
+              h("b", null, row.value),
+            )),
+          ),
+          h(DbbrainNav, {
+            key: "tabs",
+            tabs: detail.tabs,
+            active: activeTab,
+            loading,
+            onPick: pickTab,
+          }),
+          loading ? h("div", { key: "tabload", className: "ci-load" }, h(Spin), "加载中…") : [
+            h(ChipRow, { key: "sub", items: detail.subTabs, active: detail.activeSubTab, disabled: loading, onPick: (id) => onReload(filtersOf({ subTab: id, eventId: "" })) }),
+            h(ChipRow, { key: "range", items: detail.ranges, active: detail.activeRange, disabled: loading, onPick: (id) => onReload(filtersOf({ range: id, eventId: "" })) }),
+            detail.activeRange === "custom" ? h("div", { key: "custom", className: "ci-filters" },
+              h("input", { className: "ci-filter", type: "text", placeholder: "开始 2019-01-01 00:00:00", value: customStart, onChange: (e) => setCustomStart(e.target.value) }),
+              h("input", { className: "ci-filter", type: "text", placeholder: "结束", value: customEnd, onChange: (e) => setCustomEnd(e.target.value) }),
+              h("button", { type: "button", className: "ci-mini", onClick: () => onReload(filtersOf({ range: "custom", startTime: customStart, endTime: customEnd })) }, "应用"),
+            ) : null,
+            err ? h("p", { key: "err", className: "ci-err" }, err) : null,
+            (detail.hints || []).map((hint, idx) => h("p", { key: "h" + idx, className: "ci-hint" }, hint)),
+            detail.form ? h("div", { key: "form", style: { padding: "8px 14px" } },
+              (detail.form.fields || []).map((field) => h("div", { className: "ci-field", key: field.key },
+                h("label", null, field.label),
+                h(field.kind === "textarea" ? "textarea" : "input", {
+                  placeholder: field.placeholder || "",
+                  value: field.key === "sql" ? sqlDraft : (formDraft[field.key] || ""),
+                  onChange: (e) => {
+                    const next = e.target.value;
+                    if (field.key === "sql") setSqlDraft(next);
+                    setFormDraft((prev) => ({ ...prev, [field.key]: next }));
+                  },
+                }),
+              )),
+              h("button", {
+                type: "button",
+                className: "ci-mini primary",
+                disabled: busy || loading,
+                onClick: () => {
+                  if (detail.form.action === "session.kill") {
+                    const duration = String(formDraft.duration || "").trim();
+                    request(
+                      { id: "session.kill", label: "创建中断任务", confirm: "always" },
+                      {
+                        duration,
+                        time: String(formDraft.time || "").trim(),
+                        host: String(formDraft.host || "").trim(),
+                        type: String(formDraft.type || "").trim(),
+                      },
+                      `将创建中断任务，持续时间 ${duration || "?"} 秒，可能中断该实例上多条匹配会话，不只针对某一条 sessionId。此操作不可撤销。`,
+                    );
+                    return;
+                  }
+                  onReload(filtersOf({ sql: sqlDraft }));
+                },
+              }, detail.form.submitLabel || "分析"),
+            ) : null,
+            activeTab === "report" ? h("div", { key: "rpt", className: "ci-sec" },
+              h("span", { className: "ci-sec-t" }, "健康报告"),
+              h("button", {
+                type: "button",
+                className: "ci-mini primary",
+                disabled: loading,
+                onClick: () => request(
+                  { id: "report.create", label: "生成健康报告", confirm: "default" },
+                  { range: detail.activeRange || "24h" },
+                  "确认生成健康报告？",
+                ),
+              }, "生成健康报告"),
+            ) : null,
+            (detail.tables || []).map((table) => h("div", { key: table.id || table.title, className: "ci-table-wrap" },
+              table.title ? h("div", { className: "ci-sec" }, h("span", { className: "ci-sec-t" }, table.title)) : null,
+              table.rows && table.rows.length ? h("table", { className: "ci-table" },
+                h("thead", null, h("tr", null,
+                  (table.columns || []).map((col) => h("th", { key: col }, col)),
+                  h("th", null, "操作"),
+                )),
+                h("tbody", null, table.rows.map((row, idx) => h("tr", { key: row.sessionId || row.eventId || row.taskId || idx },
+                  (table.columns || []).map((col) => h("td", { key: col }, row[col] || "")),
+                  h("td", { className: "ci-ops-cell" }, rowActions(table, row)),
+                ))),
+              ) : h("div", { className: "ci-empty" }, table.empty || "暂无数据"),
+            )),
+          ],
+        ] : null,
+        h(ConfirmDialog, {
+          key: "confirm",
+          open: !!confirm,
+          title: confirm?.action?.label,
+          text: confirm?.text,
+          busy,
+          danger: !!confirm?.danger,
+          onCancel: () => { if (!busy) setConfirm(null); },
+          onConfirm: () => confirm && run(confirm.action, confirm.payload),
+        }),
+      ];
+    }
+
     function SearchToolView(props) {
       useEffect(() => ensureCss(), []);
       const payload = pickPayload(props);
       const args = parseToolArgs(props);
       const fromTool = Array.isArray(payload?.items) ? payload.items : null;
       const running = !!(props?.block && !("kind" in props.block));
-      const kind = String(args.kind || payload?.resourceKind || (payload?.kind && payload.kind !== "cloud-infra-query" ? payload.kind : "") || (payload?.items && payload.items[0] && payload.items[0].kind) || "domain");
+      const kind = payload?.resourceKind
+        || (payload?.kind && payload.kind !== "cloud-infra-query" ? payload.kind : "")
+        || args.kind
+        || "domain";
       const provider = String(args.provider || "");
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");
@@ -5986,6 +6526,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const debounce = useRef(0);
       const groupRef = useRef("");
       const isCert = kind === "cert";
+      const isDbbrain = kind === "dbbrain";
+      const [dbProduct, setDbProduct] = useState((fromTool && fromTool[0] && fromTool[0].product) || "mysql");
+      const [dbRegion, setDbRegion] = useState("");
       const refreshSkip = () => {
         api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
       };
@@ -6026,7 +6569,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         setListErr("");
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
-      const fetchList = async (nextOffset, q, regionOverride, tab) => {
+      const fetchList = async (nextOffset, q, regionOverride, tab, filterOverride) => {
         const n = ++seq.current;
         const trimmed = String(q || "").trim();
         const useTab = tab || kindTab;
@@ -6045,6 +6588,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             limit: pageSize,
             group: isCert ? (groupRef.current || group || "") : "",
             region: useRegion || undefined,
+            filters: isDbbrain ? {
+              product: (filterOverride && filterOverride.product) || dbProduct,
+              region: (filterOverride && filterOverride.region != null) ? filterOverride.region : dbRegion,
+            } : undefined,
           });
           let result = await run(useKind);
           if (n !== seq.current) return;
@@ -6101,8 +6648,28 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const openItem = async (item, tab) => {
         setPendingId(item.id);
         setMoreId("");
-        const nextTab = tab || "实例详情";
         const n = ++detailSeq.current;
+        if (item.kind === "dbbrain" || isDbbrain) {
+          const filters = {
+            tab: tab || "diag",
+            product: item.product || dbProduct,
+            region: item.region || "",
+          };
+          setSession({ item, loading: true, detail: null, filters });
+          refreshSkip();
+          try {
+            const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: item.title, filters });
+            if (n !== detailSeq.current) return;
+            setSession({ item, loading: false, detail, filters });
+          } catch (e) {
+            if (n !== detailSeq.current) return;
+            setSession({ item, loading: false, detail: null, filters, error: publicErrorMessage(e) });
+          } finally {
+            if (n === detailSeq.current) setPendingId("");
+          }
+          return;
+        }
+        const nextTab = tab || "实例详情";
         const isCdbItem = item.kind === "cdb";
         const isInstance = isInstanceKind(item.kind);
         setSession({ item, loading: true, detail: null, mode: "manage", tab: nextTab, range: "1h" });
@@ -6131,9 +6698,28 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       const reload = async (tab, opts) => {
         if (!session?.item) return;
+        const n = ++detailSeq.current;
+        if (session.item.kind === "dbbrain") {
+          const extra = tab && typeof tab === "object" ? tab : {};
+          const filters = { ...(session.filters || {}), ...extra };
+          setSession((cur) => cur ? { ...cur, loading: true, filters, error: "" } : cur);
+          try {
+            const detail = await api("detail", {
+              moduleId: session.item.moduleId,
+              id: session.item.id,
+              title: session.item.title,
+              filters,
+            });
+            if (n !== detailSeq.current) return;
+            setSession((cur) => cur && cur.item.id === session.item.id ? { ...cur, detail, filters, loading: false, error: "" } : cur);
+          } catch (e) {
+            if (n !== detailSeq.current) return;
+            setSession((cur) => cur && cur.item.id === session.item.id ? { ...cur, loading: false, error: publicErrorMessage(e) } : cur);
+          }
+          return;
+        }
         const nextTab = tab || session.tab || "实例详情";
         const nextRange = (opts && opts.range) || session.range || "1h";
-        const n = ++detailSeq.current;
         const isCdbItem = session.item.kind === "cdb";
         const isInstance = isInstanceKind(session.item.kind);
         setSession((cur) => cur ? { ...cur, loading: true, tab: nextTab, range: nextRange } : cur);
@@ -6309,7 +6895,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const errors = payload?.errors || [];
       const payloadErr = errors.map((e) => e && e.message).filter(Boolean).join("；");
       const keepCard = kind === "registrar" || kind === "my-domain";
-      if (!isCert && !fromTool?.length && !rows.length && !activeQ && !draftQ && !keepCard) {
+      if (!isCert && !fromTool?.length && !rows.length && !activeQ && !draftQ && !keepCard && !isDbbrain) {
         const msg = payloadErr;
         return msg ? h("div", { className: "ci-err" }, msg) : null;
       }
@@ -6468,13 +7054,24 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const showCdb = !registrarView && kind === "cdb";
       const showCert = kind === "cert";
       const showDomain = kind === "domain" || registrarView
-        || (kind !== "cvm" && kind !== "lighthouse" && kind !== "auto" && kind !== "cdb" && kind !== "cert" && kind !== "cluster" && kind !== "cos" && !showCvm && !showLh && !showCdb && !showCert);
+        || (kind !== "cvm" && kind !== "lighthouse" && kind !== "auto" && kind !== "cdb" && kind !== "cert" && kind !== "cluster" && kind !== "cos" && kind !== "dbbrain" && !showCvm && !showLh && !showCdb && !showCert);
       const cvmRows = rows.filter((row) => row && row.kind === "cvm");
       const lhRows = rows.filter((row) => row && row.kind === "lighthouse");
       const domainRows = rows.filter((row) => row && !isInstanceKind(row.kind));
       const isCdb = kind === "cdb" || (!!session && session.item && session.item.kind === "cdb");
       const detailNode = session
-        ? (session.mode === "dmc"
+        ? (session.item && session.item.kind === "dbbrain"
+          ? h(DbbrainDetailView, {
+            item: session.item,
+            detail: session.detail,
+            loading: session.loading,
+            error: session.error,
+            skipConfirm,
+            onBack: () => setSession(null),
+            onReload: reload,
+            onSkipConfirm: setSkipConfirm,
+          })
+        : session.mode === "dmc"
           ? h(DmcWorkbench, {
             item: session.item,
             skipConfirm,
@@ -6530,6 +7127,74 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               onCertAction: runCertAction,
             }))
         : null;
+      const dbbrainList = !session && isDbbrain ? [
+            h("div", { key: "bar", className: "ci-bar" },
+              h("div", { className: "ci-bar-left" },
+                h("span", { className: "ci-bar-title" }, "实例管理"),
+                h("span", { className: "ci-bar-count" }, `${counted} 条`),
+              ),
+            ),
+            h("div", { key: "filters", className: "ci-filters" },
+              h("select", {
+                className: "ci-filter",
+                value: dbProduct,
+                "aria-label": "数据库类型",
+                onChange: (e) => {
+                  const next = e.target.value;
+                  setDbProduct(next);
+                  fetchList(0, String(activeQ || "").trim(), undefined, undefined, { product: next, region: dbRegion });
+                },
+              }, DBBRAIN_PRODUCTS.map((row) => h("option", { key: row[0], value: row[0] }, row[1]))),
+              h("select", {
+                className: "ci-filter",
+                value: dbRegion,
+                "aria-label": "地域",
+                onChange: (e) => {
+                  const next = e.target.value;
+                  setDbRegion(next);
+                  fetchList(0, String(activeQ || "").trim(), undefined, undefined, { product: dbProduct, region: next });
+                },
+              }, DBBRAIN_REGIONS.map((row) => h("option", { key: row[0] || "all", value: row[0] }, row[1]))),
+              h("div", { className: "ci-search-wrap" },
+                h(SearchIcon),
+                h("input", {
+                  className: "ci-search",
+                  type: "search",
+                  placeholder: "实例 ID / 名称",
+                  value: draftQ,
+                  onChange: (e) => onDraft(e.target.value),
+                  onKeyDown: (e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      runSearch(draftQ);
+                    }
+                  },
+                }),
+                draftQ ? h("button", {
+                  type: "button",
+                  className: "ci-search-x",
+                  disabled: listBusy,
+                  onClick: () => { setDraftQ(""); runSearch(""); },
+                  "aria-label": "清空",
+                }, "×") : null,
+              ),
+            ),
+            listErr || payloadErr ? h("div", { key: "lerr", className: "ci-err" }, listErr || payloadErr) : null,
+            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(DbbrainTable, {
+              key: "table",
+              items: rows,
+              pendingId,
+              onOpen: openItem,
+            }),
+            h(Pager, {
+              key: "pager",
+              total: counted,
+              page,
+              pages: pageCount,
+              busy: listBusy,
+              onPage: goPage,
+            }),
+      ] : null;
       const certList = !session && showCert ? [
 
             h("div", { key: "bar", className: "ci-bar" },
@@ -6812,18 +7477,17 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("span", { className: "ci-bar-count" }, `${counted} 条`),
           ),
           h("div", { className: "ci-tools" },
-            h("select", {
-              className: "ci-sel",
+            h(RegionComboById, {
+              options: CDB_REGIONS.map((row) => ({ id: row.id, label: row.name })),
               value: region,
-              onChange: (e) => {
-                const next = e.target.value;
-                setRegion(next);
-                fetchList(0, String(activeQ || draftQ || "").trim(), next);
+              allowAll: true,
+              style: { width: 180 },
+              onChange: (next) => {
+                const used = next === REGION_ALL_ID ? "" : next;
+                setRegion(used);
+                fetchList(0, String(activeQ || draftQ || "").trim(), used);
               },
-            },
-              h("option", { value: "" }, "全部地域"),
-              CDB_REGIONS.map((row) => h("option", { key: row.id, value: row.id }, row.name)),
-            ),
+            }),
             h("button", { key: "reb", type: "button", className: "ci-mini", onClick: () => {
               const target = selectedItems[0];
               if (!target) return setNotice("请先选择实例");
@@ -6879,54 +7543,52 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const instanceList = !session && (showCvm || showLh) ? [
         h(KindTabs, {
           key: "ktabs",
-          showCvm,
-          showLh,
           value: kindTab,
           onChange: (next) => {
+            if (next === kindTab) return;
             setKindTab(next);
             fetchList(0, String(activeQ || "").trim(), undefined, next);
           },
         }),
+        h("div", { key: "bar", className: "ci-bar" },
+          h("div", { className: "ci-bar-left" },
+            h(RegionSelect, {
+              regions: regionOptions,
+              value: listRegion || defaultRegionName(regionOptions),
+              onChange: (next) => {
+                setListRegion(next);
+                fetchList(0, String(activeQ || "").trim(), next);
+              },
+            }),
+          ),
+          h(SearchField, {
+            value: draftQ,
+            onChange: onDraft,
+            onSubmit: runSearch,
+            placeholder: "搜索 ID / 名称 / IP",
+          }),
+        ),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
         errors.length ? h("div", { key: "perr", className: "ci-err" }, errors.map((e) => e.message).join("；")) : null,
-        [
-          showCvm && (!showLh || kindTab === "cvm") ? h(CvmConsole, {
-            key: "cvm",
-            items: kind === "cvm" ? rows : cvmRows,
-            pendingId,
-            onOpen: openItem,
-            onAction: onInstanceAction,
-            emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
-            region: listRegion || defaultRegionName(regionOptions),
-            regions: regionOptions,
-            onRegion: (next) => {
-              setListRegion(next);
-              fetchList(0, String(activeQ || "").trim(), next);
-            },
-            q: draftQ,
-            onQuery: onDraft,
-            onSubmit: runSearch,
-            busy: listBusy,
-          }) : null,
-          showLh && (!showCvm || kindTab === "lighthouse") ? h(LhConsole, {
-            key: "lh",
-            items: kind === "lighthouse" ? rows : lhRows,
-            pendingId,
-            onOpen: openItem,
-            onAction: onInstanceAction,
-            emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有资源",
-            region: listRegion || defaultRegionName(regionOptions),
-            regions: regionOptions,
-            onRegion: (next) => {
-              setListRegion(next);
-              fetchList(0, String(activeQ || "").trim(), next);
-            },
-            q: draftQ,
-            onQuery: onDraft,
-            onSubmit: runSearch,
-            busy: listBusy,
-          }) : null,
-        ],
+        kindTab === "cvm" ? h(CvmConsole, {
+          key: "cvm",
+          items: kind === "cvm" ? rows : cvmRows,
+          pendingId,
+          onOpen: openItem,
+          onAction: onInstanceAction,
+          emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
+          q: activeQ || draftQ,
+          busy: listBusy,
+        }) : h(LhConsole, {
+          key: "lh",
+          items: kind === "lighthouse" ? rows : lhRows,
+          pendingId,
+          onOpen: openItem,
+          onAction: onInstanceAction,
+          emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
+          q: activeQ || draftQ,
+          busy: listBusy,
+        }),
         !listBusy ? h(Pager, {
           key: "pager",
           total: counted,
@@ -7016,7 +7678,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ] : null;
       return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
         h("div", { className: "ci-panel" },
-          detailNode || cdbList || instanceList || certList || domainList,
+          detailNode || dbbrainList || cdbList || instanceList || certList || domainList,
         ),
         ...(certDialogs || []),
         h(CheckoutWizard, {
@@ -7167,7 +7829,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           h("summary", { className: "ci-cfg-h" },
             h("span", { className: "ci-cfg-t" },
               h("span", { className: "ci-cfg-n" }, "云资源"),
-              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与解析记录、云服务器、云数据库、对象存储与 TKE 集群。地域在资源列表中选择，不写入设置。TKE 列表默认广州。"),
+              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与解析记录、DBbrain、容器镜像、云服务器、云数据库、对象存储与 TKE 集群。地域在资源列表中选择，不写入设置。地域只在对话卡片里选，不进设置。TKE 列表默认广州。"),
             ),
             dirty ? h("span", { className: "ci-badge" }, "未保存") : null,
             h(ChevronDown, { className: "ci-cfg-ch" + (open ? " ci-cfg-ch-open" : "") }),

@@ -1,0 +1,35 @@
+{
+  "TotalCount": 2,
+  "DbScanStatus": 0,
+  "Items": [
+    {
+      "InstanceId": "cdb-sh",
+      "InstanceName": "pay-core",
+      "Region": "ap-shanghai",
+      "Product": "MySQL",
+      "HealthScore": 88,
+      "EventCount": 1,
+      "Status": 1,
+      "EngineVersion": "8.0",
+      "InstanceConf": {
+        "DailyInspection": "Yes",
+        "OverviewDisplay": "Yes"
+      },
+      "IsSupported": true
+    },
+    {
+      "InstanceId": "cdb-gz",
+      "InstanceName": "prod-order",
+      "Region": "ap-guangzhou",
+      "Product": "MySQL",
+      "HealthScore": 72,
+      "EventCount": 3,
+      "Status": 1,
+      "EngineVersion": "5.7",
+      "InstanceConf": {
+        "DailyInspection": "Yes"
+      },
+      "IsSupported": true
+    }
+  ]
+}

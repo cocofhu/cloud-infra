@@ -115,7 +115,11 @@ const SECRET_KEYS = /^(Certificate|CertificatePrivateKey|CertificatePublicKey|Ce
 
 const ACTIONS: ResourceAction[] = [
   { id: 'cert.apply', label: '申请免费证书', confirm: 'default' },
-  { id: 'cert.upload', label: '上传证书', confirm: 'default' },
+  { id: 'cert.upload', label: '上传证书', confirm: 'default', fields: [
+    { key: 'publicKey', label: '证书公钥(PEM)' },
+    { key: 'privateKey', label: '证书私钥(PEM)', secret: true },
+    { key: 'alias', label: '备注名' },
+  ] },
   { id: 'cert.deploy', label: '部署', confirm: 'default' },
   { id: 'cert.hosts', label: '匹配实例', confirm: 'default' },
   { id: 'cert.deploy.records', label: '部署记录', confirm: 'default' },
@@ -502,12 +506,14 @@ export function createCertModule(call: SslCall = sslCall, dnsCall: DnsCall = dns
       }, creds(ctx), opts(ctx))
       const raw = data.Certificates || []
       const items = raw.map((item) => mapCertItem(item, module.id))
-      const total = Number.isFinite(Number(data.TotalCount)) ? Number(data.TotalCount) : items.length
+      const reported = Number(data.TotalCount)
+      // TotalCount 缺失时:满页则假定还有下一页,避免翻页提前终止
+      const total = Number.isFinite(reported) ? reported : (items.length >= ctx.limit ? ctx.offset + items.length + 1 : ctx.offset + items.length)
       return {
         items,
         total,
         offset: ctx.offset,
-        hasMore: ctx.offset + items.length < total,
+        hasMore: Number.isFinite(reported) ? ctx.offset + items.length < total : items.length >= ctx.limit,
       }
     },
     async detail(ctx) {
@@ -654,9 +660,12 @@ export function createCertModule(call: SslCall = sslCall, dnsCall: DnsCall = dns
           return { ok: true }
         }
         if (actionId === 'cert.delete') {
+          // 状态查询失败时必须 fail-closed:无法确认是否需要先取消审核,就拒绝直接删除
           const info = await call<CertificatesItem>('DescribeCertificate', {
             CertificateId: certificateId,
-          }, creds(ctx), opts(ctx)).catch(() => null)
+          }, creds(ctx), opts(ctx)).catch((err: unknown) => {
+            throw Object.assign(new Error(`无法确认证书状态,已阻止删除：${publicErrorMessage(err)}`), { cause: err })
+          })
           if (info && needsCancelBeforeDelete(info.Status)) {
             return { ok: false, error: '待验证证书不支持直接删除，须先取消审核' }
           }
@@ -664,9 +673,14 @@ export function createCertModule(call: SslCall = sslCall, dnsCall: DnsCall = dns
           return { ok: true }
         }
         if (actionId === 'cert.cancel') {
-          await call('CancelCertificateOrder', { CertificateId: certificateId }, creds(ctx), opts(ctx)).catch(async () => {
+          try {
+            await call('CancelCertificateOrder', { CertificateId: certificateId }, creds(ctx), opts(ctx))
+          } catch (firstErr) {
+            // 仅在「订单不存在/不可取消」类业务错误时才回退到取消审核接口;其它错误直接上抛真实原因
+            const raw = firstErr instanceof Error ? firstErr.message : String(firstErr)
+            if (!/not.?exist|不存在|invalid|无效|不支持|not.?support/i.test(raw)) throw firstErr
             await call('CancelAuditCertificate', { CertificateId: certificateId }, creds(ctx), opts(ctx))
-          })
+          }
           return { ok: true }
         }
         if (actionId === 'cert.verify') {

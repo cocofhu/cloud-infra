@@ -37,7 +37,12 @@ function originHost(raw: string): string | undefined {
 
 export function isLoopbackAddress(address?: string): boolean {
   const value = String(address || '').replace(/^::ffff:/i, '').toLowerCase()
-  return value === '127.0.0.1' || value === '::1' || value === 'localhost'
+  if (value === '::1' || value === 'localhost') return true
+  // 127.0.0.0/8 整段都是 loopback(RFC 1122),不只 127.0.0.1
+  if (/^127(?:\.\d{1,3}){0,3}$/.test(value)) {
+    return value === '127' || value.split('.').every((part) => Number(part) <= 255)
+  }
+  return false
 }
 
 /** Same-origin UI (Origin/Referer matches Host), or loopback curl without Origin. */
@@ -47,10 +52,11 @@ export function trustedUiRequest(request: Pick<IncomingMessage, 'headers' | 'soc
   if (origin) {
     const from = originHost(origin.includes('://') ? origin : `http://${origin}`)
     if (!from) return false
+    // 只认 Host:请求经反代转发时 Host 已被重写为本地地址,此时与反代来源的 Origin 不同源,
+    // 必须拒绝;绝不能信任客户端可伪造的 X-Forwarded-Host,否则远端攻击者可借此绕过同源校验。
     const host = headerString(request.headers.host)
-    const forwardedHost = headerString(request.headers['x-forwarded-host'])
-    const candidates = [host, forwardedHost].filter((value): value is string => value !== undefined)
-    return candidates.some((candidate) => hostsMatch(from, candidate))
+    if (!host) return false
+    return hostsMatch(from, host)
   }
   return isLoopbackAddress(request.socket?.remoteAddress)
 }

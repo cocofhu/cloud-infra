@@ -14,6 +14,7 @@ import {
   formatSpec,
   instanceCardId,
   listAllPages,
+  listAllPagesTruncated,
   listAcrossRegions,
   listRegions,
   listZones,
@@ -170,6 +171,10 @@ export function createCvmModule(call: TencentProductCall = cvmCall, monitor: Ten
         const mapped = await loadCvmRegion(call, ctx, module.id, region)
         return mapped.filter((card) => matchCvmQuery(card, ctx.query) && matchRegion(card, ctx.region))
       }, module.id)
+      // 单地域超过拉取上限被截断时,明确提示而不是让用户以为「只有这些」
+      if (listAllPagesTruncated.current) {
+        errors.push({ moduleId: module.id, message: '实例数量超过单地域拉取上限(500),仅显示前 500 条;请按地域或关键字缩小范围。' })
+      }
       return {
         ...paginateItems(items, ctx.offset, ctx.limit),
         errors,
@@ -287,7 +292,8 @@ async function runPower(
       InstanceIds: [instanceId],
     }, credsOf(ctx), optsOf(ctx, region))
     const item = data.InstanceSet?.[0]
-    const stateLabel = mapInstanceState(item?.InstanceState).stateLabel
+    if (!item) return { ok: false as const, error: '未找到实例' }
+    const stateLabel = mapInstanceState(item.InstanceState).stateLabel
     if (!powerAllowed(stateLabel, actionId)) {
       const label = INSTANCE_ACTIONS.find((row) => row.id === actionId)?.label || actionId
       return { ok: false as const, error: `当前状态「${stateLabel}」不能${label}` }

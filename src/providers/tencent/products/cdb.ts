@@ -923,6 +923,7 @@ async function runLoggedSql(
     let sql = ''
     if (op === 'insert') {
       const keys = Object.keys(values)
+      if (!keys.length) return { ok: false, error: '缺少写入字段' }
       sql = `INSERT INTO ${ident} (${keys.map(qIdent).join(',')}) VALUES (${keys.map((key) => qLiteral(values[key])).join(',')})`
     } else if (op === 'delete') {
       sql = `DELETE FROM ${ident} WHERE ${whereSql(where)}`
@@ -935,6 +936,11 @@ async function runLoggedSql(
   }
   const sql = String(payload.sql || '').trim()
   if (!sql) return { ok: false, error: '缺少 SQL' }
+  // 写语句(UPDATE/INSERT/…)必须显式确认:卡片按钮的 confirm:default 只确认「执行 SQL」动作本身,
+  // 不覆盖 SQL 文本里的写操作;skipConfirm 配置不得跳过此闸门(与 isDestructiveSql 口径一致)
+  if (isWriteSql(sql) && payload.confirmed !== true) {
+    return { ok: false, error: '该 SQL 包含写操作,请确认后携带 confirmed=true 再执行' }
+  }
   const result = await driver.query({
     ...session,
     database: database || undefined,
