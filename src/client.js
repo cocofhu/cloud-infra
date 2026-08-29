@@ -416,6 +416,18 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
 .ci-tag.blue{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);border-color:transparent;color:var(--dsw-alias-brand-primary)}
 .ci-ic-meta{font-size:12px;color:var(--ci-muted);word-break:break-all}
 .ci-warn{padding:10px 12px;border-radius:10px;background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label);font-size:12px;line-height:1.5;margin:0 0 4px}
+.ci-score{border:0;background:none;padding:0;cursor:pointer;font:inherit;font-weight:600;color:var(--dsw-alias-state-warn-label)}
+.ci-score:hover{text-decoration:underline}
+.ci-nav{border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-nav .ci-groups{display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px 6px;border-bottom:0}
+.ci-nav .ci-group{height:28px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;font-size:13px;margin:0;border-bottom:0;font-weight:inherit}
+.ci-nav .ci-group.on{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:600}
+.ci-nav .ci-tabs{border-bottom:0;padding:0 8px 6px}
+.ci-chip-btn{height:28px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;font-size:12px;cursor:pointer}
+.ci-chip-btn.on{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}
+.ci-chip-btn:disabled{opacity:.45;cursor:wait}
+.ci-filter{height:32px;max-width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:0 8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;font-size:13px}
+.ci-filter:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -507,9 +519,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (node.kind === "cls" || node.resourceKind === "cls" || Array.isArray(node.logs)) return true;
       if (!Array.isArray(node.items)) return false;
       if (node.kind === "cloud-infra-query" || node.kind === "image" || node.resourceKind === "image") return true;
-      if (node.resourceKind === "cert" || node.resourceKind === "domain" || node.resourceKind === "auto" || node.resourceKind === "cls") return true;
+      if (node.resourceKind === "cert" || node.resourceKind === "domain" || node.resourceKind === "auto" || node.resourceKind === "cls" || node.resourceKind === "dbbrain") return true;
       if (node.items[0] && node.items[0].moduleId) return true;
-      if (Array.isArray(node.errors) && node.errors.length) return true;
+      if (Array.isArray(node.errors) && (node.errors.length || node.kind === "cert" || node.kind === "domain" || node.kind === "auto" || node.kind === "cls" || node.kind === "dbbrain")) return true;
       return false;
     }
 
@@ -3353,6 +3365,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (kind === "registrar") return "域名注册";
       if (kind === "my-domain") return "我的域名";
       if (kind === "domain") return "域名解析";
+      if (kind === "dbbrain") return "实例管理";
       return "云资源";
     }
 
@@ -3360,6 +3373,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (kind === "cert") return "搜索证书 ID / 备注 / 域名";
       if (kind === "registrar") return "请输入域名或后缀";
       if (kind === "my-domain" || kind === "domain") return "请输入域名关键字";
+      if (kind === "dbbrain") return "实例 ID / 名称";
       return "搜索";
     }
 
@@ -5717,13 +5731,415 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       );
     }
 
+    const DBBRAIN_PRODUCTS = [
+      ["mysql", "MySQL"],
+      ["cynosdb", "TDSQL-C"],
+      ["mariadb", "MariaDB"],
+      ["dcdb", "TDSQL MySQL"],
+      ["redis", "Redis"],
+      ["mongodb", "MongoDB"],
+      ["postgres", "PostgreSQL"],
+      ["dbbrain-mysql", "自建 MySQL"],
+    ];
+    // Keep in sync with src/providers/tencent/products/dbbrain-catalog.ts
+    const DBBRAIN_REGIONS = [
+      ["", "全地域"],
+      ["ap-guangzhou", "广州"],
+      ["ap-qingyuan", "清远"],
+      ["ap-shenzhen", "深圳"],
+      ["ap-shanghai", "上海"],
+      ["ap-nanjing", "南京"],
+      ["ap-hangzhou", "杭州"],
+      ["ap-qingdao", "青岛"],
+      ["ap-beijing", "北京"],
+      ["ap-tianjin", "天津"],
+      ["ap-chengdu", "成都"],
+      ["ap-chongqing", "重庆"],
+      ["ap-zhongwei", "中卫"],
+      ["ap-hongkong", "香港"],
+      ["ap-taipei", "台北"],
+      ["ap-shanghai-fsi", "上海金融"],
+      ["ap-shenzhen-fsi", "深圳金融"],
+      ["ap-beijing-fsi", "北京金融"],
+      ["ap-singapore", "新加坡"],
+      ["ap-jakarta", "雅加达"],
+      ["ap-bangkok", "曼谷"],
+      ["ap-seoul", "首尔"],
+      ["ap-tokyo", "东京"],
+      ["na-siliconvalley", "硅谷"],
+      ["na-ashburn", "弗吉尼亚"],
+      ["sa-saopaulo", "圣保罗"],
+      ["eu-frankfurt", "法兰克福"],
+    ];
+
+    function canKillSession(product) {
+      return product === "mysql" || product === "cynosdb";
+    }
+
+    function instanceIdentity(item) {
+      return {
+        product: item && item.product || "",
+        region: item && item.region || "",
+        instanceId: String(item && item.id || "").split(":").slice(3).join(":") || String(item && item.title || ""),
+      };
+    }
+
+    function DbbrainTable({ items, pendingId, onOpen }) {
+      const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+      if (!rows.length) return h("div", { className: "ci-empty" }, "没有可诊断实例");
+      const template = "minmax(120px,1.6fr) 70px 64px 56px 52px 72px";
+      return h("div", { className: "ci-list" },
+        h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
+          h("div", { className: "ci-cell" }, "实例"),
+          h("div", { className: "ci-cell" }, "状态"),
+          h("div", { className: "ci-cell" }, "健康分"),
+          h("div", { className: "ci-cell" }, "告警"),
+          h("div", { className: "ci-cell" }, "地域"),
+          h("div", { className: "ci-cell" }, "操作"),
+        ),
+        rows.map((item) => h("div", {
+          key: item.id,
+          className: "ci-row",
+          style: { gridTemplateColumns: template },
+        },
+          h("div", { className: "ci-cell" }, h("button", {
+            type: "button",
+            className: "ci-name",
+            title: item.title,
+            disabled: pendingId === item.id,
+            onClick: () => onOpen(item, "diag"),
+          }, item.title)),
+          h("div", { className: "ci-cell" }, cellValue(item, "状态") || statusText(item.status) || "-"),
+          h("div", { className: "ci-cell" }, h("button", {
+            type: "button",
+            className: "ci-score",
+            disabled: pendingId === item.id || !item.hasReport,
+            title: item.hasReport ? "打开健康报告" : "当前产品线没有健康报告页",
+            onClick: () => item.hasReport && onOpen(item, "report"),
+          }, cellValue(item, "健康分") || "-")),
+          h("div", { className: "ci-cell num" }, h("button", {
+            type: "button",
+            className: "ci-link",
+            disabled: pendingId === item.id,
+            onClick: () => onOpen(item, "diag"),
+          }, cellValue(item, "异常告警") || "0")),
+          h("div", { className: "ci-cell" }, cellValue(item, "地域") || item.region || "-"),
+          h("div", { className: "ci-cell ci-ops" }, h("button", {
+            type: "button",
+            className: "ci-link",
+            disabled: pendingId === item.id,
+            onClick: () => onOpen(item, "diag"),
+          }, pendingId === item.id ? "加载中" : (item.openLabel || "诊断优化"))),
+        )),
+      );
+    }
+
+    function ChipRow({ items, active, onPick, disabled }) {
+      if (!Array.isArray(items) || !items.length) return null;
+      return h("div", { className: "ci-subtabs" },
+        items.map((item) => h("button", {
+          key: item.id,
+          type: "button",
+          disabled: !!disabled,
+          className: "ci-chip-btn" + (item.id === active ? " on" : ""),
+          onClick: () => { if (!disabled) onPick(item.id); },
+        }, item.label)),
+      );
+    }
+
+    // MySQL: 异常诊断 / 性能趋势 / 实时会话 / 慢SQL分析 / 空间分析 / SQL优化 / 自治中心 / 死锁可视化 / 事件通知 / 健康报告
+    // Redis: 内存分析 / 访问分析 / 慢日志分析; MongoDB: 索引推荐 / 会话. No left nav.
+    const TAB_GROUPS = [
+      { id: "diag", label: "诊断", ids: ["diag", "deadlock", "notify"] },
+      { id: "perf", label: "性能", ids: ["trend", "slow", "sqlopt", "memory", "access", "index"] },
+      { id: "session", label: "会话", ids: ["session"] },
+      { id: "space", label: "空间", ids: ["space"] },
+      { id: "gov", label: "治理", ids: ["autonomy", "report"] },
+    ];
+
+    function tabGroupsOf(tabs) {
+      const byId = new Map((tabs || []).map((tab) => [tab.id, tab]));
+      return TAB_GROUPS.map((group) => ({
+        ...group,
+        tabs: group.ids.map((id) => byId.get(id)).filter(Boolean),
+      })).filter((group) => group.tabs.length);
+    }
+
+    function DbbrainNav({ tabs, active, loading, onPick }) {
+      const list = Array.isArray(tabs) ? tabs : [];
+      if (!list.length) return null;
+      const pick = (id) => {
+        if (loading || id === active) return;
+        onPick(id);
+      };
+      if (list.length <= 4) {
+        return h("div", { className: "ci-tabs" },
+          list.map((tab) => h("button", {
+            key: tab.id,
+            type: "button",
+            disabled: !!loading,
+            className: "ci-tab" + (tab.id === active ? " on" : ""),
+            onClick: () => pick(tab.id),
+          }, tab.label)),
+        );
+      }
+      const groups = tabGroupsOf(list);
+      const current = groups.find((group) => group.tabs.some((tab) => tab.id === active)) || groups[0];
+      return h("div", { className: "ci-nav" },
+        h("div", { className: "ci-groups" },
+          groups.map((group) => h("button", {
+            key: group.id,
+            type: "button",
+            disabled: !!loading,
+            className: "ci-group" + (group.id === current?.id ? " on" : ""),
+            onClick: () => {
+              if (group.tabs.some((tab) => tab.id === active)) return;
+              pick(group.tabs[0].id);
+            },
+          }, group.label)),
+        ),
+        current && current.tabs.length > 1 ? h("div", { className: "ci-tabs" },
+          current.tabs.map((tab) => h("button", {
+            key: tab.id,
+            type: "button",
+            disabled: !!loading,
+            className: "ci-tab" + (tab.id === active ? " on" : ""),
+            onClick: () => pick(tab.id),
+          }, tab.label)),
+        ) : null,
+      );
+    }
+
+    function DbbrainDetailView({ item, detail, loading, error, skipConfirm, onBack, onReload, onSkipConfirm }) {
+      // Grouped nav when many tabs (诊断/性能/会话/空间/治理). Redis/Mongo keep a short tab row.
+      const ident = instanceIdentity(item);
+      const [confirm, setConfirm] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const [sqlDraft, setSqlDraft] = useState("");
+      const [formDraft, setFormDraft] = useState({});
+      const [customStart, setCustomStart] = useState("");
+      const [customEnd, setCustomEnd] = useState("");
+      const [pendingTab, setPendingTab] = useState("");
+      useEffect(() => {
+        setSqlDraft(detail?.form?.values?.sql || "");
+        setFormDraft(detail?.form?.values || {});
+        setErr("");
+        setPendingTab("");
+      }, [item.id, detail?.activeTab, detail?.form?.id, detail?.form?.values?.sql]);
+      const filtersOf = (extra) => ({
+        product: ident.product,
+        region: ident.region,
+        tab: extra.tab != null ? extra.tab : (pendingTab || detail?.activeTab || "diag"),
+        subTab: extra.subTab != null ? extra.subTab : (detail?.activeSubTab || ""),
+        range: extra.range != null ? extra.range : (detail?.activeRange || ""),
+        eventId: extra.eventId != null ? extra.eventId : "",
+        sql: extra.sql != null ? extra.sql : sqlDraft,
+        table: extra.table != null ? extra.table : "",
+        startTime: extra.startTime != null ? extra.startTime : customStart,
+        endTime: extra.endTime != null ? extra.endTime : customEnd,
+      });
+      const pickTab = (id) => {
+        setPendingTab(id);
+        onReload(filtersOf({ tab: id, subTab: "", eventId: "", range: "" }));
+      };
+      const activeTab = pendingTab || detail?.activeTab;
+      const run = async (action, payload) => {
+        setBusy(true);
+        setErr("");
+        try {
+          await api("action", {
+            moduleId: item.moduleId,
+            id: item.id,
+            action: action.id,
+            payload: { ...ident, ...payload },
+          });
+          setConfirm(null);
+          await onReload(filtersOf({}));
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setBusy(false);
+        }
+      };
+      const request = async (action, payload, text) => {
+        let skip = skipConfirm;
+        try {
+          const d = await api("meta", {});
+          skip = !!d.skipConfirm;
+          if (onSkipConfirm) onSkipConfirm(skip);
+        } catch { /* keep last known skipConfirm */ }
+        const must = action.confirm === "always" || (action.confirm === "default" && !skip);
+        if (!must) return run(action, payload);
+        setConfirm({ action, payload, text, danger: action.confirm === "always" });
+      };
+      const rowActions = (table, row) => {
+        const nodes = [];
+        if (table.id === "sessions" && row.sessionId && canKillSession(ident.product)) {
+          nodes.push(h("button", {
+            key: "kill",
+            type: "button",
+            className: "ci-link danger",
+            onClick: () => request(
+              { id: "session.kill", label: "Kill 会话", confirm: "always" },
+              { sessionId: row.sessionId },
+              `确定 Kill 会话 ${row.sessionId}？此操作不可撤销。`,
+            ),
+          }, "Kill"));
+        }
+        if (table.id === "events" && row.eventId) {
+          nodes.push(h("button", {
+            key: "view",
+            type: "button",
+            className: "ci-link",
+            onClick: () => onReload(filtersOf({ eventId: row.eventId })),
+          }, "详情"));
+          nodes.push(h("button", {
+            key: "ignore",
+            type: "button",
+            className: "ci-link",
+            onClick: () => request(
+              { id: "event.ignore", label: "忽略", confirm: "default" },
+              { eventId: row.eventId },
+              `忽略诊断事件 ${row.eventId}？`,
+            ),
+          }, "忽略"));
+        }
+        if (table.id === "reports" && row.taskId) {
+          if (row.链接) {
+            nodes.push(h("a", { key: "open", className: "ci-link", href: row.链接, target: "_blank", rel: "noreferrer" }, "打开"));
+          }
+          nodes.push(h("button", {
+            key: "del",
+            type: "button",
+            className: "ci-link danger",
+            onClick: () => request(
+              { id: "report.delete", label: "删除报告", confirm: "always" },
+              { taskId: row.taskId },
+              `确定删除报告任务 ${row.taskId}？此操作不可撤销。`,
+            ),
+          }, "删除"));
+        }
+        return nodes.length ? h("div", { className: "ci-ops" }, nodes) : null;
+      };
+      return [
+        h("div", { key: "crumb", className: "ci-crumb" },
+          h(BackButton, { onClick: onBack }),
+          h("span", { className: "ci-head-t", title: item.title }, item.title),
+        ),
+        !detail && loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
+        !detail && !loading && error ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
+        detail ? [
+          h("div", { key: "chips", className: "ci-chips" },
+            (detail.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" },
+              row.label,
+              h("b", null, row.value),
+            )),
+          ),
+          h(DbbrainNav, {
+            key: "tabs",
+            tabs: detail.tabs,
+            active: activeTab,
+            loading,
+            onPick: pickTab,
+          }),
+          loading ? h("div", { key: "tabload", className: "ci-load" }, h(Spin), "加载中…") : [
+            h(ChipRow, { key: "sub", items: detail.subTabs, active: detail.activeSubTab, disabled: loading, onPick: (id) => onReload(filtersOf({ subTab: id, eventId: "" })) }),
+            h(ChipRow, { key: "range", items: detail.ranges, active: detail.activeRange, disabled: loading, onPick: (id) => onReload(filtersOf({ range: id, eventId: "" })) }),
+            detail.activeRange === "custom" ? h("div", { key: "custom", className: "ci-filters" },
+              h("input", { className: "ci-filter", type: "text", placeholder: "开始 2019-01-01 00:00:00", value: customStart, onChange: (e) => setCustomStart(e.target.value) }),
+              h("input", { className: "ci-filter", type: "text", placeholder: "结束", value: customEnd, onChange: (e) => setCustomEnd(e.target.value) }),
+              h("button", { type: "button", className: "ci-mini", onClick: () => onReload(filtersOf({ range: "custom", startTime: customStart, endTime: customEnd })) }, "应用"),
+            ) : null,
+            err ? h("p", { key: "err", className: "ci-err" }, err) : null,
+            (detail.hints || []).map((hint, idx) => h("p", { key: "h" + idx, className: "ci-hint" }, hint)),
+            detail.form ? h("div", { key: "form", style: { padding: "8px 14px" } },
+              (detail.form.fields || []).map((field) => h("div", { className: "ci-field", key: field.key },
+                h("label", null, field.label),
+                h(field.kind === "textarea" ? "textarea" : "input", {
+                  placeholder: field.placeholder || "",
+                  value: field.key === "sql" ? sqlDraft : (formDraft[field.key] || ""),
+                  onChange: (e) => {
+                    const next = e.target.value;
+                    if (field.key === "sql") setSqlDraft(next);
+                    setFormDraft((prev) => ({ ...prev, [field.key]: next }));
+                  },
+                }),
+              )),
+              h("button", {
+                type: "button",
+                className: "ci-mini primary",
+                disabled: busy || loading,
+                onClick: () => {
+                  if (detail.form.action === "session.kill") {
+                    const duration = String(formDraft.duration || "").trim();
+                    request(
+                      { id: "session.kill", label: "创建中断任务", confirm: "always" },
+                      {
+                        duration,
+                        time: String(formDraft.time || "").trim(),
+                        host: String(formDraft.host || "").trim(),
+                        type: String(formDraft.type || "").trim(),
+                      },
+                      `将创建中断任务，持续时间 ${duration || "?"} 秒，可能中断该实例上多条匹配会话，不只针对某一条 sessionId。此操作不可撤销。`,
+                    );
+                    return;
+                  }
+                  onReload(filtersOf({ sql: sqlDraft }));
+                },
+              }, detail.form.submitLabel || "分析"),
+            ) : null,
+            activeTab === "report" ? h("div", { key: "rpt", className: "ci-sec" },
+              h("span", { className: "ci-sec-t" }, "健康报告"),
+              h("button", {
+                type: "button",
+                className: "ci-mini primary",
+                disabled: loading,
+                onClick: () => request(
+                  { id: "report.create", label: "生成健康报告", confirm: "default" },
+                  { range: detail.activeRange || "24h" },
+                  "确认生成健康报告？",
+                ),
+              }, "生成健康报告"),
+            ) : null,
+            (detail.tables || []).map((table) => h("div", { key: table.id || table.title, className: "ci-table-wrap" },
+              table.title ? h("div", { className: "ci-sec" }, h("span", { className: "ci-sec-t" }, table.title)) : null,
+              table.rows && table.rows.length ? h("table", { className: "ci-table" },
+                h("thead", null, h("tr", null,
+                  (table.columns || []).map((col) => h("th", { key: col }, col)),
+                  h("th", null, "操作"),
+                )),
+                h("tbody", null, table.rows.map((row, idx) => h("tr", { key: row.sessionId || row.eventId || row.taskId || idx },
+                  (table.columns || []).map((col) => h("td", { key: col }, row[col] || "")),
+                  h("td", { className: "ci-ops-cell" }, rowActions(table, row)),
+                ))),
+              ) : h("div", { className: "ci-empty" }, table.empty || "暂无数据"),
+            )),
+          ],
+        ] : null,
+        h(ConfirmDialog, {
+          key: "confirm",
+          open: !!confirm,
+          title: confirm?.action?.label,
+          text: confirm?.text,
+          busy,
+          danger: !!confirm?.danger,
+          onCancel: () => { if (!busy) setConfirm(null); },
+          onConfirm: () => confirm && run(confirm.action, confirm.payload),
+        }),
+      ];
+    }
+
     function SearchToolView(props) {
       useEffect(() => ensureCss(), []);
       const payload = pickPayload(props);
       const args = parseToolArgs(props);
       const fromTool = Array.isArray(payload?.items) ? payload.items : null;
       const running = !!(props?.block && !("kind" in props.block));
-      const kind = String(args.kind || payload?.resourceKind || (payload?.kind && payload.kind !== "cloud-infra-query" ? payload.kind : "") || (payload?.items && payload.items[0] && payload.items[0].kind) || "domain");
+      const kind = payload?.resourceKind
+        || (payload?.kind && payload.kind !== "cloud-infra-query" ? payload.kind : "")
+        || args.kind
+        || "domain";
       const provider = String(args.provider || "");
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");
@@ -5764,6 +6180,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const debounce = useRef(0);
       const groupRef = useRef("");
       const isCert = kind === "cert";
+      const isDbbrain = kind === "dbbrain";
+      const [dbProduct, setDbProduct] = useState((fromTool && fromTool[0] && fromTool[0].product) || "mysql");
+      const [dbRegion, setDbRegion] = useState("");
       const refreshSkip = () => {
         api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
       };
@@ -5804,7 +6223,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         setListErr("");
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
-      const fetchList = async (nextOffset, q, regionOverride, tab) => {
+      const fetchList = async (nextOffset, q, regionOverride, tab, filterOverride) => {
         const n = ++seq.current;
         const trimmed = String(q || "").trim();
         const useTab = tab || kindTab;
@@ -5823,6 +6242,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             limit: pageSize,
             group: isCert ? (groupRef.current || group || "") : "",
             region: useRegion || undefined,
+            filters: isDbbrain ? {
+              product: (filterOverride && filterOverride.product) || dbProduct,
+              region: (filterOverride && filterOverride.region != null) ? filterOverride.region : dbRegion,
+            } : undefined,
           });
           let result = await run(useKind);
           if (n !== seq.current) return;
@@ -5879,8 +6302,28 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const openItem = async (item, tab) => {
         setPendingId(item.id);
         setMoreId("");
-        const nextTab = tab || "实例详情";
         const n = ++detailSeq.current;
+        if (item.kind === "dbbrain" || isDbbrain) {
+          const filters = {
+            tab: tab || "diag",
+            product: item.product || dbProduct,
+            region: item.region || "",
+          };
+          setSession({ item, loading: true, detail: null, filters });
+          refreshSkip();
+          try {
+            const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: item.title, filters });
+            if (n !== detailSeq.current) return;
+            setSession({ item, loading: false, detail, filters });
+          } catch (e) {
+            if (n !== detailSeq.current) return;
+            setSession({ item, loading: false, detail: null, filters, error: publicErrorMessage(e) });
+          } finally {
+            if (n === detailSeq.current) setPendingId("");
+          }
+          return;
+        }
+        const nextTab = tab || "实例详情";
         const isCdbItem = item.kind === "cdb";
         setSession({ item, loading: true, detail: null, mode: "manage", tab: nextTab });
         refreshSkip();
@@ -5907,8 +6350,27 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       const reload = async (tab) => {
         if (!session?.item) return;
-        const nextTab = tab || session.tab || "实例详情";
         const n = ++detailSeq.current;
+        if (session.item.kind === "dbbrain") {
+          const extra = tab && typeof tab === "object" ? tab : {};
+          const filters = { ...(session.filters || {}), ...extra };
+          setSession((cur) => cur ? { ...cur, loading: true, filters, error: "" } : cur);
+          try {
+            const detail = await api("detail", {
+              moduleId: session.item.moduleId,
+              id: session.item.id,
+              title: session.item.title,
+              filters,
+            });
+            if (n !== detailSeq.current) return;
+            setSession((cur) => cur && cur.item.id === session.item.id ? { ...cur, detail, filters, loading: false, error: "" } : cur);
+          } catch (e) {
+            if (n !== detailSeq.current) return;
+            setSession((cur) => cur && cur.item.id === session.item.id ? { ...cur, loading: false, error: publicErrorMessage(e) } : cur);
+          }
+          return;
+        }
+        const nextTab = tab || session.tab || "实例详情";
         const isCdbItem = session.item.kind === "cdb";
         setSession((cur) => cur ? { ...cur, loading: true, tab: nextTab } : cur);
         try {
@@ -6082,7 +6544,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const errors = payload?.errors || [];
       const payloadErr = errors.map((e) => e && e.message).filter(Boolean).join("；");
       const keepCard = kind === "registrar" || kind === "my-domain";
-      if (!isCert && !fromTool?.length && !rows.length && !activeQ && !draftQ && !keepCard) {
+      if (!isCert && !fromTool?.length && !rows.length && !activeQ && !draftQ && !keepCard && !isDbbrain) {
         const msg = payloadErr;
         return msg ? h("div", { className: "ci-err" }, msg) : null;
       }
@@ -6241,13 +6703,24 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const showCdb = !registrarView && kind === "cdb";
       const showCert = kind === "cert";
       const showDomain = kind === "domain" || registrarView
-        || (kind !== "cvm" && kind !== "lighthouse" && kind !== "auto" && kind !== "cdb" && kind !== "cert" && kind !== "cluster" && kind !== "cos" && !showCvm && !showLh && !showCdb && !showCert);
+        || (kind !== "cvm" && kind !== "lighthouse" && kind !== "auto" && kind !== "cdb" && kind !== "cert" && kind !== "cluster" && kind !== "cos" && kind !== "dbbrain" && !showCvm && !showLh && !showCdb && !showCert);
       const cvmRows = rows.filter((row) => row && row.kind === "cvm");
       const lhRows = rows.filter((row) => row && row.kind === "lighthouse");
       const domainRows = rows.filter((row) => row && !isInstanceKind(row.kind));
       const isCdb = kind === "cdb" || (!!session && session.item && session.item.kind === "cdb");
       const detailNode = session
-        ? (session.mode === "dmc"
+        ? (session.item && session.item.kind === "dbbrain"
+          ? h(DbbrainDetailView, {
+            item: session.item,
+            detail: session.detail,
+            loading: session.loading,
+            error: session.error,
+            skipConfirm,
+            onBack: () => setSession(null),
+            onReload: reload,
+            onSkipConfirm: setSkipConfirm,
+          })
+        : session.mode === "dmc"
           ? h(DmcWorkbench, {
             item: session.item,
             skipConfirm,
@@ -6301,6 +6774,74 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               onCertAction: runCertAction,
             }))
         : null;
+      const dbbrainList = !session && isDbbrain ? [
+            h("div", { key: "bar", className: "ci-bar" },
+              h("div", { className: "ci-bar-left" },
+                h("span", { className: "ci-bar-title" }, "实例管理"),
+                h("span", { className: "ci-bar-count" }, `${counted} 条`),
+              ),
+            ),
+            h("div", { key: "filters", className: "ci-filters" },
+              h("select", {
+                className: "ci-filter",
+                value: dbProduct,
+                "aria-label": "数据库类型",
+                onChange: (e) => {
+                  const next = e.target.value;
+                  setDbProduct(next);
+                  fetchList(0, String(activeQ || "").trim(), undefined, undefined, { product: next, region: dbRegion });
+                },
+              }, DBBRAIN_PRODUCTS.map((row) => h("option", { key: row[0], value: row[0] }, row[1]))),
+              h("select", {
+                className: "ci-filter",
+                value: dbRegion,
+                "aria-label": "地域",
+                onChange: (e) => {
+                  const next = e.target.value;
+                  setDbRegion(next);
+                  fetchList(0, String(activeQ || "").trim(), undefined, undefined, { product: dbProduct, region: next });
+                },
+              }, DBBRAIN_REGIONS.map((row) => h("option", { key: row[0] || "all", value: row[0] }, row[1]))),
+              h("div", { className: "ci-search-wrap" },
+                h(SearchIcon),
+                h("input", {
+                  className: "ci-search",
+                  type: "search",
+                  placeholder: "实例 ID / 名称",
+                  value: draftQ,
+                  onChange: (e) => onDraft(e.target.value),
+                  onKeyDown: (e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      runSearch(draftQ);
+                    }
+                  },
+                }),
+                draftQ ? h("button", {
+                  type: "button",
+                  className: "ci-search-x",
+                  disabled: listBusy,
+                  onClick: () => { setDraftQ(""); runSearch(""); },
+                  "aria-label": "清空",
+                }, "×") : null,
+              ),
+            ),
+            listErr || payloadErr ? h("div", { key: "lerr", className: "ci-err" }, listErr || payloadErr) : null,
+            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(DbbrainTable, {
+              key: "table",
+              items: rows,
+              pendingId,
+              onOpen: openItem,
+            }),
+            h(Pager, {
+              key: "pager",
+              total: counted,
+              page,
+              pages: pageCount,
+              busy: listBusy,
+              onPage: goPage,
+            }),
+      ] : null;
       const certList = !session && showCert ? [
 
             h("div", { key: "bar", className: "ci-bar" },
@@ -6787,7 +7328,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ] : null;
       return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
         h("div", { className: "ci-panel" },
-          detailNode || cdbList || instanceList || certList || domainList,
+          detailNode || dbbrainList || cdbList || instanceList || certList || domainList,
         ),
         ...(certDialogs || []),
         h(CheckoutWizard, {
@@ -6938,7 +7479,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           h("summary", { className: "ci-cfg-h" },
             h("span", { className: "ci-cfg-t" },
               h("span", { className: "ci-cfg-n" }, "云资源"),
-              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与解析记录、云服务器、云数据库、对象存储与 TKE 集群。地域在资源列表中选择，不写入设置。TKE 列表默认广州。"),
+              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与解析记录、DBbrain、容器镜像、云服务器、云数据库、对象存储与 TKE 集群。地域在资源列表中选择，不写入设置。地域只在对话卡片里选，不进设置。TKE 列表默认广州。"),
             ),
             dirty ? h("span", { className: "ci-badge" }, "未保存") : null,
             h(ChevronDown, { className: "ci-cfg-ch" + (open ? " ci-cfg-ch-open" : "") }),
