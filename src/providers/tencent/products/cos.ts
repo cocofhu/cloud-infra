@@ -131,7 +131,10 @@ export function createCosModule(clientFor: (ctx: ModuleContext) => CosClient = d
     actions: ACTIONS,
     regions: COS_REGIONS,
     async list(ctx) {
-      const region = requireRegion(ctx.region)
+      const region = resolveCosRegion(ctx.region)
+      if (!region) {
+        return { items: [], total: 0, offset: ctx.offset, hasMore: false, needsRegion: true }
+      }
       const client = clientFor(ctx)
       const all = await client.listBuckets(region.id, opts(ctx))
       const buckets = all.filter((item) => (item.region || region.id) === region.id)

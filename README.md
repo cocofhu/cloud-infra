@@ -42,7 +42,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 > 还有吗
 
-插件向 Agent 提供 `cloud_infra_query`。`kind=domain` 列出域名；`kind=cos` 必须带官方地域 id（如 `ap-guangzhou`），未选中合法地域时不会请求桶列表。
+插件向 Agent 提供 `cloud_infra_query`。`kind=domain` 列出域名；用户说「查 COS」时必须调用 `kind=cos` **且可以不带 region**，对话卡会先出现地域补全空态（「请输入并选择地域」）。未选中合法地域时不会请求桶列表，禁止把中文名或自由文本当 region，也禁止用 Ask question 代替卡内补全。
 
 COS 对话卡对齐控制台两页：顶部地域补全（中文名 / GZ / `ap-guangzhou`）→ 存储桶列表（名称 / 地域 / 创建时间 / 访问权限只读）→ 点名称进入文件列表（当前层短名 + 面包屑下钻）。访问权限、CORS、生命周期等桶设置不在对话卡内改。地域选择与上传/删除等操作只留在对话卡内存，不写插件设置。
 

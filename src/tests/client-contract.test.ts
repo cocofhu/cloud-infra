@@ -20,6 +20,12 @@ test('host and query core do not switch on vendor names', () => {
   assert.match(host, /settings\.register\('cloud-infra'/)
   assert.match(host, /cloud_infra_query/)
   assert.match(host, /kind=cos/)
+  assert.match(host, /OMIT region/)
+  assert.match(host, /Never use Ask question/)
+  assert.match(host, /still call kind=cos and omit region/)
+  assert.doesNotMatch(host, /Do not call kind=cos without/)
+  assert.doesNotMatch(host, /MUST pass a valid official region/)
+  assert.doesNotMatch(host, /Required for kind=cos/)
   assert.match(query, /region: input\.region/)
   const writeAt = host.indexOf('writeOverlay(cfg)')
   const saveAt = host.indexOf('if (body.save)')
@@ -149,6 +155,8 @@ test('g2-g3 list chrome and in-card DetailView replace fullscreen drawer', () =>
 
 test('g3 COS console two pages use region combo and file list, not an expand tree', () => {
   const client = read('src/client.js')
+  const host = read('src/host.ts')
+  const readme = read('README.md')
   assert.match(client, /function CosConsoleView/)
   assert.match(client, /function CosRegionCombo/)
   assert.match(client, /function CosBucketTable/)
@@ -166,9 +174,15 @@ test('g3 COS console two pages use region combo and file list, not an expand tre
   assert.match(client, /"最后修改时间"/)
   assert.match(client, /复制临时链接/)
   assert.match(client, /kind === "cos"/)
+  assert.match(client, /id: "ci-cos-region"/)
+  assert.match(client, /htmlFor: "ci-cos-region"/)
   assert.match(client, /prefixCrumbs/)
   assert.doesNotMatch(client, /function CosTree\b|ci-tree-expand|展开全部/)
   assert.doesNotMatch(client, /if\s*\(.*===\s*['"]tencent['"]/)
+  assert.match(host, /对象存储 · 请选择地域/)
+  assert.match(host, /needsRegion/)
+  assert.match(readme, /可以不带 region/)
+  assert.match(readme, /禁止用 Ask question/)
 })
 
 test('g1.3 settings card fields and layout stay schema-driven without COS extras', () => {

@@ -58,6 +58,7 @@ export async function queryResources(
   const errors: ModuleError[] = []
   let total = 0
   let hasMore = false
+  let needsRegion = false
 
   await Promise.allSettled(candidates.map(async (module) => {
     const providerDef = source.getProvider(module.provider)
@@ -88,6 +89,7 @@ export async function queryResources(
       if (result.total != null) total += result.total
       else total += result.items?.length || 0
       if (result.hasMore) hasMore = true
+      if (result.needsRegion) needsRegion = true
     } catch (err) {
       errors.push({ moduleId: module.id, message: publicErrorMessage(err) })
     }
@@ -95,7 +97,7 @@ export async function queryResources(
 
   const items = lists.flat()
   if (!total) total = items.length
-  return { query, kind, items, errors, total, offset, hasMore }
+  return { query, kind, items, errors, total, offset, hasMore, ...(needsRegion ? { needsRegion: true } : {}) }
 }
 
 function selectModules(kind: string, provider: string, config: PluginConfig, source: Registry): ResourceModule[] {
@@ -117,6 +119,9 @@ function clamp(n: number, min: number, max: number): number {
 
 export function renderQuery(result: QueryResult): string {
   if (!result.items.length) {
+    if (result.kind === 'cos' && result.needsRegion) {
+      return '尚未选择地域。对话卡已展示控制台空态（地域补全 #ci-cos-region / 请输入并选择地域）。请用户在卡片内输入并点选官方地域后再列桶。不要用 Ask question 代替选地域，不要编造 region id，也不要把中文名或自由文本当作 region。'
+    }
     const err = result.errors.map((item) => item.message).join('；')
     return err || '没有找到相关资源。'
   }

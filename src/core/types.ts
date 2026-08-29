@@ -86,6 +86,8 @@ export interface ListResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  /** True when kind needs a region pick in the card; list must not hit upstream. */
+  needsRegion?: boolean
 }
 
 export interface ModuleError {
@@ -101,6 +103,7 @@ export interface QueryResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  needsRegion?: boolean
 }
 
 export interface ModuleContext {

@@ -96,12 +96,17 @@ function ctx(extra: Record<string, unknown> = {}) {
 test('g1.1 g2.2 list requires a selected region and only maps that region', async () => {
   const calls: Array<{ op: string; args: unknown[] }> = []
   const module = createCosModule(() => fakeClient(calls))
-  await assert.rejects(() => module.list(ctx()), /缺少合法地域/)
+  const missing = await module.list(ctx())
+  assert.equal(missing.items.length, 0)
+  assert.equal(missing.needsRegion, true)
   assert.equal(calls.some((row) => row.op === 'listBuckets'), false)
-  await assert.rejects(() => module.list(ctx({ region: '广' })), /缺少合法地域/)
+  const freeText = await module.list(ctx({ region: '广' }))
+  assert.equal(freeText.items.length, 0)
+  assert.equal(freeText.needsRegion, true)
   assert.equal(calls.some((row) => row.op === 'listBuckets'), false)
   const listed = await module.list(ctx({ region: 'ap-guangzhou' }))
   assert.equal(listed.items.length, 2)
+  assert.equal(listed.needsRegion, undefined)
   assert.equal(listed.items.every((item) => item.kind === 'cos'), true)
   assert.equal(listed.items.some((item) => item.title === 'logs-1250000000'), false)
   assert.deepEqual(listed.items[0].columns?.map((col) => col.label), ['地域', '创建时间', '访问权限'])
@@ -252,7 +257,8 @@ test('g1.3 action and region change do not write overlay', async () => {
     })
     const result = await queryResources({ kind: 'cos', region: 'not-real' }, cfg, undefined, source)
     assert.equal(result.items.length, 0)
-    assert.match(result.errors.map((item) => item.message).join(' '), /缺少合法地域/)
+    assert.equal(result.needsRegion, true)
+    assert.equal(result.errors.length, 0)
     assert.equal(existsSync(overlayPath()), false)
   } finally {
     process.env.DSH_HOME = prev
@@ -274,6 +280,7 @@ test('g1.1 parseCosRef and mapBucketItem keep console columns', () => {
 
 test('g1.1 queryResources kind=cos without region never hits GetService', async () => {
   const { createRegistry } = await import('../core/registry.js')
+  const { renderQuery } = await import('../core/query.js')
   const source = createRegistry()
   source.registerProvider({
     id: 'tencent',
@@ -290,9 +297,15 @@ test('g1.1 queryResources kind=cos without region never hits GetService', async 
   })
   const missing = await queryResources({ kind: 'cos' }, cfg, undefined, source)
   assert.equal(missing.items.length, 0)
-  assert.match(missing.errors[0]?.message || '', /缺少合法地域/)
+  assert.equal(missing.kind, 'cos')
+  assert.equal(missing.needsRegion, true)
+  assert.equal(missing.errors.length, 0)
   assert.equal(calls.length, 0)
+  assert.match(renderQuery(missing), /请输入并选择地域/)
+  assert.match(renderQuery(missing), /Ask question/)
+  assert.doesNotMatch(renderQuery(missing), /缺少合法地域/)
   const ok = await queryResources({ kind: 'cos', region: 'ap-guangzhou' }, cfg, undefined, source)
   assert.equal(ok.items.length, 2)
+  assert.equal(ok.needsRegion, undefined)
   assert.equal(calls[0]?.op, 'listBuckets')
 })
