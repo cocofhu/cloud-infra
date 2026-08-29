@@ -54,9 +54,10 @@ window.__ModuleLoader__.load({
 .ci-st.enable{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
 .ci-st.pause{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
 .ci-st.error{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-label-primary-foreground)}
-.ci-crumb{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.ci-back{border:0;background:none;padding:0;height:auto;border-radius:0;cursor:pointer;font:inherit;font-size:13px;line-height:22px;color:var(--dsw-alias-brand-primary);flex:none}
-.ci-back:hover{background:none;text-decoration:underline}
+.ci-crumb{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-back{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;cursor:pointer;color:var(--dsw-alias-label-primary);flex:none}
+.ci-back:hover{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-interactive-bg-hover)}
+.ci-crumb-split{width:1px;height:14px;background:var(--dsw-alias-border-l2);flex:none}
 .ci-head-t{font-weight:650;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ci-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 4px}
 .ci-chip{font-size:12px;padding:4px 8px;border-radius:7px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-caption)}
@@ -273,6 +274,25 @@ window.__ModuleLoader__.load({
         strokeWidth: "1.5",
         strokeLinecap: "round",
       }));
+    }
+
+    function ChevronLeft() {
+      return h("svg", {
+        width: 16,
+        height: 16,
+        viewBox: "0 0 16 16",
+        fill: "none",
+        xmlns: "http://www.w3.org/2000/svg",
+        "aria-hidden": "true",
+      },
+        h("path", {
+          d: "M10.25 3.5L5.75 8l4.5 4.5",
+          stroke: "currentColor",
+          strokeWidth: "1.6",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+        }),
+      );
     }
 
     function statusText(status) {
@@ -681,7 +701,8 @@ window.__ModuleLoader__.load({
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h("button", { type: "button", className: "ci-back", onClick: onBack, title: "返回", "aria-label": "返回" }, h(ChevronLeft)),
+          h("span", { className: "ci-crumb-split", "aria-hidden": "true" }),
           h("span", { className: "ci-head-t", title: item.title }, item.title),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
@@ -977,7 +998,8 @@ window.__ModuleLoader__.load({
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
-          h("button", { type: "button", className: "ci-back", onClick: onBack }, "返回"),
+          h("button", { type: "button", className: "ci-back", onClick: onBack, title: "返回", "aria-label": "返回" }, h(ChevronLeft)),
+          h("span", { className: "ci-crumb-split", "aria-hidden": "true" }),
           h("span", { className: "ci-head-t", title: card.title }, card.title),
           h(StatusCell, { status: card.status, label: card.stateLabel }),
           h("div", { className: "ci-power" },
