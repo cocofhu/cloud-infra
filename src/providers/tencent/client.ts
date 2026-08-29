@@ -12,6 +12,7 @@ export interface TencentCallOptions {
   signal?: AbortSignal
   timestamp?: number
   fetchImpl?: typeof fetch
+  region?: string
 }
 
 export class TencentApiError extends Error {
@@ -36,6 +37,7 @@ export async function callTencentApi<T = unknown>(options: TencentCallOptions): 
     payload,
     timestamp,
     version: options.version,
+    region: options.region,
   })
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), options.timeoutMs)
@@ -87,5 +89,26 @@ export function dnspodCall<T>(
     timeoutMs: opts.timeoutMs,
     signal: opts.signal,
     fetchImpl: opts.fetchImpl,
+  })
+}
+
+export function tcrCall<T>(
+  action: string,
+  payload: unknown,
+  creds: { secretId: string; secretKey: string },
+  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch; region?: string },
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'tcr',
+    host: 'tcr.tencentcloudapi.com',
+    version: '2019-09-24',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+    region: opts.region,
   })
 }

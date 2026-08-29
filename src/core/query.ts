@@ -17,6 +17,8 @@ export interface QueryInput {
   query?: string
   offset?: number
   limit?: number
+  region?: string
+  instanceId?: string
 }
 
 export async function queryResources(
@@ -57,6 +59,8 @@ export async function queryResources(
   const errors: ModuleError[] = []
   let total = 0
   let hasMore = false
+  let region = String(input.region || '').trim()
+  let instanceId = String(input.instanceId || '').trim()
 
   await Promise.allSettled(candidates.map(async (module) => {
     const providerDef = source.getProvider(module.provider)
@@ -81,11 +85,15 @@ export async function queryResources(
         limit,
         timeoutMs: config.timeoutMs,
         signal,
+        region: region || undefined,
+        instanceId: instanceId || undefined,
       })
       lists.push(result.items || [])
       if (result.total != null) total += result.total
       else total += result.items?.length || 0
       if (result.hasMore) hasMore = true
+      if (!region && result.region) region = result.region
+      if (!instanceId && result.instanceId) instanceId = result.instanceId
     } catch (err) {
       errors.push({ moduleId: module.id, message: publicErrorMessage(err) })
     }
@@ -93,7 +101,17 @@ export async function queryResources(
 
   const items = lists.flat()
   if (!total) total = items.length
-  return { query, kind, items, errors, total, offset, hasMore }
+  return {
+    query,
+    kind,
+    items,
+    errors,
+    total,
+    offset,
+    hasMore,
+    ...(region ? { region } : {}),
+    ...(instanceId ? { instanceId } : {}),
+  }
 }
 
 function selectModules(kind: string, provider: string, config: PluginConfig, source: Registry): ResourceModule[] {
@@ -129,5 +147,8 @@ export function renderQuery(result: QueryResult): string {
     ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}，offset=${shown}。`
     : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
-  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} 用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。\n\n${lines.join('\n')}${err}`
+  const hint = result.kind === 'image'
+    ? '请用户在卡片中先选择地域，再点实例卡片查看仓库与版本。不要打印密钥。'
+    : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
+  return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
 }

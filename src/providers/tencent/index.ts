@@ -1,5 +1,6 @@
 import { registerProvider } from '../../core/registry.js'
 import './products/domain.js'
+import './products/image.js'
 
 registerProvider({
   id: 'tencent',

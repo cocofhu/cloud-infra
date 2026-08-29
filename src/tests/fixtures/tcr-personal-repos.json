@@ -1,0 +1,28 @@
+{
+  "Data": {
+    "TotalCount": 3,
+    "RepoInfo": [
+      {
+        "RepoName": "team-01/nginx",
+        "Public": 0,
+        "TagCount": 3,
+        "CreateTime": "2024-01-02",
+        "UpdateTime": "2024-06-01"
+      },
+      {
+        "RepoName": "team-01/api",
+        "Public": 0,
+        "TagCount": 1,
+        "CreateTime": "2024-01-03",
+        "UpdateTime": "2024-06-02"
+      },
+      {
+        "RepoName": "demo/hello",
+        "Public": 1,
+        "TagCount": 1,
+        "CreateTime": "2024-03-01",
+        "UpdateTime": "2024-03-02"
+      }
+    ]
+  }
+}

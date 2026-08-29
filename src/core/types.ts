@@ -46,10 +46,39 @@ export interface DnsRecord {
   remark?: string
 }
 
+export interface ResourceScope {
+  region?: string
+  instanceId?: string
+  namespace?: string
+  repository?: string
+  view?: string
+}
+
+export interface ResourceTableColumn {
+  key: string
+  label: string
+}
+
+export interface ResourceTableRow {
+  id: string
+  cells: Record<string, string>
+  badges?: string[]
+}
+
+export interface ResourceTable {
+  id: string
+  title?: string
+  columns: ResourceTableColumn[]
+  rows: ResourceTableRow[]
+  total?: number
+}
+
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
   records?: DnsRecord[]
+  tables?: ResourceTable[]
+  scope?: ResourceScope
 }
 
 export interface ResourceAction {
@@ -64,6 +93,8 @@ export interface ListResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  region?: string
+  instanceId?: string
 }
 
 export interface ModuleError {
@@ -79,6 +110,8 @@ export interface QueryResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  region?: string
+  instanceId?: string
 }
 
 export interface ModuleContext {
@@ -90,9 +123,14 @@ export interface ModuleContext {
   signal?: AbortSignal
   id?: string
   title?: string
+  region?: string
+  instanceId?: string
+  view?: string
+  namespace?: string
+  repository?: string
 }
 
-export type ActionResult = { ok: true } | { ok: false; error: string }
+export type ActionResult = { ok: true; command?: string } | { ok: false; error: string }
 
 export interface ResourceModule {
   id: string

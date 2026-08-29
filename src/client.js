@@ -126,6 +126,42 @@ window.__ModuleLoader__.load({
 .ci-field{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .ci-field input,.ci-field select{height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit}
 .ci-field input:focus,.ci-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
+.ci-image{--ci-title:var(--dsw-alias-label-primary,#0f1419);--ci-text:var(--dsw-alias-label-secondary,#3b4250);--ci-muted:var(--dsw-alias-label-tertiary,#5c6570);--ci-faint:var(--dsw-alias-label-caption,#8b939e);width:100%;max-width:100%;min-width:0;color:var(--ci-text)}
+html[data-theme=light] .ci-image,.ci-image[data-theme=light]{--ci-title:#0f1419}
+html[data-theme=dark] .ci-image,.ci-image[data-theme=dark]{--ci-title:#f7f8fb}
+@media (prefers-color-scheme: dark){html:not([data-theme=light]) .ci-image{--ci-title:var(--dsw-alias-label-primary,#f7f8fb)}}
+.ci-image-head{padding:16px 16px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-image-title{margin:0;font-size:16px;font-weight:650;line-height:22px;color:var(--ci-title)}
+.ci-image-sub{margin:4px 0 12px;color:var(--ci-muted);font-size:12px}
+.ci-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.ci-chip-sel{height:32px;padding:0 10px 0 12px;border-radius:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--ci-title);font:inherit;display:flex;align-items:center;gap:8px}
+.ci-chip-sel span{color:var(--ci-muted);font-size:12px}
+.ci-chip-sel select{border:0;background:transparent;color:var(--ci-title);font:inherit;outline:none;max-width:160px}
+.ci-search-wide{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:12px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2)}
+.ci-search-wide:focus-within{border-color:var(--dsw-alias-brand-primary)}
+.ci-search-wide svg{flex:none;color:var(--ci-muted)}
+.ci-search-wide input{flex:1;min-width:0;border:0;outline:none;background:transparent;color:var(--ci-title);font:inherit}
+.ci-search-wide input::placeholder{color:var(--ci-faint)}
+.ci-tabs{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.ci-tab{height:30px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--ci-muted);font:inherit;cursor:pointer}
+.ci-tab.on{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);color:var(--dsw-alias-brand-primary);font-weight:600}
+.ci-image-body{padding:16px}
+.ci-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(max-width:640px){.ci-grid{grid-template-columns:1fr}}
+.ci-ic{text-align:left;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:14px;padding:14px;cursor:pointer;min-height:124px;color:var(--ci-text);width:100%;font:inherit}
+.ci-ic:hover{border-color:var(--dsw-alias-brand-primary)}
+.ci-ic.on{border-color:var(--dsw-alias-brand-primary);box-shadow:inset 0 0 0 1px var(--dsw-alias-brand-primary)}
+.ci-ic-ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);margin-bottom:10px;color:var(--dsw-alias-brand-primary)}
+.ci-ic h3{margin:0 0 8px;font-size:15px;font-weight:700;letter-spacing:.01em;color:var(--ci-title);-webkit-text-fill-color:var(--ci-title)}
+html[data-theme=light] .ci-ic h3{color:#0f1419;-webkit-text-fill-color:#0f1419}
+html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
+.ci-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.ci-tag{font-size:11px;padding:2px 7px;border-radius:999px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);color:var(--ci-muted)}
+.ci-tag.ok{background:var(--dsw-alias-state-success-tertiary);border-color:transparent;color:var(--dsw-alias-state-success-primary)}
+.ci-tag.blue{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);border-color:transparent;color:var(--dsw-alias-brand-primary)}
+.ci-ic-meta{font-size:12px;color:var(--ci-muted);word-break:break-all}
+.ci-warn{padding:10px 12px;border-radius:10px;background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label);font-size:12px;line-height:1.5;margin:0 0 4px}
+.ci-copied{margin:8px 0 0;color:var(--dsw-alias-state-success-primary);font-size:12px}
 `;
 
     const CSS_ID = "cloud-infra-style";
@@ -452,7 +488,7 @@ window.__ModuleLoader__.load({
       return box;
     }
 
-    function ConfirmDialog({ open, title, text, busy, danger, onCancel, onConfirm }) {
+    function ConfirmDialog({ open, title, text, warn, busy, danger, onCancel, onConfirm }) {
       const box = useOverlayKeys(open, busy, onCancel, true);
       if (!open) return null;
       const node = h("div", {
@@ -463,6 +499,7 @@ window.__ModuleLoader__.load({
         h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
           h("h3", null, title || "确认"),
           h("p", null, text),
+          warn ? h("div", { className: "ci-warn" }, warn) : null,
           h("div", { className: "ci-modal-actions" },
             h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
             h("button", {
@@ -673,6 +710,425 @@ window.__ModuleLoader__.load({
       ];
     }
 
+    const TCR_REGIONS = [
+      { id: "ap-guangzhou", label: "广州" },
+      { id: "ap-shanghai", label: "上海" },
+      { id: "ap-beijing", label: "北京" },
+      { id: "ap-nanjing", label: "南京" },
+      { id: "ap-chengdu", label: "成都" },
+    ];
+    const PERSONAL_DOMAIN = "ccr.ccs.tencentyun.com";
+    const DIGEST_WARNING = "注意：删除指定版本可能同时删除相同镜像 ID（SHA256）的其它版本。";
+
+    function inferImageRegion(query, fallback) {
+      const text = String(query || "");
+      const pairs = [
+        [/广州|guangzhou/i, "ap-guangzhou"],
+        [/上海|shanghai/i, "ap-shanghai"],
+        [/北京|beijing/i, "ap-beijing"],
+        [/南京|nanjing/i, "ap-nanjing"],
+        [/成都|chengdu/i, "ap-chengdu"],
+      ];
+      for (const [re, id] of pairs) {
+        if (re.test(text)) return id;
+      }
+      return fallback || "ap-guangzhou";
+    }
+
+    function imageCol(item, label) {
+      const col = (item && item.columns || []).find((c) => c && c.label === label);
+      return col && col.value != null ? String(col.value) : "";
+    }
+
+    function imageDomain(item) {
+      return imageCol(item, "访问域名") || String((item && item.description) || "") || PERSONAL_DOMAIN;
+    }
+
+    function imageEdition(item) {
+      return imageCol(item, "类型") || ((item && item.badges) || []).find((b) => /个人版|企业版/.test(String(b))) || "企业版";
+    }
+
+    function hitKw(kw, ...values) {
+      const q = String(kw || "").trim().toLowerCase();
+      if (!q) return true;
+      return values.some((v) => String(v || "").toLowerCase().includes(q));
+    }
+
+    function ImageIcon() {
+      return h("div", { className: "ci-ic-ico", "aria-hidden": "true" },
+        h("svg", { width: 18, height: 18, viewBox: "0 0 18 18", fill: "none" },
+          h("rect", { x: 3, y: 4, width: 12, height: 10, rx: 2, stroke: "currentColor", strokeWidth: "1.4" }),
+          h("path", { d: "M6 8h6M6 11h4", stroke: "currentColor", strokeWidth: "1.4", strokeLinecap: "round" }),
+        ),
+      );
+    }
+
+    function SearchWideIcon() {
+      return h("svg", { width: 16, height: 16, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" },
+        h("circle", { cx: 7, cy: 7, r: 4.4, stroke: "currentColor", strokeWidth: "1.5" }),
+        h("path", { d: "M10.4 10.4L13.2 13.2", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round" }),
+      );
+    }
+
+    function ImageToolView({ payload, args, fromTool, initialQuery }) {
+      const provider = String(args.provider || "");
+      const errors = payload?.errors || [];
+      const [region, setRegion] = useState(payload?.region || inferImageRegion(initialQuery, "ap-guangzhou"));
+      const [instances, setInstances] = useState(Array.isArray(fromTool) ? fromTool : []);
+      const [instanceId, setInstanceId] = useState((fromTool && fromTool[0] && fromTool[0].id) || "");
+      const [view, setView] = useState("inst");
+      const [nsFilter, setNsFilter] = useState("");
+      const [namespaces, setNamespaces] = useState([]);
+      const [repos, setRepos] = useState([]);
+      const [tags, setTags] = useState([]);
+      const [repo, setRepo] = useState(null);
+      const [fields, setFields] = useState([]);
+      const [draftQ, setDraftQ] = useState(initialQuery || "");
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState(errors.map((e) => e.message).join("；"));
+      const [copied, setCopied] = useState("");
+      const [confirm, setConfirm] = useState(null);
+      const [actBusy, setActBusy] = useState(false);
+      const seq = useRef(0);
+      const debounce = useRef(0);
+      const current = (Array.isArray(instances) ? instances : []).find((item) => item && item.id === instanceId) || instances[0];
+
+      const toolSig = fromTool
+        ? `${payload?.region || ""}|${fromTool.map((i) => i.id).join(",")}|${initialQuery}`
+        : "";
+      useEffect(() => {
+        if (!fromTool) return;
+        setInstances(fromTool);
+        if (payload?.region) setRegion(payload.region);
+        if (fromTool[0]?.id) setInstanceId(fromTool[0].id);
+        setDraftQ(initialQuery || "");
+        setErr(errors.map((e) => e.message).join("；"));
+      }, [toolSig]);
+      useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
+
+      const loadInstances = async (nextRegion, keepId) => {
+        const n = ++seq.current;
+        setBusy(true);
+        setErr("");
+        try {
+          const result = await api("query", { kind: "image", query: "", provider, region: nextRegion, limit: 80 });
+          if (n !== seq.current) return;
+          const items = result.items || [];
+          setInstances(items);
+          const nextId = keepId && items.some((item) => item.id === keepId) ? keepId : (items[0]?.id || "");
+          setInstanceId(nextId);
+          if (result.errors?.length) setErr(result.errors.map((e) => e.message).join("；"));
+        } catch (e) {
+          if (n !== seq.current) return;
+          setErr(publicErrorMessage(e));
+          setInstances([]);
+          setInstanceId("");
+        } finally {
+          if (n === seq.current) setBusy(false);
+        }
+      };
+
+      const loadDetail = async (nextView, nextInstance, extra) => {
+        if (!nextInstance) {
+          setNamespaces([]);
+          setRepos([]);
+          setTags([]);
+          return;
+        }
+        const n = ++seq.current;
+        setBusy(true);
+        setErr("");
+        try {
+          const item = (instances || []).find((row) => row && row.id === nextInstance);
+          const detail = await api("detail", {
+            moduleId: item?.moduleId || "tencent.image",
+            id: nextInstance,
+            region,
+            view: nextView,
+            query: extra?.query || "",
+            namespace: extra?.namespace || "",
+            repository: extra?.repository || "",
+          });
+          if (n !== seq.current) return;
+          const table = (detail.tables || [])[0] || { rows: [] };
+          const rows = table.rows || [];
+          if (nextView === "namespaces") setNamespaces(rows);
+          else if (nextView === "tags") setTags(rows);
+          else setRepos(rows);
+          setFields(detail.fields || []);
+        } catch (e) {
+          if (n !== seq.current) return;
+          setErr(publicErrorMessage(e));
+        } finally {
+          if (n === seq.current) setBusy(false);
+        }
+      };
+
+      const changeRegion = (next) => {
+        setRegion(next);
+        setView("inst");
+        setRepo(null);
+        setNsFilter("");
+        setDraftQ("");
+        setCopied("");
+        loadInstances(next);
+      };
+
+      const selectInstance = (item, nextView) => {
+        setInstanceId(item.id);
+        setRepo(null);
+        setNsFilter("");
+        setDraftQ("");
+        setCopied("");
+        setView(nextView || "repo");
+        if ((nextView || "repo") !== "inst") loadDetail(nextView === "ns" ? "namespaces" : "repos", item.id, {});
+      };
+
+      const changeView = (next) => {
+        setView(next);
+        setCopied("");
+        if (next === "inst") return;
+        if (next === "detail") return;
+        setRepo(null);
+        loadDetail(next === "ns" ? "namespaces" : "repos", instanceId, { namespace: nsFilter, query: "" });
+      };
+
+      const openRepo = (row) => {
+        const namespace = row.cells?.namespace || "";
+        const full = row.cells?.name || row.id;
+        const name = full.includes("/") ? full.slice(full.indexOf("/") + 1) : full;
+        setRepo({ id: row.id, namespace, name, full });
+        setDraftQ("");
+        setView("detail");
+        loadDetail("tags", instanceId, { namespace, repository: name });
+      };
+
+      const onDraft = (value) => {
+        setDraftQ(value);
+        if (debounce.current) clearTimeout(debounce.current);
+        debounce.current = setTimeout(() => {
+          if (view === "ns") loadDetail("namespaces", instanceId, { query: value });
+          else if (view === "repo") loadDetail("repos", instanceId, { namespace: nsFilter, query: value });
+          else if (view === "detail" && repo) loadDetail("tags", instanceId, { namespace: repo.namespace, repository: repo.name, query: value });
+        }, 400);
+      };
+
+      const placeholder = view === "inst"
+        ? "搜索实例名称"
+        : view === "ns"
+          ? "搜索命名空间"
+          : view === "detail"
+            ? "搜索镜像版本"
+            : "搜索仓库名称";
+
+      const filteredInstances = (instances || []).filter((item) => hitKw(
+        draftQ,
+        item.title,
+        item.description,
+        imageEdition(item),
+        imageDomain(item),
+        ...(item.badges || []),
+      ));
+      const nsNames = [...new Set((namespaces.length ? namespaces : repos).map((row) => row.cells?.namespace || row.cells?.name).filter(Boolean))];
+
+      const copyPull = async (tag) => {
+        if (!current || !repo) return;
+        const personal = imageEdition(current) === "个人版";
+        const cmd = `docker pull ${personal ? PERSONAL_DOMAIN : imageDomain(current)}/${repo.namespace}/${repo.name}:${tag}`;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(cmd);
+          setCopied(cmd);
+        } catch {
+          setCopied(cmd);
+        }
+      };
+
+      const runDelete = async (payload) => {
+        setActBusy(true);
+        setErr("");
+        try {
+          await api("action", {
+            moduleId: current?.moduleId || "tencent.image",
+            id: instanceId,
+            action: "image.delete",
+            payload,
+          });
+          setConfirm(null);
+          if (repo) await loadDetail("tags", instanceId, { namespace: repo.namespace, repository: repo.name, query: draftQ });
+        } catch (e) {
+          setErr(publicErrorMessage(e));
+        } finally {
+          setActBusy(false);
+        }
+      };
+
+      const askDelete = (row) => {
+        const tag = row.cells?.version || row.id;
+        const full = repo ? `${repo.namespace}/${repo.name}:${tag}` : tag;
+        setConfirm({
+          tag,
+          text: `确定删除 ${full}？此操作不可撤销。`,
+          warn: DIGEST_WARNING,
+          payload: {
+            region,
+            instanceId,
+            namespace: repo?.namespace,
+            repository: repo?.name,
+            tag,
+            publicDomain: imageDomain(current),
+          },
+        });
+      };
+
+      const body = () => {
+        if (busy) return h("div", { className: "ci-load" }, h(Spin), "加载中…");
+        if (view === "inst") {
+          if (!filteredInstances.length) return h("div", { className: "ci-empty" }, draftQ ? "没有匹配的实例" : "该地域没有实例");
+          return h("div", { className: "ci-grid" }, filteredInstances.map((item) => h("button", {
+            key: item.id,
+            type: "button",
+            className: "ci-ic" + (item.id === instanceId ? " on" : ""),
+            onClick: () => selectInstance(item, "repo"),
+          },
+            h(ImageIcon),
+            h("h3", null, item.title),
+            h("div", { className: "ci-tags" },
+              h("span", { className: "ci-tag ok" }, item.status === "enable" ? "运行中" : (item.status || "未知")),
+              h("span", { className: "ci-tag blue" }, imageEdition(item)),
+            ),
+            h("div", { className: "ci-ic-meta" }, imageDomain(item)),
+          )));
+        }
+        if (view === "ns") {
+          const rows = (namespaces || []).filter((row) => hitKw(draftQ, row.cells?.name, row.cells?.access));
+          if (!rows.length) return h("div", { className: "ci-empty" }, "没有匹配的命名空间");
+          return h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+            h("thead", null, h("tr", null, h("th", null, "名称"), h("th", null, "访问级别"))),
+            h("tbody", null, rows.map((row) => h("tr", { key: row.id },
+              h("td", null, row.cells?.name || row.id),
+              h("td", null, h("span", { className: "ci-tag" }, row.cells?.access || "私有")),
+            ))),
+          ));
+        }
+        if (view === "detail") {
+          const rows = (tags || []).filter((row) => hitKw(draftQ, row.cells?.version, row.cells?.digest));
+          return [
+            h("div", { key: "crumb", className: "ci-crumb", style: { padding: 0, border: 0, marginBottom: 14 } },
+              h("button", { type: "button", className: "ci-back", onClick: () => { setRepo(null); setDraftQ(""); changeView("repo"); } }, "返回"),
+              h("span", { className: "ci-head-t" }, repo?.full || "版本管理"),
+            ),
+            fields.length ? h("div", { key: "chips", className: "ci-chips", style: { padding: 0 } },
+              fields.map((row) => h("span", { key: row.label, className: "ci-chip" }, row.label, h("b", null, row.value))),
+            ) : null,
+            copied ? h("p", { key: "copied", className: "ci-copied" }, "已复制：" + copied) : null,
+            rows.length ? h("div", { key: "tb", className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+              h("thead", null, h("tr", null,
+                h("th", null, "镜像版本"),
+                h("th", null, "镜像ID"),
+                h("th", null, "大小"),
+                h("th", null, "更新时间"),
+                h("th", null, "操作"),
+              )),
+              h("tbody", null, rows.map((row) => h("tr", { key: row.id },
+                h("td", null, row.cells?.version || row.id),
+                h("td", null, row.cells?.digest || "-"),
+                h("td", null, row.cells?.size || "-"),
+                h("td", null, row.cells?.updated || "-"),
+                h("td", { className: "ci-ops-cell" }, h("div", { className: "ci-ops" },
+                  h("button", { type: "button", className: "ci-link", onClick: () => copyPull(row.cells?.version || row.id) }, "拉取指令"),
+                  h("button", { type: "button", className: "ci-link danger", onClick: () => askDelete(row) }, "删除"),
+                )),
+              ))),
+            )) : h("div", { key: "empty", className: "ci-empty" }, "没有匹配的镜像版本"),
+          ];
+        }
+        const rows = (repos || []).filter((row) => (nsFilter ? row.cells?.namespace === nsFilter : true) && hitKw(draftQ, row.cells?.name, row.cells?.namespace));
+        if (!rows.length) return h("div", { className: "ci-empty" }, "没有匹配的仓库");
+        return h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+          h("thead", null, h("tr", null,
+            h("th", null, "仓库名称"),
+            h("th", null, "命名空间"),
+            h("th", null, "类型"),
+          )),
+          h("tbody", null, rows.map((row) => h("tr", { key: row.id },
+            h("td", null, h("button", { type: "button", className: "ci-link", onClick: () => openRepo(row) }, row.cells?.name || row.id)),
+            h("td", null, row.cells?.namespace || ""),
+            h("td", null, h("span", { className: "ci-tag" }, row.cells?.access || "私有")),
+          ))),
+        ));
+      };
+
+      return h("div", { className: "ci-root ci-tool" },
+        h("div", { className: "ci-panel ci-image" },
+          h("div", { className: "ci-image-head" },
+            h("h1", { className: "ci-image-title" }, "容器镜像"),
+            h("p", { className: "ci-image-sub" }, "当前范围内的实例、仓库与版本"),
+            h("div", { className: "ci-filters" },
+              h("label", { className: "ci-chip-sel" },
+                h("span", null, "地域"),
+                h("select", { value: region, onChange: (e) => changeRegion(e.target.value) },
+                  TCR_REGIONS.map((item) => h("option", { key: item.id, value: item.id }, item.label)),
+                ),
+              ),
+              h("label", { className: "ci-chip-sel" },
+                h("span", null, "实例"),
+                h("select", {
+                  value: instanceId,
+                  onChange: (e) => {
+                    const item = instances.find((row) => row.id === e.target.value);
+                    if (item) selectInstance(item, view === "inst" ? "repo" : view);
+                  },
+                },
+                  instances.length
+                    ? instances.map((item) => h("option", { key: item.id, value: item.id }, item.title))
+                    : h("option", { value: "" }, "无实例"),
+                ),
+              ),
+              view === "repo" && nsNames.length ? h("label", { className: "ci-chip-sel" },
+                h("span", null, "命名空间"),
+                h("select", {
+                  value: nsFilter,
+                  onChange: (e) => {
+                    setNsFilter(e.target.value);
+                    loadDetail("repos", instanceId, { namespace: e.target.value, query: draftQ });
+                  },
+                },
+                  h("option", { value: "" }, "全部"),
+                  nsNames.map((name) => h("option", { key: name, value: name }, name)),
+                ),
+              ) : null,
+            ),
+            h("label", { className: "ci-search-wide" },
+              h(SearchWideIcon),
+              h("input", {
+                type: "search",
+                placeholder,
+                value: draftQ,
+                onChange: (e) => onDraft(e.target.value),
+              }),
+            ),
+          ),
+          h("div", { className: "ci-tabs" },
+            h("button", { type: "button", className: "ci-tab" + (view === "inst" ? " on" : ""), onClick: () => changeView("inst") }, "实例"),
+            h("button", { type: "button", className: "ci-tab" + (view === "ns" ? " on" : ""), onClick: () => changeView("ns") }, "命名空间"),
+            h("button", { type: "button", className: "ci-tab" + (view === "repo" || view === "detail" ? " on" : ""), onClick: () => changeView("repo") }, "镜像仓库"),
+          ),
+          err ? h("div", { className: "ci-err" }, err) : null,
+          h("div", { className: "ci-image-body" }, body()),
+        ),
+        h(ConfirmDialog, {
+          open: !!confirm,
+          title: "删除镜像版本",
+          text: confirm?.text,
+          warn: confirm?.warn,
+          busy: actBusy,
+          danger: true,
+          onCancel: () => { if (!actBusy) setConfirm(null); },
+          onConfirm: () => confirm && runDelete(confirm.payload),
+        }),
+      );
+    }
+
     function SearchToolView(props) {
       useEffect(() => ensureCss(), []);
       const payload = pickPayload(props);
@@ -783,6 +1239,14 @@ window.__ModuleLoader__.load({
         setSession((cur) => cur ? { ...cur, detail, loading: false } : cur);
       };
       if (running) return null;
+      if (kind === "image") {
+        return h(CiBoundary, null, h(ImageToolView, {
+          payload,
+          args,
+          fromTool,
+          initialQuery,
+        }));
+      }
       const errors = payload?.errors || [];
       if (!fromTool?.length && !rows.length && !activeQ && !draftQ) {
         const msg = errors.map((e) => e.message).join("；");

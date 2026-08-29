@@ -1,0 +1,9 @@
+{
+  "Data": {
+    "NamespaceCount": 2,
+    "NamespaceInfo": [
+      { "Namespace": "team-01", "CreationTime": "2024-01-01" },
+      { "Namespace": "demo", "CreationTime": "2024-02-01" }
+    ]
+  }
+}

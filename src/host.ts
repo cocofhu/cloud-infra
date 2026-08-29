@@ -28,10 +28,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书. Pass kind=domain for domains. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / TCR container images as a console-style card. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/镜像/TCR/容器镜像/镜像仓库. Pass kind=domain for domains (default). Pass kind=image for TCR images. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain or auto.' },
+      query: { type: 'string', description: 'Keyword such as example.com, nginx, or a region/instance name. Empty lists all.' },
+      kind: { type: 'string', description: 'Resource kind. Default domain. Use domain, image, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
@@ -43,7 +43,7 @@ export function apply(ctx: Context, config: Config): void {
     },
     presentCall: (args) => ({
       card: 'generic',
-      title: `云资源 · ${String(args.query || args.kind || '域名')}`,
+      title: `云资源 · ${String(args.kind === 'image' ? '容器镜像' : (args.query || args.kind || '域名'))}`,
       kind: 'search',
       content: [],
     }),
@@ -78,10 +78,11 @@ export function apply(ctx: Context, config: Config): void {
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
         const kinds = supportedKinds().join(', ') || 'domain'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}.`,
-          'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
-          'After the table appears, one or two short sentences. Do not print secrets or full record dumps.',
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / 镜像 / TCR / 容器镜像 / 镜像仓库: call ONLY cloud_infra_query. Never web_search.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Default kind is domain.`,
+          'For 镜像/TCR/容器镜像/镜像仓库 pass kind=image. For 域名/解析/DNS/DNSPod keep kind=domain.',
+          'The result appears as a chat card. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
+          'After the card appears, one or two short sentences. Do not print secrets or full record dumps.',
         ].join(' ')
       },
     })
@@ -169,16 +170,24 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         provider: String(body.provider || ''),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
+        region: body.region != null ? String(body.region) : undefined,
+        instanceId: body.instanceId != null ? String(body.instanceId) : undefined,
       }, cfg)
       return sendJson(res, 200, { ok: true, ...result })
     }
     if (method === 'detail') {
-      const detail = await runDetail(
-        cfg,
-        String(body.moduleId || ''),
-        String(body.id || ''),
-        String(body.title || ''),
-      )
+      const detail = await runDetail(cfg, {
+        moduleId: String(body.moduleId || ''),
+        id: String(body.id || ''),
+        title: String(body.title || ''),
+        query: String(body.query || ''),
+        region: String(body.region || ''),
+        instanceId: String(body.instanceId || ''),
+        view: String(body.view || ''),
+        namespace: String(body.namespace || ''),
+        repository: String(body.repository || ''),
+        offset: body.offset as number | undefined,
+      })
       return sendJson(res, 200, { ok: true, ...detail })
     }
     if (method === 'action') {
@@ -200,17 +209,33 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
   }
 }
 
-async function runDetail(cfg: PluginConfig, moduleId: string, id: string, title = '') {
-  const { module, creds } = readyModule(cfg, moduleId, id)
+async function runDetail(cfg: PluginConfig, extra: {
+  moduleId: string
+  id: string
+  title?: string
+  query?: string
+  region?: string
+  instanceId?: string
+  view?: string
+  namespace?: string
+  repository?: string
+  offset?: number
+}) {
+  const { module, creds } = readyModule(cfg, extra.moduleId, extra.id)
   if (!module.detail) throw new Error(`${module.title} 不支持详情`)
   return module.detail({
     creds,
-    query: '',
-    offset: 0,
+    query: extra.query || '',
+    offset: Math.max(0, Math.floor(Number(extra.offset) || 0)),
     limit: cfg.maxResults,
     timeoutMs: cfg.timeoutMs,
-    id,
-    title: title || undefined,
+    id: extra.id,
+    title: extra.title || undefined,
+    region: extra.region || undefined,
+    instanceId: extra.instanceId || extra.id,
+    view: extra.view || undefined,
+    namespace: extra.namespace || undefined,
+    repository: extra.repository || undefined,
   })
 }
 
@@ -225,11 +250,15 @@ async function runAction(
   if (!module.execute) return { ok: false, error: `${module.title} 不支持写操作` }
   return module.execute(actionId, payload, {
     creds,
-    query: '',
+    query: String(payload.query || ''),
     offset: 0,
     limit: cfg.maxResults,
     timeoutMs: cfg.timeoutMs,
     id,
+    region: payload.region != null ? String(payload.region) : undefined,
+    instanceId: payload.instanceId != null ? String(payload.instanceId) : id,
+    namespace: payload.namespace != null ? String(payload.namespace) : undefined,
+    repository: payload.repository != null ? String(payload.repository) : undefined,
   })
 }
 
