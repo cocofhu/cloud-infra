@@ -63,6 +63,7 @@ window.__ModuleLoader__.load({
 .ci-chip b{color:var(--dsw-alias-label-primary);margin-left:4px;font-weight:600}
 .ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
 .ci-sec-t{font-size:13px;font-weight:650}
+.ci-sec-empty{display:flex;align-items:center;gap:8px;padding:0 14px 14px;font-size:13px;color:var(--dsw-alias-label-secondary);line-height:22px}
 .ci-table-wrap{width:100%;overflow:auto}
 .ci-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
 .ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle}
@@ -678,9 +679,8 @@ window.__ModuleLoader__.load({
       return [
         h("div", { key: section.id + "-t", className: "ci-sec" }, h("span", { className: "ci-sec-t" }, title)),
         empty
-          ? h("div", { key: section.id + "-e", className: "ci-dl" },
-            h("span", null, ""),
-            h("b", null, section.empty || "暂无"),
+          ? h("div", { key: section.id + "-e", className: "ci-sec-empty" },
+            h("span", null, section.empty || "暂无"),
             onRetry ? h("button", { type: "button", className: "ci-link", onClick: onRetry }, "重试") : null,
           )
           : h("div", { key: section.id + "-d", className: "ci-dl" },
@@ -985,7 +985,7 @@ window.__ModuleLoader__.load({
             ? sections.map((section) => h(CertSection, {
               key: section.id,
               section,
-              onRetry: section.id === "bound" ? onReload : undefined,
+              onRetry: section.id === "bound" && /可重试/.test(section.empty || "") ? onReload : undefined,
             }))
             : h("div", { key: "empty", className: "ci-empty" }, "没有详情字段"),
           applying ? h("div", { key: "va", className: "ci-actions", style: { padding: "4px 14px 8px" } },
