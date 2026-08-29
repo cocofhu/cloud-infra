@@ -124,9 +124,10 @@ test('matchModule filters by title or id without dropping other checked modules'
     module: { id: string; title?: string },
     q: string,
   ) => boolean
-  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名' }, ''), true)
-  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名' }, '域名'), true)
-  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名' }, 'TENCENT'), true)
+  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名解析' }, ''), true)
+  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名解析' }, '域名'), true)
+  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名解析' }, 'TENCENT'), true)
+  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名解析' }, '解析'), true)
   assert.equal(fn({ id: 'aliyun.dns', title: '阿里云解析' }, '域名'), false)
   assert.equal(fn({ id: 'aliyun.dns', title: '阿里云解析' }, '   '), true)
 })
