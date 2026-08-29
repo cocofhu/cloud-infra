@@ -59,12 +59,37 @@ export interface FieldGroup {
   fields: Array<{ label: string; value: string }>
 }
 
+export interface DetailPage {
+  id: string
+  title: string
+}
+
+export interface DetailBlock {
+  id: string
+  title: string
+  fields: Array<{ label: string; value: string }>
+}
+
+export interface DetailCard {
+  id: string
+  title: string
+  status?: string
+  badges?: string[]
+  columns?: ResourceColumn[]
+  fields?: Array<{ label: string; value: string }>
+  flags?: Record<string, string | number | boolean | undefined>
+}
+
 export interface ResourceDetail {
   card: ResourceCard
   fields: Array<{ label: string; value: string }>
   groups?: FieldGroup[]
   records?: DnsRecord[]
   extra?: Record<string, unknown>
+  pages?: DetailPage[]
+  blocks?: DetailBlock[]
+  cards?: Record<string, DetailCard[]>
+  flags?: Record<string, string | number | boolean | undefined>
 }
 
 export interface ResourceAction {
@@ -97,6 +122,7 @@ export interface QueryResult {
   total?: number
   offset?: number
   hasMore?: boolean
+  region?: string
   regions?: string[]
 }
 
@@ -111,6 +137,7 @@ export interface ModuleContext {
   title?: string
   region?: string
   tab?: string
+  filters?: Record<string, string>
 }
 
 export type ActionResult = { ok: true; data?: Record<string, unknown> } | { ok: false; error: string }

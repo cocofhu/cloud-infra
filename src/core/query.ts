@@ -18,6 +18,7 @@ export interface QueryInput {
   offset?: number
   limit?: number
   region?: string
+  filters?: Record<string, string>
 }
 
 export async function queryResources(
@@ -29,7 +30,8 @@ export async function queryResources(
   const kind = String(input.kind || 'domain').trim() || 'domain'
   const provider = String(input.provider || '').trim()
   const query = String(input.query || '').trim()
-  const region = String(input.region || '').trim()
+  const region = String(input.region || '').trim() || (kind === 'cluster' ? 'ap-guangzhou' : '')
+  const filters = sanitizeFilters(input.filters)
   const offset = Math.max(0, Math.floor(Number(input.offset) || 0))
   const explicit = Number(input.limit)
   const limit = Number.isFinite(explicit) && explicit > 0
@@ -52,6 +54,7 @@ export async function queryResources(
       total: 0,
       offset,
       hasMore: false,
+      region: region || undefined,
     }
   }
 
@@ -85,6 +88,7 @@ export async function queryResources(
         timeoutMs: config.timeoutMs,
         signal,
         region: region || undefined,
+        filters,
       })
       lists.push(result.items || [])
       if (result.total != null) total += result.total
@@ -109,7 +113,17 @@ export async function queryResources(
 
   const items = lists.flat()
   if (!total) total = items.length
-  return { query, kind, items, errors, total, offset, hasMore, regions: regions.length ? regions : undefined }
+  return {
+    query,
+    kind,
+    items,
+    errors,
+    total,
+    offset,
+    hasMore,
+    region: region || undefined,
+    regions: regions.length ? regions : undefined,
+  }
 }
 
 function selectModules(kind: string, provider: string, config: PluginConfig, source: Registry): ResourceModule[] {
@@ -153,7 +167,7 @@ export function renderQuery(result: QueryResult): string {
   const start = result.offset || 0
   const shown = start + result.items.length
   const more = result.hasMore
-    ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}，offset=${shown}。`
+    ? `这是第 ${start + 1}–${shown} 条。列表可翻页；用户若在对话里问还有吗，立刻再调用 cloud_infra_query，query 仍为「${result.query || ''}」，kind=${result.kind}${result.region ? `，region=${result.region}` : ''}，offset=${shown}。`
     : `一共 ${result.total ?? result.items.length} 条，已经全部列出。`
   const err = result.errors.length ? `\n部分模块失败：${result.errors.map((item) => item.moduleId).join(', ')}` : ''
   if (result.kind === 'registrar') {
@@ -162,13 +176,28 @@ export function renderQuery(result: QueryResult): string {
   if (result.kind === 'my-domain') {
     return `我的域名已显示为对话卡片。请用户在卡片顶部搜索框筛选，点「管理」查看基本信息与域名安全。不要引导去设置页或独立页。不要打印密钥。\n\n${lines.join('\n')}${err}`
   }
+  const cluster = result.kind === 'cluster' || result.items.some((item) => item.kind === 'cluster')
   const cdb = result.kind === 'cdb' || result.items.some((item) => item.kind === 'cdb')
   const instance = result.kind === 'cvm' || result.kind === 'lighthouse'
     || result.items.some((item) => item.kind === 'cvm' || item.kind === 'lighthouse')
-  const hint = cdb
-    ? '用一两句话概括即可，请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。不要打印密钥。'
-    : instance
-      ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
-      : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
+  const hint = cluster
+    ? '用一两句话概括即可，列表默认广州，用户可在顶栏切换地域并点击集群 ID 进入配置。不要询问地域、不要打印密钥或集群凭证，不要套用域名解析页。'
+    : cdb
+      ? '用一两句话概括即可，请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。不要打印密钥。'
+      : instance
+        ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
+        : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
   return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
+}
+
+function sanitizeFilters(raw: Record<string, string> | undefined): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    const name = String(key || '').trim()
+    const text = String(value ?? '').trim()
+    if (!name || !text) continue
+    out[name] = text
+  }
+  return Object.keys(out).length ? out : undefined
 }
