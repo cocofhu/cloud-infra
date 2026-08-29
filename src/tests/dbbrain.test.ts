@@ -19,9 +19,12 @@ import {
   readableDiagText,
   requireRegion,
   resolveTab,
+  supportsThreadKill,
   tabsForProduct,
   timeRange,
   toIso8601,
+  KILL_UNSUPPORTED,
+  MONGO_KILL_HINT,
   type InstanceInfo,
 } from '../providers/tencent/products/dbbrain.js'
 import { DBBRAIN_REGIONS } from '../providers/tencent/products/dbbrain-catalog.js'
@@ -49,6 +52,7 @@ test('mapInstanceItem encodes product region instance and 诊断优化 (g1.1 g1.
   assert.equal(card.region, 'ap-shanghai')
   assert.equal(card.product, 'mysql')
   assert.equal(card.openLabel, '诊断优化')
+  assert.equal(card.hasReport, true)
   assert.equal(card.columns?.find((col) => col.label === '地域')?.value, '上海')
   assert.equal(card.columns?.find((col) => col.label === '健康分')?.value, '88')
   assert.equal(card.columns?.find((col) => col.label === '异常告警')?.value, '1')
@@ -196,10 +200,22 @@ test('Kill execute uses Prepare/Commit, instance region, and does not write over
   assert.equal(calls[0].action, 'KillMySqlThreads')
   assert.equal(calls[0].region, 'ap-shanghai')
   assert.equal(calls[0].payload.Stage, 'Prepare')
+  assert.equal(calls[0].payload.Product, 'mysql')
   assert.deepEqual(calls[0].payload.Threads, [123])
   assert.equal(calls[0].payload.SessionIds, undefined)
   assert.equal(calls[1].payload.Stage, 'Commit')
   assert.equal(calls[1].payload.SqlExecId, 'exec-9')
+  assert.equal(calls[1].payload.Product, 'mysql')
+  calls.length = 0
+  const cynos = await module.execute?.('session.kill', {
+    sessionId: '8',
+    product: 'cynosdb',
+    region: 'ap-shanghai',
+    instanceId: 'cynosdbmysql-1',
+  }, ctx({ id: 'tencent.dbbrain:cynosdb:ap-shanghai:cynosdbmysql-1' }))
+  assert.equal(cynos?.ok, true)
+  assert.equal(calls[0].payload.Product, 'cynosdb')
+  assert.deepEqual(calls[0].payload.Threads, [8])
   const src = readFileSync(join(dir, '../../src/providers/tencent/products/dbbrain.ts'), 'utf8')
   assert.doesNotMatch(src, /writeOverlay/)
 })
@@ -328,7 +344,7 @@ test('event.ignore uses integer Status (g2.2 g4.1)', async () => {
   assert.equal(typeof calls[0].payload.Status, 'number')
 })
 
-test('Mongo kill uses CreateMongoDBKillTask official fields (g2.3 g4.1)', async () => {
+test('Mongo kill uses CreateMongoDBKillTask form fields, not sessionId (g2.3 g4.1)', async () => {
   const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
   const call = async (action: string, payload: unknown) => {
     calls.push({ action, payload: payload as Record<string, unknown> })
@@ -336,8 +352,11 @@ test('Mongo kill uses CreateMongoDBKillTask official fields (g2.3 g4.1)', async 
   }
   const module = createDbbrainModule(call as never)
   const killed = await module.execute?.('session.kill', {
-    sessionId: '61',
+    duration: '30',
+    time: '5',
     host: '10.0.0.1',
+    type: 'active',
+    sessionId: '61',
     product: 'mongodb',
     region: 'ap-beijing',
     instanceId: 'cmgo-1',
@@ -345,9 +364,82 @@ test('Mongo kill uses CreateMongoDBKillTask official fields (g2.3 g4.1)', async 
   assert.equal(killed?.ok, true)
   assert.equal(calls[0].action, 'CreateMongoDBKillTask')
   assert.equal(calls[0].payload.Product, 'mongodb')
-  assert.equal(calls[0].payload.Duration, 10)
+  assert.equal(calls[0].payload.Duration, 30)
+  assert.equal(calls[0].payload.Time, 5)
   assert.equal(calls[0].payload.Host, '10.0.0.1')
+  assert.equal(calls[0].payload.Type, 'active')
   assert.equal(calls[0].payload.SessionIds, undefined)
+  assert.equal(calls[0].payload.sessionId, undefined)
+  calls.length = 0
+  const missing = await module.execute?.('session.kill', {
+    sessionId: '61',
+    product: 'mongodb',
+    region: 'ap-beijing',
+    instanceId: 'cmgo-1',
+  }, ctx({ id: 'tencent.dbbrain:mongodb:ap-beijing:cmgo-1' }))
+  assert.equal(missing?.ok, false)
+  assert.match(String(missing?.error), /Duration/)
+  assert.equal(calls.length, 0)
+})
+
+test('Mongo session tab offers kill-task form and hides per-row Kill (g2.3 g4.1)', async () => {
+  const module = createDbbrainModule((async () => ({
+    ProcessList: [{ Id: '61', Host: '10.0.0.1', User: 'app' }],
+  })) as never)
+  const detail = await module.detail?.(ctx({
+    id: 'tencent.dbbrain:mongodb:ap-beijing:cmgo-1',
+    title: 'mongo',
+    filters: { tab: 'session', product: 'mongodb', region: 'ap-beijing' },
+  }))
+  assert.equal(detail?.form?.id, 'mongo-kill-task')
+  assert.equal(detail?.form?.action, 'session.kill')
+  assert.equal(detail?.form?.submitLabel, '创建中断任务')
+  assert.ok(detail?.form?.fields?.some((field) => field.key === 'duration'))
+  assert.ok(detail?.form?.fields?.some((field) => field.key === 'time'))
+  assert.ok(detail?.form?.fields?.some((field) => field.key === 'host'))
+  assert.ok(detail?.hints?.some((hint) => hint.includes('不支持按会话 ID 杀')))
+  assert.equal(detail?.hints?.some((hint) => hint.includes(MONGO_KILL_HINT.split('。')[0])), true)
+  const client = readFileSync(join(dir, '../../src/client.js'), 'utf8')
+  assert.match(client, /创建中断任务/)
+  assert.match(client, /可能中断该实例上多条匹配会话/)
+  assert.match(client, /不只针对某一条 sessionId/)
+  assert.match(client, /canKillSession/)
+  assert.match(client, /item\.hasReport/)
+  assert.match(client, /sessionId: row\.sessionId/)
+  assert.doesNotMatch(client, /function hasReportTab/)
+  assert.doesNotMatch(client, /sessionId: row\.sessionId,\s*host:/)
+})
+
+test('MariaDB/TDSQL/self-built MySQL refuse Kill and never send Product=mysql (g2.2 g4.1)', async () => {
+  for (const product of ['mariadb', 'dcdb', 'dbbrain-mysql']) {
+    const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
+    const module = createDbbrainModule((async (action: string, payload: unknown) => {
+      calls.push({ action, payload: payload as Record<string, unknown> })
+      return {}
+    }) as never)
+    const killed = await module.execute?.('session.kill', {
+      sessionId: '1',
+      product,
+      region: 'ap-shanghai',
+      instanceId: 'inst-1',
+    }, ctx({ id: `tencent.dbbrain:${product}:ap-shanghai:inst-1` }))
+    assert.equal(killed?.ok, false, product)
+    assert.equal(killed?.error, KILL_UNSUPPORTED, product)
+    assert.equal(calls.length, 0, product)
+    assert.equal(supportsThreadKill(product), false, product)
+    const detail = await module.detail?.(ctx({
+      id: `tencent.dbbrain:${product}:ap-shanghai:inst-1`,
+      title: product,
+      filters: { tab: 'session', product, region: 'ap-shanghai' },
+    }))
+    assert.ok(detail?.hints?.some((hint) => hint.includes(KILL_UNSUPPORTED)), product)
+  }
+  assert.equal(supportsThreadKill('mysql'), true)
+  assert.equal(supportsThreadKill('cynosdb'), true)
+  assert.equal(supportsThreadKill('mongodb'), false)
+  assert.equal(hasReportTab('postgres'), true)
+  assert.equal(mapInstanceItem({ InstanceId: 'crs-1', Region: 'ap-shanghai' }, 'redis').hasReport, false)
+  assert.equal(mapInstanceItem({ InstanceId: 'cmgo-1', Region: 'ap-beijing' }, 'mongodb').hasReport, false)
 })
 
 test('history diagnosis clamps 3d window to two days (g2.1 g4.1)', async () => {

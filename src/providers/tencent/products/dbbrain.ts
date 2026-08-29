@@ -56,6 +56,10 @@ const MYSQL_FULL = new Set(['mysql', 'cynosdb'])
 const MYSQL_CORE = new Set(['mariadb', 'dcdb', 'dbbrain-mysql'])
 const MYSQL_LIKE = new Set(['mysql', 'cynosdb', 'mariadb', 'dcdb', 'dbbrain-mysql'])
 const AUTONOMY_PRODUCTS = new Set(['redis'])
+/** KillMySqlThreads public Product matrix: mysql / cynosdb only. */
+export const THREAD_KILL_PRODUCTS = new Set(['mysql', 'cynosdb'])
+export const KILL_UNSUPPORTED = '当前产品线不支持 Kill 会话'
+export const MONGO_KILL_HINT = '请在卡片内创建中断任务，不支持按会话 ID 杀。中断任务可能同时中断多条匹配会话。'
 
 const ACTIONS: ResourceAction[] = [
   { id: 'session.kill', label: 'Kill 会话', confirm: 'always' },
@@ -163,6 +167,7 @@ export function mapInstanceItem(item: InstanceInfo, product: string, moduleId = 
     region,
     product: prod,
     openLabel: '诊断优化',
+    hasReport: hasReportTab(prod),
     columns: [
       { label: '状态', value: mapped.label },
       { label: '健康分', value: score },
@@ -221,6 +226,18 @@ export function tabsForProduct(product: string): DetailTab[] {
 
 export function hasReportTab(product: string): boolean {
   return tabsForProduct(product).some((tab) => tab.id === 'report')
+}
+
+export function supportsThreadKill(product: string): boolean {
+  return THREAD_KILL_PRODUCTS.has(normalizeProduct(product))
+}
+
+function optionalInt(raw: unknown): number | undefined {
+  const text = String(raw ?? '').trim()
+  if (!text) return undefined
+  const value = Number(text)
+  if (!Number.isInteger(value)) return undefined
+  return value
 }
 
 export function defaultRangeForTab(tab: string, subTab?: string): string {
@@ -490,25 +507,36 @@ export function createDbbrainModule(call: DbbrainCaller = dbbrainCall): Resource
         if (!instanceId) return { ok: false, error: '缺少实例' }
         const base = { InstanceId: instanceId, Product: product }
         if (actionId === 'session.kill') {
-          const sessionId = String(payload.sessionId || payload.SessionId || '').trim()
-          if (!sessionId) return { ok: false, error: '缺少会话' }
           if (product === 'mongodb') {
-            const host = String(payload.host || payload.Host || '').trim()
+            const duration = optionalInt(payload.duration ?? payload.Duration)
+            if (duration == null || duration === 0 || duration < -1) {
+              return { ok: false, error: '缺少 Duration（任务持续秒数，-1 手动关闭）' }
+            }
             const mongoPayload: Record<string, unknown> = {
               InstanceId: instanceId,
               Product: 'mongodb',
-              Duration: 10,
+              Duration: duration,
             }
+            const host = String(payload.host || payload.Host || '').trim()
+            const type = String(payload.type || payload.Type || '').trim()
+            const db = String(payload.db || payload.DB || '').trim()
+            const time = optionalInt(payload.time ?? payload.Time)
             if (host) mongoPayload.Host = host
+            if (type) mongoPayload.Type = type
+            if (db) mongoPayload.DB = db
+            if (time != null && time > 0) mongoPayload.Time = time
             await call('CreateMongoDBKillTask', mongoPayload, creds(ctx), callOpts(ctx, region))
             return { ok: true }
           }
+          if (!supportsThreadKill(product)) {
+            return { ok: false, error: KILL_UNSUPPORTED }
+          }
+          const sessionId = String(payload.sessionId || payload.SessionId || '').trim()
           const threadId = Number(sessionId)
-          if (!Number.isInteger(threadId) || threadId <= 0) return { ok: false, error: '缺少会话' }
-          const killProduct = product === 'cynosdb' ? 'cynosdb' : 'mysql'
+          if (!sessionId || !Number.isInteger(threadId) || threadId <= 0) return { ok: false, error: '缺少会话' }
           const prepared = await call<{ SqlExecId?: string }>(
             'KillMySqlThreads',
-            { InstanceId: instanceId, Product: killProduct, Stage: 'Prepare', Threads: [threadId] },
+            { InstanceId: instanceId, Product: product, Stage: 'Prepare', Threads: [threadId] },
             creds(ctx),
             callOpts(ctx, region),
           )
@@ -516,7 +544,7 @@ export function createDbbrainModule(call: DbbrainCaller = dbbrainCall): Resource
           if (!sqlExecId) return { ok: false, error: 'Kill 预提交未返回执行凭证' }
           await call(
             'KillMySqlThreads',
-            { InstanceId: instanceId, Product: killProduct, Stage: 'Commit', SqlExecId: sqlExecId },
+            { InstanceId: instanceId, Product: product, Stage: 'Commit', SqlExecId: sqlExecId },
             creds(ctx),
             callOpts(ctx, region),
           )
@@ -728,10 +756,17 @@ async function loadSession(
     const hint = looksUnsupported(data.error)
       ? unsupportedHint(product, '实时会话')
       : data.error
+    if (product === 'mongodb') {
+      return {
+        hints: [hint, MONGO_KILL_HINT],
+        tables: [table('sessions', '实时会话', ['会话ID', '用户', '耗时'], [], hint)],
+        form: mongoKillTaskForm(),
+      }
+    }
     return {
-      subTabs: product === 'mongodb' ? undefined : SESSION_SUBTABS,
+      subTabs: SESSION_SUBTABS,
       activeSubTab: subTab,
-      hints: [hint],
+      hints: supportsThreadKill(product) ? [hint] : [hint, `${KILL_UNSUPPORTED}。KillMySqlThreads 仅支持 MySQL / TDSQL-C。`],
       tables: [table('sessions', '实时会话', ['会话ID', '用户', '耗时'], [], hint)],
     }
   }
@@ -760,11 +795,42 @@ async function loadSession(
   if (subTab === 'user') tables.push(table('session-user', '用户统计', ['用户', '数量'], userRows.length ? userRows : summarize(rows, '用户')))
   else if (subTab === 'host') tables.push(table('session-host', '来源统计', ['来源', '数量'], hostRows.length ? hostRows : summarize(rows, '来源')))
   else tables.push(table('sessions', '会话列表', ['会话ID', '用户', '来源', '库', '状态', '耗时', 'SQL'], rows))
+  if (product === 'mongodb') {
+    return {
+      tables,
+      form: mongoKillTaskForm(),
+      hints: [MONGO_KILL_HINT],
+    }
+  }
+  if (!supportsThreadKill(product)) {
+    return {
+      subTabs: SESSION_SUBTABS,
+      activeSubTab: subTab,
+      tables,
+      hints: [`${KILL_UNSUPPORTED}。KillMySqlThreads 仅支持 MySQL / TDSQL-C。`],
+    }
+  }
   return {
-    subTabs: product === 'mongodb' ? undefined : SESSION_SUBTABS,
+    subTabs: SESSION_SUBTABS,
     activeSubTab: subTab,
     tables,
     hints: ['Kill 使用对话确认弹层，始终二次确认。'],
+  }
+}
+
+function mongoKillTaskForm(): ResourceDetail['form'] {
+  return {
+    id: 'mongo-kill-task',
+    title: '创建中断任务',
+    submitLabel: '创建中断任务',
+    action: 'session.kill',
+    fields: [
+      { key: 'duration', label: '持续时间（秒）', placeholder: '必填，-1 表示手动关闭' },
+      { key: 'time', label: '会话时长过滤（秒）', placeholder: '可选，只中断超过该时长的会话' },
+      { key: 'host', label: '客户端 Host', placeholder: '可选' },
+      { key: 'type', label: 'Type', placeholder: '可选' },
+    ],
+    values: { duration: '10', time: '', host: '', type: '' },
   }
 }
 

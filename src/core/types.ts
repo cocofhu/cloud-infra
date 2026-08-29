@@ -34,6 +34,8 @@ export interface ResourceCard {
   expiresAt?: string
   region?: string
   product?: string
+  /** Server-computed from module tabs; list health-score jump must not hardcode products. */
+  hasReport?: boolean
 }
 
 export interface DnsRecord {

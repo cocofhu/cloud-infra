@@ -48,7 +48,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 - 域名：点击域名或「解析」配置解析记录
 - DBbrain：`kind=dbbrain`，点击实例名 / 告警 /「诊断优化」进入异常诊断；有健康报告页的产品线可点健康分进入健康报告，Redis / MongoDB 没有该页则不跳转。筛选和详情都留在这张对话卡片里
-- Kill 会话：MySQL / TDSQL-C 按官方两阶段 `Prepare(Threads)` → `Commit(SqlExecId)`；MongoDB 走 `CreateMongoDBKillTask`。生成健康报告不发送邮件（`SendMailFlag=0`）
+- Kill 会话：仅 MySQL / TDSQL-C 支持按会话 ID 两阶段 `Prepare(Threads)` → `Commit(SqlExecId)`。MariaDB / TDSQL / 自建 MySQL 不展示行上 Kill。MongoDB 在卡片内「创建中断任务」（`Duration` 必填，`Time`/`Host`/`Type` 可选），不按 sessionId 杀，可能同时中断多条会话。生成健康报告不发送邮件（`SendMailFlag=0`）
 
 地域约定：
 

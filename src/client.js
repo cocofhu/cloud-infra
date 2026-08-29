@@ -727,8 +727,8 @@ window.__ModuleLoader__.load({
       ["eu-frankfurt", "法兰克福"],
     ];
 
-    function hasReportTab(product) {
-      return product !== "redis" && product !== "mongodb";
+    function canKillSession(product) {
+      return product === "mysql" || product === "cynosdb";
     }
 
     function instanceIdentity(item) {
@@ -768,9 +768,9 @@ window.__ModuleLoader__.load({
           h("div", { className: "ci-cell" }, h("button", {
             type: "button",
             className: "ci-score",
-            disabled: pendingId === item.id || !hasReportTab(item.product),
-            title: hasReportTab(item.product) ? "打开健康报告" : "当前产品线没有健康报告页",
-            onClick: () => hasReportTab(item.product) && onOpen(item, "report"),
+            disabled: pendingId === item.id || !item.hasReport,
+            title: item.hasReport ? "打开健康报告" : "当前产品线没有健康报告页",
+            onClick: () => item.hasReport && onOpen(item, "report"),
           }, cellValue(item, "健康分") || "-")),
           h("div", { className: "ci-cell num" }, h("button", {
             type: "button",
@@ -809,12 +809,14 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState("");
       const [sqlDraft, setSqlDraft] = useState("");
+      const [formDraft, setFormDraft] = useState({});
       const [customStart, setCustomStart] = useState("");
       const [customEnd, setCustomEnd] = useState("");
       useEffect(() => {
         setSqlDraft(detail?.form?.values?.sql || "");
+        setFormDraft(detail?.form?.values || {});
         setErr("");
-      }, [item.id, detail?.activeTab, detail?.form?.values?.sql]);
+      }, [item.id, detail?.activeTab, detail?.form?.id, detail?.form?.values?.sql]);
       const filtersOf = (extra) => ({
         product: ident.product,
         region: ident.region,
@@ -858,14 +860,14 @@ window.__ModuleLoader__.load({
       };
       const rowActions = (table, row) => {
         const nodes = [];
-        if (table.id === "sessions" && row.sessionId) {
+        if (table.id === "sessions" && row.sessionId && canKillSession(ident.product)) {
           nodes.push(h("button", {
             key: "kill",
             type: "button",
             className: "ci-link danger",
             onClick: () => request(
               { id: "session.kill", label: "Kill 会话", confirm: "always" },
-              { sessionId: row.sessionId, host: row.host || row.来源 || "" },
+              { sessionId: row.sessionId },
               `确定 Kill 会话 ${row.sessionId}？此操作不可撤销。`,
             ),
           }, "Kill"));
@@ -941,15 +943,35 @@ window.__ModuleLoader__.load({
               h("label", null, field.label),
               h(field.kind === "textarea" ? "textarea" : "input", {
                 placeholder: field.placeholder || "",
-                value: field.key === "sql" ? sqlDraft : (detail.form.values?.[field.key] || ""),
-                onChange: (e) => { if (field.key === "sql") setSqlDraft(e.target.value); },
+                value: field.key === "sql" ? sqlDraft : (formDraft[field.key] || ""),
+                onChange: (e) => {
+                  const next = e.target.value;
+                  if (field.key === "sql") setSqlDraft(next);
+                  setFormDraft((prev) => ({ ...prev, [field.key]: next }));
+                },
               }),
             )),
             h("button", {
               type: "button",
               className: "ci-mini primary",
               disabled: busy,
-              onClick: () => onReload(filtersOf({ sql: sqlDraft })),
+              onClick: () => {
+                if (detail.form.action === "session.kill") {
+                  const duration = String(formDraft.duration || "").trim();
+                  request(
+                    { id: "session.kill", label: "创建中断任务", confirm: "always" },
+                    {
+                      duration,
+                      time: String(formDraft.time || "").trim(),
+                      host: String(formDraft.host || "").trim(),
+                      type: String(formDraft.type || "").trim(),
+                    },
+                    `将创建中断任务，持续时间 ${duration || "?"} 秒，可能中断该实例上多条匹配会话，不只针对某一条 sessionId。此操作不可撤销。`,
+                  );
+                  return;
+                }
+                onReload(filtersOf({ sql: sqlDraft }));
+              },
             }, detail.form.submitLabel || "分析"),
           ) : null,
           detail.activeTab === "report" ? h("div", { key: "rpt", className: "ci-sec" },
