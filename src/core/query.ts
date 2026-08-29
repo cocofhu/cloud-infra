@@ -271,7 +271,9 @@ export function renderQuery(result: QueryResult): string {
   const cdb = result.kind === 'cdb' || result.items.some((item) => item.kind === 'cdb')
   const instance = result.kind === 'cvm' || result.kind === 'lighthouse'
     || result.items.some((item) => item.kind === 'cvm' || item.kind === 'lighthouse')
-  const hint = result.kind === 'cos'
+  const hint = result.kind === 'dbbrain'
+    ? '用一两句话概括即可，请用户在对话卡片里点击「诊断优化」或实例名称，不要离开对话。不要打印密钥。'
+    : result.kind === 'cos'
     ? '用一两句话概括即可，请用户点击存储桶名称进入文件列表。不要打印密钥或签名 URL。'
     : result.kind === 'cert'
       ? '用一两句话概括即可，请用户点击证书 ID 或绑定域名查看完整详情。不要打印密钥或证书正文。'

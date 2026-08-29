@@ -16,8 +16,15 @@ import {
   resourceKeyword,
   TCR_REGIONS,
 } from '../providers/tencent/products/image.js'
+import type { ResourceTable } from '../core/types.js'
 
 const dir = dirname(fileURLToPath(import.meta.url))
+
+function resourceTable(detail: { tables?: unknown[] } | null | undefined, index = 0): ResourceTable | undefined {
+  const tables = detail?.tables
+  if (!Array.isArray(tables)) return undefined
+  return tables[index] as ResourceTable | undefined
+}
 const fixture = (name: string) => JSON.parse(readFileSync(join(dir, 'fixtures', name), 'utf8')) as Record<string, unknown>
 
 function ctx(extra: Record<string, unknown> = {}) {
@@ -168,7 +175,7 @@ test('g2.3 repo table maps created/updated/tag count and hasMore when TotalCount
     region: 'ap-guangzhou',
     view: 'repos',
   }))
-  const table = repos?.tables?.[0]
+  const table = resourceTable(repos)
   assert.equal(table?.rows[0].cells.created, '2024-01-02')
   assert.equal(table?.rows[0].cells.updated, '2024-06-01')
   assert.equal(table?.rows[0].cells.tags, '3')
@@ -196,17 +203,17 @@ test('g2.3 namespaces repos and version search stay in current instance', async 
     region: 'ap-guangzhou',
     view: 'namespaces',
   }))
-  assert.equal(ns?.tables?.[0].rows.some((row) => row.cells.name === 'team-01'), true)
+  assert.equal(resourceTable(ns)?.rows.some((row) => row.cells.name === 'team-01'), true)
   const repos = await module.detail?.(ctx({
     id: `tencent.image:${PERSONAL_INSTANCE_ID}`,
     region: 'ap-guangzhou',
     view: 'repos',
     query: 'nginx',
   }))
-  assert.equal(repos?.tables?.[0].rows.length, 1)
-  assert.equal(repos?.tables?.[0].rows[0].cells.name, 'team-01/nginx')
-  assert.equal(repos?.tables?.[0].rows[0].cells.created, '2024-01-02')
-  assert.equal(repos?.tables?.[0].rows[0].cells.tags, '3')
+  assert.equal(resourceTable(repos)?.rows.length, 1)
+  assert.equal(resourceTable(repos)?.rows[0].cells.name, 'team-01/nginx')
+  assert.equal(resourceTable(repos)?.rows[0].cells.created, '2024-01-02')
+  assert.equal(resourceTable(repos)?.rows[0].cells.tags, '3')
   const tags = await module.detail?.(ctx({
     id: `tencent.image:${PERSONAL_INSTANCE_ID}`,
     region: 'ap-guangzhou',
@@ -215,15 +222,15 @@ test('g2.3 namespaces repos and version search stay in current instance', async 
     repository: 'nginx',
     query: '1.2',
   }))
-  assert.equal(tags?.tables?.[0].rows.length, 1)
-  assert.equal(tags?.tables?.[0].rows[0].cells.version, '1.2.0')
-  assert.match(String(tags?.tables?.[0].rows[0].cells.size), /MB/)
+  assert.equal(resourceTable(tags)?.rows.length, 1)
+  assert.equal(resourceTable(tags)?.rows[0].cells.version, '1.2.0')
+  assert.match(String(resourceTable(tags)?.rows[0].cells.size), /MB/)
   const ent = await module.detail?.(ctx({
     id: 'tencent.image:tcr-sh',
     region: 'ap-shanghai',
     view: 'repos',
   }))
-  assert.equal(ent?.tables?.[0].rows[0].cells.name, 'pay/api')
+  assert.equal(resourceTable(ent)?.rows[0].cells.name, 'pay/api')
   assert.equal(calls.find((row) => row.action === 'DescribeRepositories')?.region, 'ap-shanghai')
   assert.equal(formatSize(10485760), '10 MB')
 })
