@@ -12,7 +12,27 @@ export interface TencentCallOptions {
   signal?: AbortSignal
   timestamp?: number
   fetchImpl?: typeof fetch
+  region?: string
 }
+
+export interface TencentCreds {
+  secretId: string
+  secretKey: string
+}
+
+export interface TencentCallContext {
+  timeoutMs: number
+  signal?: AbortSignal
+  fetchImpl?: typeof fetch
+  region?: string
+}
+
+export type TencentProductCall = <T = unknown>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+) => Promise<T>
 
 export class TencentApiError extends Error {
   constructor(
@@ -36,6 +56,7 @@ export async function callTencentApi<T = unknown>(options: TencentCallOptions): 
     payload,
     timestamp,
     version: options.version,
+    region: options.region,
   })
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), options.timeoutMs)
@@ -73,8 +94,8 @@ export async function callTencentApi<T = unknown>(options: TencentCallOptions): 
 export function dnspodCall<T>(
   action: string,
   payload: unknown,
-  creds: { secretId: string; secretKey: string },
-  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch },
+  creds: TencentCreds,
+  opts: TencentCallContext,
 ): Promise<T> {
   return callTencentApi<T>({
     service: 'dnspod',
@@ -94,8 +115,8 @@ export function dnspodCall<T>(
 export function domainCall<T>(
   action: string,
   payload: unknown,
-  creds: { secretId: string; secretKey: string },
-  opts: { timeoutMs: number; signal?: AbortSignal; fetchImpl?: typeof fetch },
+  creds: TencentCreds,
+  opts: TencentCallContext,
 ): Promise<T> {
   return callTencentApi<T>({
     service: 'domain',
@@ -103,6 +124,48 @@ export function domainCall<T>(
     version: '2018-08-08',
     action,
     payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+  })
+}
+
+export function lighthouseCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'lighthouse',
+    host: 'lighthouse.tencentcloudapi.com',
+    version: '2020-03-24',
+    action,
+    payload,
+    region: opts.region,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+  })
+}
+
+export function cvmCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'cvm',
+    host: 'cvm.tencentcloudapi.com',
+    version: '2017-03-12',
+    action,
+    payload,
+    region: opts.region,
     secretId: creds.secretId,
     secretKey: creds.secretKey,
     timeoutMs: opts.timeoutMs,

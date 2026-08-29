@@ -28,10 +28,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates / domain registration as a console-style chat tool card. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/注册/可注册/能不能注册/买域名/我的域名. Pass kind=domain for DNS 解析; kind=registrar to check if a name can be registered; kind=my-domain for purchased domains. After the card appears, the user searches and 立即加购 inside the card — do not send them to settings or a standalone page. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / domain registration / CVM / Lighthouse as a console-style chat tool card. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/注册/可注册/能不能注册/买域名/我的域名/云服务器/轻量/CVM/实例. Pass kind=domain for DNS 解析 (default). Pass kind=registrar to check if a name can be registered; kind=my-domain for purchased domains. Pass kind=cvm for 云服务器, kind=lighthouse for 轻量应用服务器, kind=auto to query every enabled module. After the card appears, the user searches and 立即加购 inside the card — do not send them to settings or a standalone page. For 「查一下我的服务器」use kind=cvm, kind=lighthouse or kind=auto — never kind=domain. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example or example.com. Empty lists all purchased domains, or waits for in-card search on registrar.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, registrar, my-domain, or auto.' },
+      query: { type: 'string', description: 'Keyword such as example.com, instance name, ins-/lhins- ID, or IP. Empty lists all purchased domains, or waits for in-card search on registrar.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, registrar, my-domain, lighthouse, cvm, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
       offset: { type: 'number', description: 'Skip this many already-shown rows when the user wants more in chat.' },
@@ -76,12 +76,13 @@ export function apply(ctx: Context, config: Config): void {
       text: () => {
         const modules = implementedModules(cfg)
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
-        const kinds = supportedKinds().join(', ') || 'domain'
+        const kinds = [...new Set([...supportedKinds(), 'auto'])].join(', ') || 'domain, auto'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书 / 注册 / 可注册 / 我的域名: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / 注册 / 可注册 / 我的域名 / 云服务器 / 轻量 / CVM / 实例: call ONLY cloud_infra_query. Never web_search.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Default kind is domain.`,
           'kind=registrar for 注册/能不能注册; kind=my-domain for 我的域名; kind=domain for DNS 解析.',
           'The result is a chat tool card. Users search and 立即加购 inside the card. Do not send them to settings or a standalone page.',
+          'For 服务器/实例/CVM/轻量, use kind=cvm, kind=lighthouse, or kind=auto. Do not query domains when the user asks for 服务器.',
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
           'After the table appears, one or two short sentences. Do not print secrets or full record dumps.',
         ].join(' ')
@@ -171,6 +172,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         provider: String(body.provider || ''),
         limit: body.limit as number | undefined,
         offset: body.offset as number | undefined,
+        region: body.region ? String(body.region) : undefined,
       }, cfg)
       return sendJson(res, 200, { ok: true, ...result })
     }
