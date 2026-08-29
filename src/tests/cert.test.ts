@@ -7,10 +7,15 @@ import {
   buildCertSections,
   canDeleteDirectly,
   canRenew,
+  candidateZones,
+  checkDnspodHosted,
   chainSummary,
   createCertModule,
+  DNSPOD_AUTO_DNS_HINT,
+  isDomainVerificationPassed,
   isFreeDomainValid,
   mapCertItem,
+  needsCancelBeforeDelete,
   normalizeHostInstances,
   parseCertRef,
   stripPem,
@@ -225,6 +230,115 @@ test('normalizeHostInstances prefers checkbox keys over empty ids', () => {
   const rows = normalizeHostInstances('cdn', { InstanceList: [{ Domain: 'a.com', InstanceName: 'cdn' }] })
   assert.equal(rows[0].instanceId, 'a.com|off')
   assert.equal(rows[0].matched, true)
+})
+
+test('candidateZones and DNS_AUTO reject domains not on DNSPod', async () => {
+  assert.deepEqual(candidateZones('www.example.com'), ['www.example.com', 'example.com'])
+  assert.deepEqual(candidateZones('example.com'), ['example.com'])
+  const missing = await checkDnspodHosted(
+    (async () => { throw new Error('域名不存在') }) as never,
+    'www.example.com',
+    { secretId: 'id', secretKey: 'key' },
+    { timeoutMs: 1000 },
+  )
+  assert.equal(missing, false)
+  const hosted = await checkDnspodHosted(
+    (async () => ({ DomainInfo: { Name: 'example.com' } })) as never,
+    'www.example.com',
+    { secretId: 'id', secretKey: 'key' },
+    { timeoutMs: 1000 },
+  )
+  assert.equal(hosted, true)
+
+  const ssl: string[] = []
+  const sslStub = (async (action: string) => {
+    ssl.push(action)
+    return { CertificateId: 'X' }
+  }) as never
+  const dnsMissing = (async () => {
+    throw new Error('域名不存在')
+  }) as never
+  const applyBlocked = await createCertModule(sslStub, dnsMissing).execute?.('cert.apply', {
+    domain: 'www.example.com',
+    verifyType: 'DNS_AUTO',
+  }, ctx)
+  assert.equal(applyBlocked?.ok, false)
+  if (!applyBlocked?.ok) assert.equal(applyBlocked.error, DNSPOD_AUTO_DNS_HINT)
+  assert.ok(!ssl.includes('ApplyCertificate'))
+
+  const sslOk = (async () => ({ CertificateId: 'NEWauto' })) as never
+  const dnsOk = (async () => ({})) as never
+  const applyOk = await createCertModule(sslOk, dnsOk).execute?.('cert.apply', {
+    domain: 'www.example.com',
+    verifyType: 'DNS_AUTO',
+  }, ctx)
+  assert.equal(applyOk?.ok, true)
+})
+
+test('delete of applying cert requires cancel; verify completes manual DNS', async () => {
+  assert.equal(needsCancelBeforeDelete(0), true)
+  assert.equal(needsCancelBeforeDelete(1), false)
+  const deleteCalls: string[] = []
+  const deleteStub = (async (action: string) => {
+    deleteCalls.push(action)
+    if (action === 'DescribeCertificate') return { CertificateId: 'AP1pend', Status: 0 }
+    throw new Error('should not ' + action)
+  }) as never
+  const blocked = await createCertModule(deleteStub).execute?.('cert.delete', { certificateId: 'AP1pend' }, { ...ctx, id: 'tencent.cert:AP1pend' })
+  assert.equal(blocked?.ok, false)
+  if (!blocked?.ok) assert.match(blocked.error, /取消审核/)
+  assert.ok(!deleteCalls.includes('DeleteCertificate'))
+
+  const verifyCalls: string[] = []
+  const verifyStub = (async (action: string) => {
+    verifyCalls.push(action)
+    if (action === 'CheckCertificateDomainVerification') {
+      return { VerificationResults: [{ Domain: 'pending.example.com', Status: 1, StatusName: '通过' }] }
+    }
+    return {}
+  }) as never
+  const module = createCertModule(verifyStub)
+  const manual = await module.execute?.('cert.verify', {
+    certificateId: 'AP1pend',
+    verifyType: 'DNS',
+    completeIfManual: true,
+  }, { ...ctx, id: 'tencent.cert:AP1pend' })
+  assert.equal(manual?.ok, true)
+  if (manual?.ok) {
+    assert.equal(manual.data?.passed, true)
+    assert.equal(manual.data?.completed, true)
+  }
+  assert.ok(verifyCalls.includes('CompleteCertificate'))
+  verifyCalls.length = 0
+  const auto = await module.execute?.('cert.verify', {
+    certificateId: 'AP1pend',
+    verifyType: 'DNS_AUTO',
+    completeIfManual: true,
+  }, { ...ctx, id: 'tencent.cert:AP1pend' })
+  assert.equal(auto?.ok, true)
+  if (auto?.ok) assert.equal(auto.data?.completed, false)
+  assert.ok(!verifyCalls.includes('CompleteCertificate'))
+  assert.equal(isDomainVerificationPassed({ VerificationResults: [{ Status: 1 }] }), true)
+  assert.equal(isDomainVerificationPassed({ VerificationResults: [{ StatusName: '失败' }] }), false)
+})
+
+test('detail prefers BoundResource and skips 12-way DescribeDeployedResources', async () => {
+  const calls: string[] = []
+  const raw = fixture('cert-detail.json') as CertificatesItem
+  const call = (async (action: string) => {
+    calls.push(action)
+    if (action === 'DescribeCertificateDetail' || action === 'DescribeCertificate') {
+      return { ...raw, BoundResource: ['cdn-www.example.com'] }
+    }
+    throw new Error('unexpected ' + action)
+  }) as never
+  const detail = await createCertModule(call).detail?.({ ...ctx, id: 'tencent.cert:QL8k2m', title: 'QL8k2m' })
+  assert.ok(detail)
+  assert.ok(!calls.includes('DescribeDeployedResources'))
+  const bound = (detail?.sections || []).find((section) => section.id === 'bound')
+  assert.ok(bound?.fields?.some((row) => row.value === 'cdn-www.example.com'))
+  const failed = buildCertSections({ item: raw, bound: [], boundFailed: true })
+  assert.ok(failed.find((section) => section.id === 'bound')?.empty?.includes('可重试'))
 })
 
 test('renderQuery for cert does not guide 解析 or settings', () => {

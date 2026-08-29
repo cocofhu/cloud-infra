@@ -221,6 +221,16 @@ window.__ModuleLoader__.load({
       try { return JSON.parse(raw); } catch { return {}; }
     }
 
+    function isCloudInfraPayload(node) {
+      if (!node || typeof node !== "object" || Array.isArray(node)) return false;
+      if (!Array.isArray(node.items)) return false;
+      if (node.kind === "cloud-infra-query") return true;
+      if (node.resourceKind === "cert" || node.resourceKind === "domain" || node.resourceKind === "auto") return true;
+      if (node.items[0] && node.items[0].moduleId) return true;
+      if (Array.isArray(node.errors) && (node.kind === "cert" || node.kind === "domain" || node.kind === "auto")) return true;
+      return false;
+    }
+
     function pickPayload(props) {
       const found = [];
       const visit = (node, depth) => {
@@ -230,8 +240,7 @@ window.__ModuleLoader__.load({
           for (const x of node) visit(x, depth + 1);
           return;
         }
-        if (node.kind === "cloud-infra-query" && Array.isArray(node.items)) found.push(node);
-        else if (Array.isArray(node.items) && node.items[0] && node.items[0].moduleId) found.push(node);
+        if (isCloudInfraPayload(node)) found.push(node);
         for (const key of ["meta", "presentationMeta", "result", "content", "block", "call", "output"]) {
           if (node[key]) visit(node[key], depth + 1);
         }
@@ -547,11 +556,10 @@ window.__ModuleLoader__.load({
     }
 
     function triggerDownload(filename, content, contentType) {
-      if (!content || /-----BEGIN /i.test(String(content))) {
-        const raw = String(content || "");
-        if (!raw) throw new Error("没有可下载的内容");
-      }
-      const binary = atob(String(content || ""));
+      const raw = String(content || "");
+      if (!raw) throw new Error("没有可下载的内容");
+      if (/-----BEGIN /i.test(raw)) throw new Error("下载内容含 PEM，不支持明文下发，请使用 zip 包下载");
+      const binary = atob(raw);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const blob = new Blob([bytes], { type: contentType || "application/zip" });
@@ -581,8 +589,12 @@ window.__ModuleLoader__.load({
       const status = Number(meta.status);
       const items = [];
       if (status === 1) items.push({ id: "cert.replace", label: "重颁发" }, { id: "cert.revoke", label: "吊销", danger: true });
-      if (meta.cancelable) items.push({ id: "cert.cancel", label: "取消审核" });
-      items.push({ id: "cert.delete", label: "删除", danger: true });
+      if (meta.cancelable) {
+        items.push({ id: "cert.verify", label: "查看验证状态" });
+        items.push({ id: "cert.cancel", label: "取消审核" });
+      } else {
+        items.push({ id: "cert.delete", label: "删除", danger: true });
+      }
       return h("span", { className: "ci-more" },
         h("button", { type: "button", className: "ci-link", onClick: onToggle }, "更多"),
         open ? h("div", { className: "ci-more-menu", role: "menu" },
@@ -596,7 +608,7 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function CertOps({ item, pendingId, moreId, setMoreId, onOpen, onDeploy, onDownload, onMore }) {
+    function CertOps({ item, pendingId, moreId, setMoreId, onDeploy, onDownload, onMore }) {
       const meta = certMeta(item);
       const busy = pendingId === item.id;
       return h("div", { className: "ci-ops" },
@@ -608,7 +620,6 @@ window.__ModuleLoader__.load({
           onToggle: () => setMoreId(moreId === item.id ? "" : item.id),
           onAction: (row) => { setMoreId(""); onMore(item, row); },
         }),
-        h("button", { type: "button", className: "ci-link", disabled: busy, onClick: () => onOpen(item) }, busy ? "加载中" : "详情"),
       );
     }
 
@@ -645,7 +656,7 @@ window.__ModuleLoader__.load({
               meta.renewable ? h("button", { type: "button", className: "ci-link ci-renew", onClick: () => onMore(item, { id: "cert.renew", label: "快速续期" }) }, "快速续期") : null,
             ),
             h("div", { className: "ci-cell" }, meta.validTo || certCol(item, "有效期") || "—"),
-            h("div", { className: "ci-cell" }, h(CertOps, { item, pendingId, moreId, setMoreId, onOpen, onDeploy, onDownload, onMore })),
+            h("div", { className: "ci-cell" }, h(CertOps, { item, pendingId, moreId, setMoreId, onDeploy, onDownload, onMore })),
           );
         }),
       );
@@ -659,7 +670,7 @@ window.__ModuleLoader__.load({
       bound: "关联云资源",
     };
 
-    function CertSection({ section }) {
+    function CertSection({ section, onRetry }) {
       const fields = section.fields || [];
       const rows = section.rows || [];
       const empty = !fields.length && !rows.length;
@@ -667,7 +678,11 @@ window.__ModuleLoader__.load({
       return [
         h("div", { key: section.id + "-t", className: "ci-sec" }, h("span", { className: "ci-sec-t" }, title)),
         empty
-          ? h("div", { key: section.id + "-e", className: "ci-dl" }, h("span", null, ""), h("b", null, section.empty || "暂无"))
+          ? h("div", { key: section.id + "-e", className: "ci-dl" },
+            h("span", null, ""),
+            h("b", null, section.empty || "暂无"),
+            onRetry ? h("button", { type: "button", className: "ci-link", onClick: onRetry }, "重试") : null,
+          )
           : h("div", { key: section.id + "-d", className: "ci-dl" },
             fields.flatMap((row) => [h("span", { key: section.id + row.label }, row.label), h("b", { key: section.id + row.label + "v" }, row.value || "—")]),
             rows.flatMap((row, idx) => [h("span", { key: section.id + "r" + idx }, row.label), h("b", { key: section.id + "rv" + idx }, row.value || "—")]),
@@ -716,6 +731,35 @@ window.__ModuleLoader__.load({
           h("div", { className: "ci-modal-actions" },
             h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "取消"),
             h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: () => onSubmit(draft) }, busy ? "提交中" : "下一步：验证域名"),
+          ),
+        ),
+      ), document.body);
+    }
+
+    function VerifyCertDialog({ item, verifyType, busy, err, status, onCancel, onCheck, onComplete, onOpenDetail }) {
+      const auto = String(verifyType || "").toUpperCase() === "DNS_AUTO";
+      const box = useOverlayKeys(true, busy, onCancel, false);
+      return createPortal(h("div", {
+        className: "ci-modal-mask",
+        role: "presentation",
+        onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
+      },
+        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+          h("h3", null, "验证域名"),
+          h("p", null, auto
+            ? "已提交自动 DNS。请确认域名在 DNSPod 托管；可查看验证状态，签发后即可部署。"
+            : "请按详情中的主机记录或文件完成验证，然后查看验证状态。校验通过后将提交完成审核。"),
+          status ? h("p", { className: "ci-hint" }, status) : null,
+          err ? h("p", { className: "ci-err", style: { margin: "0 0 8px" } }, err) : null,
+          h("div", { className: "ci-modal-actions" },
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onCancel }, "关闭"),
+            h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: () => onOpenDetail(item) }, "查看详情"),
+            h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: onCheck }, busy ? "检查中" : "查看验证状态"),
+            !auto ? h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: onComplete }, "完成审核") : null,
+          ),
+        ),
+      ), document.body);
+    }
           ),
         ),
       ), document.body);
@@ -864,7 +908,12 @@ window.__ModuleLoader__.load({
       const [confirm, setConfirm] = useState(null);
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState("");
+      const [verifyMsg, setVerifyMsg] = useState("");
       const sections = (detail && detail.sections) || [];
+      const meta = (detail && detail.card && detail.card.meta) || certMeta(item);
+      const applying = !!meta.cancelable;
+      const verifyType = String(meta.verifyType || "");
+      const autoDns = verifyType.toUpperCase() === "DNS_AUTO";
       const run = async (action, payload) => {
         setBusy(true);
         setErr("");
@@ -880,16 +929,17 @@ window.__ModuleLoader__.load({
           setBusy(false);
         }
       };
-      const request = async (action, payload, text) => {
-        let skip = skipConfirm;
+      const checkVerify = async () => {
         try {
-          const d = await api("meta", {});
-          skip = !!d.skipConfirm;
-          if (onSkipConfirm) onSkipConfirm(skip);
-        } catch { /* keep */ }
-        const must = action.confirm === "always" || (action.confirm === "default" && !skip);
-        if (!must) return run(action, payload);
-        setConfirm({ action, payload, text, danger: action.confirm === "always" });
+          const result = await run({ id: "cert.verify", label: "查看验证状态", confirm: "default" }, {
+            verifyType,
+            completeIfManual: true,
+          });
+          const data = (result && result.data) || {};
+          if (data.completed) setVerifyMsg("验证已通过，已提交完成审核。");
+          else if (data.passed) setVerifyMsg("域名验证已通过，等待签发。");
+          else setVerifyMsg("尚未通过验证，请确认 DNS/文件记录后重试。");
+        } catch { /* run already setErr */ }
       };
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
@@ -901,8 +951,28 @@ window.__ModuleLoader__.load({
         !loading && detail ? [
           err ? h("p", { key: "err", className: "ci-err" }, err) : null,
           sections.length
-            ? sections.map((section) => h(CertSection, { key: section.id, section }))
+            ? sections.map((section) => h(CertSection, {
+              key: section.id,
+              section,
+              onRetry: section.id === "bound" ? onReload : undefined,
+            }))
             : h("div", { key: "empty", className: "ci-empty" }, "没有详情字段"),
+          applying ? h("div", { key: "va", className: "ci-actions", style: { padding: "4px 14px 8px" } },
+            h("button", {
+              type: "button",
+              className: "ci-mini primary",
+              disabled: busy || loading,
+              onClick: checkVerify,
+            }, busy ? "检查中" : "查看验证状态"),
+            !autoDns ? h("button", {
+              type: "button",
+              className: "ci-mini",
+              disabled: busy || loading,
+              onClick: () => run({ id: "cert.complete", label: "完成审核", confirm: "default" }, {}),
+            }, "完成审核") : null,
+          ) : null,
+          applying && autoDns ? h("p", { key: "auto-hint", className: "ci-hint", style: { padding: "0 14px 8px" } }, "自动 DNS 将等待签发，无需手动完成审核。") : null,
+          verifyMsg ? h("p", { key: "vmsg", className: "ci-hint", style: { padding: "0 14px 10px" } }, verifyMsg) : null,
         ] : null,
         h(ConfirmDialog, {
           key: "confirm",
@@ -1078,7 +1148,10 @@ window.__ModuleLoader__.load({
       const args = parseToolArgs(props);
       const fromTool = Array.isArray(payload?.items) ? payload.items : null;
       const running = !!(props?.block && !("kind" in props.block));
-      const kind = payload?.kind || args.kind || "domain";
+      const kind = payload?.resourceKind
+        || (payload?.kind && payload.kind !== "cloud-infra-query" ? payload.kind : "")
+        || args.kind
+        || "domain";
       const provider = String(args.provider || "");
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");
@@ -1230,6 +1303,9 @@ window.__ModuleLoader__.load({
         if (row.id === "cert.replace") return askConfirm(item, row, "确定重颁发该证书？");
         if (row.id === "cert.cancel") return askConfirm(item, row, "确定取消审核？取消后可删除该申请。");
         if (row.id === "cert.renew") return askConfirm(item, row, "确定对免费证书执行快速续期？");
+        if (row.id === "cert.verify") {
+          return setWizard({ type: "verify", item, verifyType: certMeta(item).verifyType, status: "" });
+        }
         setWizard({ type: row.id, item });
       };
       const onDownload = async (item) => {
@@ -1245,8 +1321,9 @@ window.__ModuleLoader__.load({
       };
       if (running) return null;
       const errors = payload?.errors || [];
-      if (!fromTool?.length && !rows.length && !activeQ && !draftQ) {
-        const msg = errors.map((e) => e.message).join("；");
+      const payloadErr = errors.map((e) => e && e.message).filter(Boolean).join("；");
+      if (!isCert && !fromTool?.length && !rows.length && !activeQ && !draftQ) {
+        const msg = payloadErr;
         return msg ? h("div", { className: "ci-err" }, msg) : null;
       }
       const extraCols = columnLabels(rows);
@@ -1312,7 +1389,7 @@ window.__ModuleLoader__.load({
                 onClick: () => changeGroup(tab.id),
               }, tab.label)),
             ) : null,
-            listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
+            listErr || payloadErr ? h("div", { key: "lerr", className: "ci-err" }, listErr || payloadErr) : null,
             listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : (
               isCert
                 ? h(CertTable, {
@@ -1361,10 +1438,59 @@ window.__ModuleLoader__.load({
                   action: "cert.apply",
                   payload: draft,
                 });
-                setWizard(null);
                 await fetchList(0, String(activeQ || "").trim());
                 const id = result.data && result.data.certificateId;
-                if (id) openItem({ id: `tencent.cert:${id}`, moduleId: "tencent.cert", kind: "cert", title: id, meta: { certificateId: id } });
+                const item = id
+                  ? { id: `tencent.cert:${id}`, moduleId: "tencent.cert", kind: "cert", title: id, meta: { certificateId: id, verifyType: draft.verifyType, cancelable: true } }
+                  : null;
+                if (item) setWizard({ type: "verify", item, verifyType: draft.verifyType, status: "" });
+                else setWizard(null);
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+          }) : null,
+          wizard && wizard.type === "verify" && wizard.item ? h(VerifyCertDialog, {
+            key: "verify",
+            item: wizard.item,
+            verifyType: wizard.verifyType || certMeta(wizard.item).verifyType,
+            busy: wizardBusy,
+            err: wizardErr,
+            status: wizard.status,
+            onCancel: () => { if (!wizardBusy) setWizard(null); },
+            onOpenDetail: (item) => {
+              setWizard(null);
+              openItem(item);
+            },
+            onCheck: async () => {
+              setWizardBusy(true);
+              setWizardErr("");
+              try {
+                const result = await runCertAction(wizard.item, { id: "cert.verify" }, {
+                  verifyType: wizard.verifyType || certMeta(wizard.item).verifyType,
+                  completeIfManual: true,
+                });
+                const data = (result && result.data) || {};
+                let status = "尚未通过验证，请确认 DNS/文件记录后重试。";
+                if (data.completed) status = "验证已通过，已提交完成审核。";
+                else if (data.passed) status = "域名验证已通过，等待签发。";
+                setWizard({ ...wizard, status });
+                await fetchList(0, String(activeQ || "").trim());
+              } catch (e) {
+                setWizardErr(publicErrorMessage(e));
+              } finally {
+                setWizardBusy(false);
+              }
+            },
+            onComplete: async () => {
+              setWizardBusy(true);
+              setWizardErr("");
+              try {
+                await runCertAction(wizard.item, { id: "cert.complete" }, {});
+                setWizard({ ...wizard, status: "已提交完成审核。" });
+                await fetchList(0, String(activeQ || "").trim());
               } catch (e) {
                 setWizardErr(publicErrorMessage(e));
               } finally {

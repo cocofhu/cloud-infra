@@ -39,7 +39,11 @@ export function apply(ctx: Context, config: Config): void {
     output: {
       schema: { type: 'object', additionalProperties: true },
       render: (_args, value) => [{ type: 'text', text: renderQuery(value as unknown as QueryResult) }],
-      presentationMeta: (_args, value) => ({ kind: 'cloud-infra-query', ...(value as object) }),
+      presentationMeta: (_args, value) => ({
+        ...value,
+        kind: 'cloud-infra-query',
+        resourceKind: typeof value.kind === 'string' ? value.kind : 'domain',
+      }),
     },
     presentCall: (args) => ({
       card: 'generic',

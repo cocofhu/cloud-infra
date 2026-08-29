@@ -10,9 +10,10 @@ import type {
   ResourceModule,
   ResourceStatus,
 } from '../../../core/types.js'
-import { sslCall } from '../client.js'
+import { dnspodCall, sslCall, TencentApiError } from '../client.js'
 
 export type SslCall = typeof sslCall
+export type DnsCall = typeof dnspodCall
 
 export interface CertificatesItem {
   CertificateId?: string
@@ -126,6 +127,7 @@ const ACTIONS: ResourceAction[] = [
   { id: 'cert.cancel', label: '取消审核', confirm: 'always' },
   { id: 'cert.renew', label: '快速续期', confirm: 'default' },
   { id: 'cert.verify', label: '查看验证状态', confirm: 'default' },
+  { id: 'cert.complete', label: '完成审核', confirm: 'default' },
 ]
 
 export function parseCertRef(id: string): { certificateId: string; moduleId: string } {
@@ -195,6 +197,60 @@ export function isFreeDomainValid(domain: string): string {
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(name)) return '免费证书仅支持单域名，不支持 IP 与泛域名'
   if (name.includes('*')) return '免费证书仅支持单域名，不支持 IP 与泛域名'
   return ''
+}
+
+export function candidateZones(domain: string): string[] {
+  const host = domain.trim().toLowerCase().replace(/\.$/, '')
+  const parts = host.split('.').filter(Boolean)
+  const zones: string[] = []
+  for (let i = 0; i < Math.max(0, parts.length - 1); i++) zones.push(parts.slice(i).join('.'))
+  return zones
+}
+
+export const DNSPOD_AUTO_DNS_HINT = '该域名未在 DNSPod 托管，不支持自动 DNS。请改用手动 DNS 或文件验证。'
+
+function isDomainMissing(err: unknown): boolean {
+  const code = err instanceof TencentApiError ? String(err.code || '') : ''
+  const msg = err instanceof Error ? err.message : String(err)
+  return /ResourceNotFound|DomainNotFound|NoDataOfDomain/i.test(code)
+    || /不存在|未找到|not found|no data/i.test(msg)
+}
+
+export async function checkDnspodHosted(
+  dnsCall: DnsCall,
+  domain: string,
+  creds: { secretId: string; secretKey: string },
+  opts: { timeoutMs: number; signal?: AbortSignal },
+): Promise<boolean | null> {
+  const zones = candidateZones(domain)
+  if (!zones.length) return false
+  let unknown = false
+  for (const zone of zones) {
+    try {
+      await dnsCall('DescribeDomain', { Domain: zone }, creds, opts)
+      return true
+    } catch (err) {
+      if (isDomainMissing(err)) continue
+      unknown = true
+    }
+  }
+  if (unknown) return null
+  return false
+}
+
+export function isDomainVerificationPassed(data: Record<string, unknown> | undefined | null): boolean {
+  if (!data) return false
+  const lists = [data.VerificationResults, data.DomainVerificationResults, data.VerificationResultList]
+    .find((item) => Array.isArray(item)) as Array<Record<string, unknown>> | undefined
+  if (lists?.length) {
+    return lists.every((row) => {
+      const status = row.Status ?? row.VerificationStatus ?? row.Result
+      if (status === 1 || status === true || status === '1') return true
+      return /pass|ok|success|通过|成功/i.test(String(row.StatusName || row.Message || row.Result || ''))
+    })
+  }
+  const flag = data.Passed ?? data.Success ?? data.Verified ?? data.passed
+  return flag === true || flag === 1 || flag === '1'
 }
 
 export function daysUntil(date?: string): number | null {
@@ -340,8 +396,9 @@ export function buildCertSections(input: {
   item: CertificateDetailRaw
   chain?: { issuer: string; subject: string; fingerprint: string; validFrom: string; validTo: string } | null
   bound?: Array<{ resourceType: string; instanceId: string }>
+  boundFailed?: boolean
 }): DetailSection[] {
-  const { item, chain, bound } = input
+  const { item, chain, bound, boundFailed } = input
   const status = item.Status
   const applying = GROUP_STATUSES.applying.includes(status ?? -1)
   const issued = status === CERT_STATUS.issued
@@ -416,12 +473,12 @@ export function buildCertSections(input: {
     fields: (bound && bound.length)
       ? bound.map((row) => ({ label: row.resourceType.toUpperCase(), value: row.instanceId || '—' }))
       : undefined,
-    empty: '暂无',
+    empty: boundFailed ? '暂无（加载失败，可重试）' : '暂无',
   })
   return stripPem(sections)
 }
 
-export function createCertModule(call: SslCall = sslCall): ResourceModule {
+export function createCertModule(call: SslCall = sslCall, dnsCall: DnsCall = dnspodCall): ResourceModule {
   const module: ResourceModule = {
     id: 'tencent.cert',
     provider: 'tencent',
@@ -461,6 +518,10 @@ export function createCertModule(call: SslCall = sslCall): ResourceModule {
           if (alias.length > 200) return { ok: false, error: '备注名不能超过 200 字' }
           const method = normalizeVerify(String(payload.verifyType || payload.DvAuthMethod || 'DNS_AUTO'))
           const algo = String(payload.algorithm || payload.CsrEncryptAlgo || 'RSA').trim().toUpperCase() || 'RSA'
+          if (method === 'DNS_AUTO') {
+            const hosted = await checkDnspodHosted(dnsCall, domain, creds(ctx), opts(ctx))
+            if (hosted === false) return { ok: false, error: DNSPOD_AUTO_DNS_HINT }
+          }
           const data = await call<{ CertificateId?: string }>('ApplyCertificate', {
             DvAuthMethod: method,
             DomainName: domain,
@@ -470,7 +531,13 @@ export function createCertModule(call: SslCall = sslCall): ResourceModule {
             ...(actionId === 'cert.renew' || payload.oldCertificateId
               ? { OldCertificateId: String(payload.oldCertificateId || certificateId) }
               : {}),
-          }, creds(ctx), opts(ctx))
+          }, creds(ctx), opts(ctx)).catch((err) => {
+            const raw = err instanceof Error ? err.message : String(err)
+            if (method === 'DNS_AUTO' && /dnspod|DNS.?Pod|托管|自动\s*DNS/i.test(raw)) {
+              throw Object.assign(new Error(DNSPOD_AUTO_DNS_HINT), { cause: err })
+            }
+            throw err
+          })
           return { ok: true, data: { certificateId: data.CertificateId || '' } }
         }
         if (actionId === 'cert.upload') {
@@ -571,6 +638,12 @@ export function createCertModule(call: SslCall = sslCall): ResourceModule {
           return { ok: true }
         }
         if (actionId === 'cert.delete') {
+          const info = await call<CertificatesItem>('DescribeCertificate', {
+            CertificateId: certificateId,
+          }, creds(ctx), opts(ctx)).catch(() => null)
+          if (info && needsCancelBeforeDelete(info.Status)) {
+            return { ok: false, error: '待验证证书不支持直接删除，须先取消审核' }
+          }
           await call('DeleteCertificate', { CertificateId: certificateId }, creds(ctx), opts(ctx))
           return { ok: true }
         }
@@ -584,7 +657,20 @@ export function createCertModule(call: SslCall = sslCall): ResourceModule {
           const data = await call<Record<string, unknown>>('CheckCertificateDomainVerification', {
             CertificateId: certificateId,
           }, creds(ctx), opts(ctx))
-          return { ok: true, data: stripPem(data) as Record<string, unknown> }
+          const cleaned = stripPem(data) as Record<string, unknown>
+          const passed = isDomainVerificationPassed(cleaned)
+          const rawType = String(payload.verifyType || payload.DvAuthMethod || '')
+          const method = rawType ? normalizeVerify(rawType) : ''
+          let completed = false
+          if (passed && payload.completeIfManual && method && method !== 'DNS_AUTO') {
+            await call('CompleteCertificate', { CertificateId: certificateId }, creds(ctx), opts(ctx))
+            completed = true
+          }
+          return { ok: true, data: { ...cleaned, passed, completed } }
+        }
+        if (actionId === 'cert.complete') {
+          await call('CompleteCertificate', { CertificateId: certificateId }, creds(ctx), opts(ctx))
+          return { ok: true }
         }
         return { ok: false, error: `未知动作 ${actionId}` }
       } catch (err) {
@@ -612,9 +698,14 @@ async function loadDetail(call: SslCall, moduleId: string, ctx: ModuleContext): 
     pem = extra && typeof extra.Certificate === 'string' ? extra.Certificate : ''
   }
   const chain = chainSummary(pem)
-  const bound = await loadBound(call, certificateId, raw, ctx)
+  const boundResult = await loadBound(call, certificateId, raw, ctx)
   const card = mapCertItem(stripPem(raw), moduleId)
-  const sections = buildCertSections({ item: raw, chain, bound })
+  const sections = buildCertSections({
+    item: raw,
+    chain,
+    bound: boundResult.rows,
+    boundFailed: boundResult.failed,
+  })
   const fields = sections.flatMap((section) => section.fields || [])
   const safe: ResourceDetail = stripPem({
     card,
@@ -625,33 +716,52 @@ async function loadDetail(call: SslCall, moduleId: string, ctx: ModuleContext): 
   return safe
 }
 
+const BOUND_CONCURRENCY = 3
+const BOUND_CALL_TIMEOUT_MS = 3000
+
 async function loadBound(
   call: SslCall,
   certificateId: string,
   raw: CertificatesItem,
   ctx: ModuleContext,
-): Promise<Array<{ resourceType: string; instanceId: string }>> {
-  const types = HOST_PRODUCTS.map((item) => item.id)
+): Promise<{ rows: Array<{ resourceType: string; instanceId: string }>; failed: boolean }> {
+  const fromDetail = (raw.BoundResource || [])
+    .map((instanceId) => String(instanceId || '').trim())
+    .filter(Boolean)
+    .map((instanceId) => ({ resourceType: 'bound', instanceId }))
+  if (fromDetail.length) return { rows: fromDetail, failed: false }
+
   const rows: Array<{ resourceType: string; instanceId: string }> = []
-  await Promise.all(types.map(async (resourceType) => {
+  let failed = false
+  const types = HOST_PRODUCTS.map((item) => item.id)
+  await mapPool(types, BOUND_CONCURRENCY, async (resourceType) => {
     try {
       const data = await call<{
         DeployedResources?: Array<{ ResourceType?: string; ResourceIdList?: string[]; Domain?: string }>
-      }>('DescribeDeployedResources', { CertificateId: certificateId, ResourceType: resourceType }, creds(ctx), opts(ctx))
+      }>('DescribeDeployedResources', { CertificateId: certificateId, ResourceType: resourceType }, creds(ctx), {
+        ...opts(ctx),
+        timeoutMs: Math.min(BOUND_CALL_TIMEOUT_MS, ctx.timeoutMs || BOUND_CALL_TIMEOUT_MS),
+      })
       for (const item of data.DeployedResources || []) {
         const ids = item.ResourceIdList?.filter(Boolean) || (item.Domain ? [item.Domain] : [])
         for (const instanceId of ids) rows.push({ resourceType: item.ResourceType || resourceType, instanceId })
       }
     } catch {
-      /* product may be unauthorized; fall back below */
+      failed = true
     }
-  }))
-  if (!rows.length) {
-    for (const instanceId of raw.BoundResource || []) {
-      if (instanceId) rows.push({ resourceType: 'bound', instanceId })
+  })
+  return { rows, failed: !rows.length && failed }
+}
+
+async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let index = 0
+  const workers = Array.from({ length: Math.min(Math.max(1, limit), items.length || 1) }, async () => {
+    while (index < items.length) {
+      const current = items[index++]
+      if (current !== undefined) await fn(current)
     }
-  }
-  return rows
+  })
+  await Promise.all(workers)
 }
 
 export function normalizeHostInstances(resourceType: string, data: Record<string, unknown>): Array<{

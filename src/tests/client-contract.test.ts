@@ -174,6 +174,59 @@ test('conversation card clones 我的证书 while ConfigCard stays frozen', () =
   assert.doesNotMatch(actionBlock, /writeOverlay|assignConfig/)
 })
 
+test('empty cert query still paints 我的证书 card and pickPayload keeps resourceKind', () => {
+  const client = read('src/client.js')
+  const host = read('src/host.ts')
+  assert.match(host, /kind: 'cloud-infra-query'/)
+  assert.match(host, /resourceKind:/)
+  assert.doesNotMatch(host, /kind: 'cloud-infra-query', \.\.\.\(value/)
+  assert.match(client, /function isCloudInfraPayload/)
+  assert.match(client, /if \(!isCert && !fromTool/)
+  assert.match(client, /function VerifyCertDialog/)
+  assert.match(client, /查看验证状态/)
+  assert.match(client, /完成审核/)
+  assert.match(client, /completeIfManual: true/)
+  const start = client.indexOf('function isCloudInfraPayload')
+  const end = client.indexOf('\n    function ChevronDown', start)
+  const pick = new Function('props', `${client.slice(start, end)}\nreturn pickPayload(props)`) as (props: unknown) => {
+    resourceKind?: string
+    items?: unknown[]
+    kind?: string
+  } | null
+  const empty = pick({
+    presentationMeta: {
+      kind: 'cloud-infra-query',
+      resourceKind: 'cert',
+      items: [],
+      errors: [{ moduleId: 'tencent.cert', message: '未配置 SecretId' }],
+      query: '',
+    },
+  })
+  assert.ok(empty)
+  assert.equal(empty?.resourceKind, 'cert')
+  assert.equal(empty?.items?.length, 0)
+  const legacyEmpty = pick({
+    kind: 'cert',
+    items: [],
+    errors: [{ moduleId: 'tencent.cert', message: '未配置 SecretId' }],
+  })
+  assert.ok(legacyEmpty)
+  assert.equal(legacyEmpty?.kind, 'cert')
+  const ops = client.slice(client.indexOf('function CertOps'), client.indexOf('function CertTable'))
+  assert.match(ops, /部署/)
+  assert.match(ops, /下载/)
+  assert.match(ops, /MoreMenu/)
+  assert.doesNotMatch(ops, /"详情"/)
+  const more = client.slice(client.indexOf('function MoreMenu'), client.indexOf('function CertOps'))
+  assert.match(more, /cert\.verify/)
+  assert.match(more, /cancelable/)
+  assert.match(more, /else \{\s*items\.push\(\{ id: "cert\.delete"/)
+  const dl = client.slice(client.indexOf('function triggerDownload'), client.indexOf('\n    function FieldInput'))
+  assert.match(dl, /if \(\/-----BEGIN \/i\.test\(raw\)\) throw/)
+  assert.match(dl, /不支持明文下发/)
+  assert.doesNotMatch(dl, /if \(!content \|\| \/-----BEGIN/)
+})
+
 test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () => {
   const client = read('src/client.js')
   assert.match(client, /min\(400px,100%\)/)
