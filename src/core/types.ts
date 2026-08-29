@@ -32,6 +32,7 @@ export interface ResourceCard {
   columns?: ResourceColumn[]
   openLabel?: string
   expiresAt?: string
+  extras?: Record<string, string | number | boolean | null | undefined>
   meta?: Record<string, string>
   region?: string
   regionName?: string
@@ -112,7 +113,7 @@ export interface ModuleContext {
   tab?: string
 }
 
-export type ActionResult = { ok: true; data?: unknown } | { ok: false; error: string }
+export type ActionResult = { ok: true; data?: Record<string, unknown> } | { ok: false; error: string }
 
 export interface ResourceModule {
   id: string
