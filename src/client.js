@@ -27,6 +27,7 @@ window.__ModuleLoader__.load({
 .ci-cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary)}
 .ci-row.head .ci-cell{color:var(--dsw-alias-label-tertiary)}
 .ci-cell.num{font-variant-numeric:tabular-nums}
+.ci-cell.ci-ops{overflow:visible;position:sticky;right:0;z-index:4;background:inherit;justify-self:end}
 .ci-name{font-weight:550;color:var(--dsw-alias-label-primary);background:none;border:0;padding:0;cursor:pointer;font:inherit;font-size:13px;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ci-name:hover{color:var(--dsw-alias-brand-primary)}
 .ci-ops{display:flex;align-items:center;gap:10px;white-space:nowrap}
@@ -148,9 +149,11 @@ window.__ModuleLoader__.load({
 .ci-form-panel{margin:0 14px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:10px 12px;background:var(--dsw-alias-bg-layer-2)}
 .ci-form-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:650;margin:0 0 8px}
 .ci-form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
-.ci-more{position:relative}
-.ci-menu{position:absolute;right:0;top:22px;z-index:5;min-width:140px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:4px;box-shadow:var(--dsw-alias-shadow)}
-.ci-menu button{display:block;width:100%;text-align:left;border:0;background:transparent;color:inherit;font:inherit;font-size:13px;padding:6px 8px;border-radius:6px;cursor:pointer}
+.ci-more{position:relative;overflow:visible;z-index:5}
+.ci-more>.ci-link{padding:4px 8px;min-width:44px;min-height:28px;display:inline-flex;align-items:center;justify-content:center;pointer-events:auto}
+.ci-menu{position:absolute;right:0;top:100%;z-index:80;min-width:160px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:4px;box-shadow:var(--dsw-alias-shadow);pointer-events:auto}
+.ci-menu.ci-menu-portal{position:fixed;right:auto;top:auto}
+.ci-menu button{display:block;width:100%;text-align:left;border:0;background:transparent;color:inherit;font:inherit;font-size:13px;padding:8px 10px;border-radius:6px;cursor:pointer;pointer-events:auto}
 .ci-menu button:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-check{display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0}
 `;
@@ -759,10 +762,71 @@ window.__ModuleLoader__.load({
       return type.includes("super") || type.includes("eklet") || badge.includes("超级");
     }
 
+    function MoreMenu({ open, onToggle, onClose, children }) {
+      const btnRef = useRef(null);
+      const [pos, setPos] = useState(null);
+      useEffect(() => {
+        if (!open) {
+          setPos(null);
+          return undefined;
+        }
+        const place = () => {
+          const el = btnRef.current;
+          if (!el || typeof document === "undefined") return;
+          const r = el.getBoundingClientRect();
+          const width = 168;
+          const vw = window.innerWidth || 800;
+          const left = Math.min(Math.max(8, r.right - width), Math.max(8, vw - width - 8));
+          setPos({ top: r.bottom + 4, left, width });
+        };
+        place();
+        const onDoc = (e) => {
+          const t = e.target;
+          if (btnRef.current && btnRef.current.contains(t)) return;
+          if (t && typeof t.closest === "function" && t.closest(".ci-menu-portal")) return;
+          onClose();
+        };
+        window.addEventListener("resize", place);
+        window.addEventListener("scroll", place, true);
+        document.addEventListener("pointerdown", onDoc, true);
+        return () => {
+          window.removeEventListener("resize", place);
+          window.removeEventListener("scroll", place, true);
+          document.removeEventListener("pointerdown", onDoc, true);
+        };
+      }, [open, onClose]);
+      const menuNode = open
+        ? h("div", {
+          className: "ci-menu" + (pos ? " ci-menu-portal" : ""),
+          role: "menu",
+          style: pos ? { top: pos.top, left: pos.left, width: pos.width, zIndex: 80 } : undefined,
+        }, children)
+        : null;
+      const menu = pos && typeof document !== "undefined" && document.body
+        ? createPortal(menuNode, document.body)
+        : menuNode;
+      return h("div", { className: "ci-more", ref: btnRef },
+        h("button", {
+          type: "button",
+          className: "ci-link",
+          "aria-haspopup": "menu",
+          "aria-expanded": !!open,
+          onPointerDown: (e) => { e.stopPropagation(); },
+          onMouseDown: (e) => { e.stopPropagation(); },
+          onClick: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggle();
+          },
+        }, "更多"),
+        menu,
+      );
+    }
+
     function ClusterListTable({ items, pendingId, menuId, onOpen, onMenu, onProtect, onDelete }) {
       const rows = Array.isArray(items) ? items.filter(Boolean) : [];
       if (!rows.length) return h("div", { className: "ci-empty" }, "请选择地域后查看该地域集群，或当前筛选无数据");
-      const template = "minmax(160px,1.6fr) 84px minmax(88px,0.8fr) 64px minmax(88px,0.8fr) minmax(120px,1fr) 72px";
+      const template = "minmax(160px,1.6fr) 84px minmax(88px,0.8fr) 64px minmax(88px,0.8fr) minmax(120px,1fr) 88px";
       return h("div", { className: "ci-list" },
         h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
           h("div", { className: "ci-cell" }, "集群 ID/名称"),
@@ -790,13 +854,25 @@ window.__ModuleLoader__.load({
           h("div", { className: "ci-cell" }, col(item, "所在网络") || "-"),
           h("div", { className: "ci-cell" }, col(item, "创建时间") || "-"),
           h("div", { className: "ci-cell ci-ops" },
-            h("div", { className: "ci-more" },
-              h("button", { type: "button", className: "ci-link", onClick: () => onMenu(menuId === item.id ? "" : item.id) }, "更多"),
-              menuId === item.id ? h("div", { className: "ci-menu" },
-                h("button", { type: "button", onClick: () => onProtect(item) }, "关闭删除保护"),
-                h("button", { type: "button", className: "ci-link danger", onClick: () => onDelete(item) }, "删除"),
-              ) : null,
-            ),
+            h(MoreMenu, {
+              open: menuId === item.id,
+              onToggle: () => onMenu(menuId === item.id ? "" : item.id),
+              onClose: () => onMenu(""),
+            }, [
+              h("button", {
+                key: "protect",
+                type: "button",
+                role: "menuitem",
+                onClick: (e) => { e.stopPropagation(); onProtect(item); },
+              }, "关闭删除保护"),
+              h("button", {
+                key: "delete",
+                type: "button",
+                role: "menuitem",
+                className: "ci-link danger",
+                onClick: (e) => { e.stopPropagation(); onDelete(item); },
+              }, "删除"),
+            ]),
           ),
         )),
       );
@@ -1464,7 +1540,7 @@ window.__ModuleLoader__.load({
         setSession((cur) => cur ? { ...cur, detail, loading: false } : cur);
       };
       const runAction = async (action, payload, opts) => {
-        const target = session?.item || deleteItem;
+        const target = (opts && opts.item) || session?.item || deleteItem;
         setBusy(true);
         setErr("");
         try {
@@ -1591,8 +1667,11 @@ window.__ModuleLoader__.load({
               menuId,
               onOpen: openItem,
               onMenu: setMenuId,
-              onProtect: (item) => requestAction("cluster.protection", { enable: false, clusterId: col(item, "集群ID") }, "关闭删除保护？"),
-              onDelete: (item) => { setDeleteItem(item); setScreen("delete"); setMenuId(""); },
+              onProtect: (item) => {
+                setMenuId("");
+                requestAction("cluster.protection", { enable: false, clusterId: col(item, "集群ID") }, "关闭删除保护？", { item });
+              },
+              onDelete: (item) => { setMenuId(""); setDeleteItem(item); setScreen("delete"); },
             }),
             h(Pager, { key: "pager", total: counted, page, pages: pageCount, busy: listBusy, onPage: (next) => fetchList((next - 1) * pageSize, activeQ, region, filters) }),
           ] : null,
