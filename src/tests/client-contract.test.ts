@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { COS_REGIONS } from '../providers/tencent/cos-regions.js'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const root = join(dir, '../..')
@@ -19,6 +21,62 @@ test('host and query core do not switch on vendor names', () => {
   assert.doesNotMatch(query, /tencent\s*\|\s*aliyun/)
   assert.match(host, /settings\.register\('cloud-infra'/)
   assert.match(host, /cloud_infra_query/)
+  assert.match(host, /kind=cos/)
+  assert.match(host, /OMIT region/)
+  assert.match(host, /Never use Ask question/)
+  assert.match(host, /still call kind=cos and omit region/)
+  assert.doesNotMatch(host, /Do not call kind=cos without/)
+  assert.doesNotMatch(host, /MUST pass a valid official region/)
+  assert.doesNotMatch(host, /Required for kind=cos/)
+  assert.match(query, /region: input\.region/)
+  const writeAt = host.indexOf('writeOverlay(cfg)')
+  const saveAt = host.indexOf('if (body.save)')
+  assert.ok(writeAt > 0 && saveAt > 0 && writeAt > saveAt)
+  assert.equal(host.split('writeOverlay(cfg)').length - 1, 1)
+  assert.match(host, /kind=registrar/)
+  assert.match(host, /kind=my-domain/)
+  assert.match(host, /do not send them to settings/i)
+  assert.match(host, /timeoutMs: Schema.number/)
+  assert.match(host, /maxResults: Schema.number/)
+  assert.match(host, /skipConfirm: Schema.boolean/)
+  assert.doesNotMatch(host, /registrarSearch|domainCart|templateId/)
+  assert.match(query, /立即加购/)
+  assert.match(query, /我的域名/)
+})
+
+test('g3 registrar search / checkout stay on the chat tool card, not SettingsCard', () => {
+  const client = read('src/client.js')
+  const toolStart = client.indexOf('function searchPlaceholderOf')
+  const settingsStart = client.indexOf('function ConfigCard')
+  assert.ok(toolStart > 0 && settingsStart > toolStart)
+  const tool = client.slice(toolStart, settingsStart)
+  const settings = client.slice(settingsStart)
+  assert.match(tool, /请输入域名或后缀/)
+  assert.match(tool, /请输入域名关键字/)
+  assert.match(tool, /立即加购/)
+  assert.match(tool, /购物车/)
+  assert.match(tool, /提交订单/)
+  assert.match(tool, /核对信息/)
+  assert.match(tool, /账户余额支付/)
+  assert.match(tool, /将从账户余额扣费/)
+  assert.match(tool, /未勾选协议，不能提交订单/)
+  assert.match(tool, /基本信息/)
+  assert.match(tool, /域名安全/)
+  assert.match(tool, /function RegistrarTable/)
+  assert.match(tool, /function MyDomainTable/)
+  assert.match(tool, /function OwnedDetailView/)
+  assert.match(tool, /onChange: \(\) => setDraft\(\{ \.\.\.draft, updateLock: !draft\.updateLock \}\)/)
+  assert.match(tool, /onChange: \(\) => setDraft\(\{ \.\.\.draft, transferLock: !draft\.transferLock \}\)/)
+  assert.doesNotMatch(tool, /transferLock: draft\.updateLock \? draft\.transferLock : false/)
+  assert.doesNotMatch(tool, /disabled: busy \|\| !!draft\.updateLock/)
+  assert.match(tool, /disabled: busy \|\| updateLock/)
+  assert.match(tool, /h\("div", \{ className: "ci-cell" \}, "状态"\)/)
+  assert.doesNotMatch(settings, /立即加购/)
+  assert.doesNotMatch(settings, /请输入域名或后缀/)
+  assert.doesNotMatch(settings, /账户余额支付/)
+  assert.doesNotMatch(settings, /function RegistrarTable/)
+  assert.doesNotMatch(client, /save:\s*true[\s\S]{0,80}order\.create/)
+  assert.doesNotMatch(client, /if\s*\(.*===\s*['"]tencent['"]/)
 })
 
 test('client settings card is schema-driven and uses key cloud-infra', () => {
@@ -114,9 +172,10 @@ test('matchModule filters by title or id without dropping other checked modules'
     module: { id: string; title?: string },
     q: string,
   ) => boolean
-  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名' }, ''), true)
-  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名' }, '域名'), true)
-  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名' }, 'TENCENT'), true)
+  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名解析' }, ''), true)
+  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名解析' }, '域名'), true)
+  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名解析' }, 'TENCENT'), true)
+  assert.equal(fn({ id: 'tencent.domain', title: '腾讯云域名解析' }, '解析'), true)
   assert.equal(fn({ id: 'aliyun.dns', title: '阿里云解析' }, '域名'), false)
   assert.equal(fn({ id: 'aliyun.dns', title: '阿里云解析' }, '   '), true)
 })
@@ -175,6 +234,454 @@ test('g2-g3 list chrome and in-card DetailView replace fullscreen drawer', () =>
   assert.doesNotMatch(client, /2147483|86vh/)
 })
 
+test('client.js parses so DSH can load 我的证书 card', () => {
+  const check = spawnSync(process.execPath, ['--check', join(root, 'src/client.js')], { encoding: 'utf8' })
+  assert.equal(check.status, 0, check.stderr || check.stdout || 'node --check src/client.js failed')
+  const client = read('src/client.js')
+  const verify = client.slice(client.indexOf('function VerifyCertDialog'), client.indexOf('function ReplaceCertDialog'))
+  assert.match(verify, /查看验证状态/)
+  assert.match(verify, /document\.body\);\s*\}\s*$/)
+  assert.doesNotMatch(verify, /document\.body\);\s*\}\s+\),/)
+  assert.match(client, /function ReplaceCertDialog/)
+  assert.match(client, /type: "replace"/)
+  assert.match(client, /请确认验证方式/)
+})
+
+test('conversation card clones 我的证书 while ConfigCard stays frozen', () => {
+  const client = read('src/client.js')
+  const host = read('src/host.ts')
+  assert.match(client, /我的证书/)
+  assert.match(client, /申请免费证书/)
+  assert.match(client, /上传证书/)
+  assert.match(client, /证书详情/)
+  assert.match(client, /function CertTable/)
+  assert.match(client, /function CertDetailView/)
+  assert.match(client, /基本信息/)
+  assert.match(client, /域名验证/)
+  assert.match(client, /证书链摘要/)
+  assert.match(client, /关联云资源/)
+  assert.match(client, /function triggerDownload/)
+  assert.match(client, /国密 SM2/)
+  assert.match(client, /搜索证书 ID \/ 备注 \/ 域名/)
+  assert.match(host, /kind=cert/)
+  assert.match(host, /查证书必须传 kind=cert/)
+  assert.match(host, /未传 kind 仍默认 domain/)
+  const cardStart = client.indexOf('function ConfigCard()')
+  const cardEnd = client.indexOf('const inject = ["slots"]')
+  const card = client.slice(cardStart, cardEnd)
+  assert.ok(cardStart > 0 && cardEnd > cardStart)
+  assert.doesNotMatch(card, /申请免费证书|上传证书|我的证书|CertTable|证书详情/)
+  const handle = host.slice(host.indexOf('export async function handleApi'), host.indexOf('async function runDetail'))
+  const queryBlock = handle.slice(handle.indexOf("if (method === 'query')"), handle.indexOf("if (method === 'detail')"))
+  const detailBlock = handle.slice(handle.indexOf("if (method === 'detail')"), handle.indexOf("if (method === 'action')"))
+  const actionBlock = handle.slice(handle.indexOf("if (method === 'action')"))
+  assert.doesNotMatch(queryBlock, /writeOverlay|assignConfig/)
+  assert.doesNotMatch(detailBlock, /writeOverlay|assignConfig/)
+  assert.doesNotMatch(actionBlock, /writeOverlay|assignConfig/)
+})
+
+test('empty cert query still paints 我的证书 card and pickPayload keeps resourceKind', () => {
+  const client = read('src/client.js')
+  const host = read('src/host.ts')
+  assert.match(host, /kind: 'cloud-infra-query'/)
+  assert.match(host, /resourceKind:/)
+  assert.doesNotMatch(host, /kind: 'cloud-infra-query', \.\.\.\(value/)
+  assert.match(client, /function isCloudInfraPayload/)
+  assert.match(client, /if \(!isCert && !fromTool/)
+  assert.match(client, /function VerifyCertDialog/)
+  assert.match(client, /查看验证状态/)
+  assert.match(client, /完成审核/)
+  assert.match(client, /completeIfManual: true/)
+  const start = client.indexOf('function isCloudInfraPayload')
+  const end = client.indexOf('\n    function ChevronDown', start)
+  const pick = new Function('props', `${client.slice(start, end)}\nreturn pickPayload(props)`) as (props: unknown) => {
+    resourceKind?: string
+    items?: unknown[]
+    kind?: string
+  } | null
+  const empty = pick({
+    presentationMeta: {
+      kind: 'cloud-infra-query',
+      resourceKind: 'cert',
+      items: [],
+      errors: [{ moduleId: 'tencent.cert', message: '未配置 SecretId' }],
+      query: '',
+    },
+  })
+  assert.ok(empty)
+  assert.equal(empty?.resourceKind, 'cert')
+  assert.equal(empty?.items?.length, 0)
+  const legacyEmpty = pick({
+    kind: 'cert',
+    items: [],
+    errors: [{ moduleId: 'tencent.cert', message: '未配置 SecretId' }],
+  })
+  assert.ok(legacyEmpty)
+  assert.equal(legacyEmpty?.kind, 'cert')
+  const ops = client.slice(client.indexOf('function CertOps'), client.indexOf('function CertTable'))
+  assert.match(ops, /部署/)
+  assert.match(ops, /下载/)
+  assert.match(ops, /MoreMenu/)
+  assert.doesNotMatch(ops, /"详情"/)
+  const more = client.slice(client.indexOf('function MoreMenu'), client.indexOf('function CertOps'))
+  assert.match(more, /cert\.verify/)
+  assert.match(more, /cancelable/)
+  assert.match(more, /else \{\s*items\.push\(\{ id: "cert\.delete"/)
+  const onMore = client.slice(client.indexOf('const onMore ='), client.indexOf('const onDownload'))
+  assert.match(onMore, /cert\.replace/)
+  assert.match(onMore, /type: "replace"/)
+  assert.doesNotMatch(onMore, /askConfirm\(item, row, "确定重颁发该证书/)
+  const dl = client.slice(client.indexOf('function triggerDownload'), client.indexOf('\n    function FieldInput'))
+  assert.match(dl, /if \(\/-----BEGIN \/i\.test\(raw\)\) throw/)
+  assert.match(dl, /不支持明文下发/)
+  assert.doesNotMatch(dl, /if \(!content \|\| \/-----BEGIN/)
+})
+
+test('g3 ClusterConsole is a separate console tree and never saves settings', () => {
+  const client = read('src/client.js')
+  assert.match(client, /function ClusterConsole/)
+  assert.match(client, /function ClusterListTable/)
+  assert.match(client, /function CreateWizard/)
+  assert.match(client, /function DeleteWizard/)
+  assert.match(client, /function ClusterDetail/)
+  assert.match(client, /选择地域/)
+  assert.match(client, /ci-type-card/)
+  assert.match(client, /我已阅读并同意腾讯云 TKE 服务等级协议/)
+  assert.match(client, /我已知晓风险/)
+  assert.match(client, /ci-side-nav/)
+  assert.match(client, /ci-np-card/)
+  assert.match(client, /function FormPanel/)
+  assert.match(client, /单节点 Pod 上限/)
+  assert.match(client, /可用区/)
+  assert.match(client, /登录密钥/)
+  assert.doesNotMatch(client.slice(client.indexOf('function CreateWizard'), client.indexOf('function SearchToolView')), /window\.prompt/)
+  assert.match(client, /kind === "cluster"/)
+  assert.match(client, /地域在资源列表中选择，不写入设置/)
+  const start = client.indexOf('function ClusterConsole')
+  const end = client.indexOf('function SearchToolView')
+  const consoleSrc = client.slice(start, end)
+  assert.doesNotMatch(consoleSrc, /api\("config"/)
+  assert.doesNotMatch(consoleSrc, /writeOverlay/)
+  assert.doesNotMatch(consoleSrc, /解析记录/)
+  assert.doesNotMatch(consoleSrc, /function DetailView/)
+})
+
+test('cdb conversation UI uses official login/manage and 11 tabs g1-g3', () => {
+  const client = read('src/client.js')
+  assert.match(client, /const CDB_OFFICIAL_TABS = \[/)
+  for (const tab of ['实例详情', '实例监控', '账号管理', '数据库管理', '安全组', '备份恢复', '日志中心', '只读实例', '数据库代理', '数据安全', '连接检查']) {
+    assert.match(client, new RegExp(tab))
+  }
+  assert.match(client, /登录/)
+  assert.match(client, /管理/)
+  assert.match(client, /实例 ID \/ 实例名 \/ 内网 IP/)
+  assert.match(client, /全部地域/)
+  assert.match(client, /登录数据库（DMC）/)
+  assert.match(client, /数据库类型/)
+  assert.match(client, /密码登录/)
+  assert.match(client, /SQL 窗口/)
+  assert.match(client, /kind === "cdb"/)
+  assert.match(client, /const CDB_TAB_GROUPS/)
+  assert.match(client, /function cdbTabGroup/)
+  assert.match(client, /className: "ci-subnav"/)
+  const cdbUi = client.slice(client.indexOf('const CDB_OFFICIAL_TABS'), client.indexOf('function extraOf'))
+  assert.doesNotMatch(cdbUi, /新建实例|续费|购买相同配置|分配至项目|配置安全组/)
+  assert.doesNotMatch(client, /购买类操作不在插件内下单/)
+  assert.doesNotMatch(client, /CDB_OFFICIAL_TABS[\s\S]{0,500}在线查询/)
+  assert.doesNotMatch(client, /CDB_OFFICIAL_TABS[\s\S]{0,500}慢查询/)
+  assert.doesNotMatch(client, /if\s*\(.*===\s*['"]tencent['"]/)
+})
+
+test('settings card still has no region or db account fields g4.1', () => {
+  const client = read('src/client.js')
+  const start = client.indexOf('function ConfigCard')
+  const end = client.indexOf('const inject')
+  const settings = client.slice(start, end)
+  assert.match(settings, /provider\.fields/)
+  assert.doesNotMatch(settings, /库账号|库密码|DMC/)
+  assert.doesNotMatch(settings, /placeholder: "ap-/)
+  assert.match(client, /腾讯云 CDB|matchModule/)
+})
+
+test('cvm and lighthouse consoles use two skins and console Chinese status', () => {
+  const client = read('src/client.js')
+  assert.match(client, /function CvmConsole/)
+  assert.match(client, /function LhConsole/)
+  assert.match(client, /function InstanceDetailView/)
+  assert.match(client, /function MoreMenu/)
+  assert.match(client, /ID\/名称/)
+  assert.match(client, /主IPv4地址/)
+  assert.match(client, /可用区/)
+  assert.match(client, /实例类型/)
+  assert.match(client, /实例配置/)
+  assert.match(client, /实例计费模式/)
+  assert.match(client, /华南地区（广州）/)
+  assert.match(client, /function RegionSelect/)
+  assert.match(client, /function KindTabs/)
+  assert.match(client, /全部地域/)
+  assert.match(client, /云服务器/)
+  assert.match(client, /轻量应用服务器/)
+  assert.match(client, /搜索 ID \/ 名称 \/ IP/)
+  assert.doesNotMatch(client, /卡片视图/)
+  assert.doesNotMatch(client, /function RegionTabs/)
+  assert.match(client, /运行中/)
+  assert.match(client, /已关机/)
+  assert.match(client, /"更多"/)
+  assert.match(client, /instance\.start/)
+  assert.match(client, /instance\.stop/)
+  assert.match(client, /instance\.reboot/)
+  assert.match(client, /kind === "cvm"/)
+  assert.match(client, /kind === "lighthouse"/)
+  assert.match(client, /kind === "auto"/)
+  assert.match(client, /ci-dense/)
+  assert.match(client, /min-width:980px/)
+  assert.match(client, /\.ci-select\{[^}]*max-width:180px/)
+  assert.match(client, /region: listRegion/)
+  assert.match(client, /onQuery: onDraft/)
+  const toolStart = client.indexOf('function SearchToolView')
+  const toolEnd = client.indexOf('function matchModule', toolStart)
+  const tool = client.slice(toolStart, toolEnd)
+  assert.match(tool, /h\(KindTabs/)
+  assert.match(tool, /h\(Pager/)
+  assert.match(tool, /region: useRegion/)
+  assert.match(tool, /trimmed \? "all"/)
+  assert.match(tool, /kind === "auto"/)
+  assert.match(tool, /kind !== "auto"/)
+  assert.match(tool, /tabToKind/)
+  assert.match(tool, /kind: nextKind/)
+  assert.match(tool, /onChange: \(next\)/)
+  assert.match(tool, /usableInstanceQuery/)
+  assert.match(client, /function usableInstanceQuery/)
+  assert.match(tool, /华南地区（广州）/)
+  assert.match(tool, /onSubmit: runSearch/)
+  assert.match(tool, /setTimeout\(\(\) => runSearch\(value\), 800\)/)
+  assert.match(client, /function SearchField/)
+  assert.match(client, /function ListPane/)
+  assert.match(client, /加载列表/)
+  assert.doesNotMatch(client, /ci-list-mask/)
+  assert.doesNotMatch(tool, /showDomain = kind === "domain" \|\| \(!showCvm && !showLh\)/)
+})
+
+test('instance detail uses official groups and never renders DNS records', () => {
+  const client = read('src/client.js')
+  const start = client.indexOf('function InstanceDetailView')
+  const tke = client.indexOf('const TKE_REGIONS', start)
+  const search = client.indexOf('function SearchToolView', start)
+  const end = tke > start ? tke : search
+  assert.ok(start > 0 && end > start)
+  const body = client.slice(start, end)
+  assert.match(body, /h\(ChevronLeft/)
+  assert.match(body, /aria-label": "返回"/)
+  assert.doesNotMatch(body, /返回实例列表/)
+  assert.match(body, /detail\?\.groups/)
+  assert.match(body, /开机/)
+  assert.match(body, /关机/)
+  assert.match(body, /重启/)
+  assert.doesNotMatch(body, /解析记录/)
+  assert.doesNotMatch(body, /添加记录/)
+  assert.doesNotMatch(body, /ci-chips/)
+})
+
+test('settings card still has no region picker or power buttons', () => {
+  const client = read('src/client.js')
+  const start = client.indexOf('function ConfigCard')
+  assert.ok(start > 0)
+  const body = client.slice(start)
+  assert.match(body, /产品模块/)
+  assert.match(body, /SecretId|provider\.fields/)
+  assert.doesNotMatch(body, /全部地域/)
+  assert.doesNotMatch(body, /instance\.start/)
+  assert.doesNotMatch(body, /卡片视图/)
+  assert.doesNotMatch(body, /开机/)
+  assert.doesNotMatch(body, /地域多选/)
+})
+
+test('instancePower and matchLocalInstance cover console states and IP search', () => {
+  const src = read('src/client.js')
+  const powerStart = src.indexOf('function instancePower')
+  const powerEnd = src.indexOf('\n    function groupByRegion', powerStart)
+  const power = new Function('item', `${src.slice(powerStart, powerEnd)}\nreturn instancePower(item)`) as (item: {
+    status?: string
+    stateLabel?: string
+  }) => { start: boolean; stop: boolean; reboot: boolean }
+  assert.deepEqual(power({ stateLabel: '运行中', status: 'enable' }), { start: true, stop: false, reboot: false })
+  assert.deepEqual(power({ stateLabel: '已关机', status: 'pause' }), { start: false, stop: true, reboot: true })
+  assert.deepEqual(power({ stateLabel: '开机中', status: 'unknown' }), { start: true, stop: true, reboot: true })
+  const matchStart = src.indexOf('function matchLocalInstance')
+  const matchEnd = src.indexOf('\n    function actionLabel', matchStart)
+  const match = new Function('item', 'q', `${src.slice(matchStart, matchEnd)}\nreturn matchLocalInstance(item, q)`) as (
+    item: {
+      title?: string
+      instanceId?: string
+      id?: string
+      privateIp?: string
+      publicIp?: string
+      columns?: Array<{ value?: string }>
+    },
+    q: string,
+  ) => boolean
+  assert.equal(match({ title: 'api-prod', instanceId: 'ins-8k2m1a', publicIp: '43.138.9.21' }, '43.138'), true)
+  assert.equal(match({ title: 'api-prod', instanceId: 'ins-8k2m1a' }, 'lhins-'), false)
+  assert.equal(match({
+    title: 'unnamed',
+    columns: [{ value: '内网：10.0.0.1\n弹性：106.55.252.113' }],
+  }, '106.55.252.113'), true)
+})
+
+test('host tool kind lists domain lighthouse cvm auto and default stays domain', () => {
+  const host = read('src/host.ts')
+  assert.match(host, /kind=domain/)
+  assert.match(host, /kind=cvm/)
+  assert.match(host, /kind=lighthouse/)
+  assert.match(host, /kind=auto/)
+  assert.match(host, /default domain/)
+  assert.match(host, /查一下我的服务器/)
+  assert.match(host, /never kind=domain/)
+  assert.match(host, /args\.kind != null \? String\(args\.kind\) : 'domain'/)
+  assert.match(host, /云服务器 \/ 轻量 \/ CVM \/ 实例/)
+  assert.doesNotMatch(host, /if\s*\(.*provider\s*===\s*['"]tencent['"]/)
+})
+
+test('g3 COS console two pages use region combo and file list, not an expand tree', () => {
+  const client = read('src/client.js')
+  const host = read('src/host.ts')
+  const readme = read('README.md')
+  assert.match(client, /function CosConsoleView/)
+  assert.match(client, /function CosRegionCombo/)
+  assert.match(client, /function CosBucketTable/)
+  assert.match(client, /function CosFileTable/)
+  assert.match(client, /\.ci-table-wrap\{[^}]*overflow-x:auto/)
+  assert.match(client, /\.ci-table th,\.ci-table td\{[^}]*white-space:nowrap/)
+  assert.match(client, /请输入并选择地域/)
+  assert.match(client, /DEFAULT_COS_REGION_ID = "ap-guangzhou"/)
+  assert.match(client, /function defaultCosRegion/)
+  assert.match(client, /useState\(\(\) => defaultCosRegion/)
+  assert.match(client, /comboNeedle/)
+  assert.match(client, /创建存储桶/)
+  assert.match(client, /请输入存储桶名称/)
+  assert.match(client, /"名称"/)
+  assert.match(client, /"访问权限"/)
+  assert.match(client, /上传文件/)
+  assert.match(client, /创建文件夹/)
+  assert.match(client, /搜索文件名/)
+  assert.match(client, /"文件名"/)
+  assert.match(client, /"存储类型"/)
+  assert.match(client, /"最后修改时间"/)
+  assert.match(client, /复制临时链接/)
+  assert.match(client, /kind === "cos"/)
+  assert.match(client, /id: "ci-cos-region"/)
+  assert.match(client, /htmlFor: "ci-cos-region"/)
+  assert.match(client, /\.ci-bar\{[^}]*flex-wrap:nowrap/)
+  assert.match(client, /\.ci-regionbar label\{[^}]*font-size:13px/)
+  assert.match(client, /\.ci-combo input\{[^}]*font-size:13px/)
+  assert.match(client, /\.ci-mini\{[^}]*font-size:13px/)
+  assert.match(client, /\.ci-search\{[^}]*font-size:13px/)
+  assert.match(client, /prefixCrumbs/)
+  assert.doesNotMatch(client, /function CosTree\b|ci-tree-expand|展开全部/)
+  assert.doesNotMatch(client, /if\s*\(.*===\s*['"]tencent['"]/)
+  assert.match(host, /对象存储/)
+  assert.match(host, /defaults #ci-cos-region to 广州/)
+  assert.match(host, /stays selectable/)
+  assert.doesNotMatch(host, /对象存储 · 请选择地域/)
+  assert.match(host, /needsRegion/)
+  assert.match(readme, /可以不带 region/)
+  assert.match(readme, /默认选中广州/)
+  assert.match(readme, /禁止用 Ask question/)
+  assert.match(readme, /上一页 \/ 下一页/)
+  assert.match(readme, /设置 → 插件 → 云资源/)
+  assert.match(readme, /x-cos-copy-source/)
+  assert.match(client, /下一页/)
+  assert.match(client, /id: "ci-cos-file-next"/)
+  assert.match(client, /id: "ci-cos-file-prev"/)
+  assert.doesNotMatch(client, /className: "ci-page-btns" \},\)/)
+  assert.doesNotMatch(client, /id: "ci-cos-load-more"/)
+  assert.doesNotMatch(client, /加载更多/)
+  assert.doesNotMatch(client, /一层过多可翻页/)
+  assert.doesNotMatch(client, /已加载 \$\{/)
+  assert.match(client, /仅搜索当前页的文件/)
+  assert.match(client, /id: "ci-cos-cred-err"/)
+  assert.match(client, /result\.errors/)
+  assert.match(client, /function formatFileTime/)
+  assert.match(client, /na-siliconvalley/)
+  assert.match(client, /eu-frankfurt/)
+  assert.match(client, /ap-beijing-fsi/)
+  assert.match(client, /setTimeout\(\(\) => fetchBuckets/)
+  assert.match(client, /id: "ci-cos-presign-url"/)
+  assert.match(client, /readOnly: true/)
+  assert.match(client, /剪贴板不可用/)
+  assert.match(client, /stat\.copied === false && stat\.expiresSec/)
+  assert.match(client, /function isPresignStat/)
+  assert.match(client, /function detailStatRows/)
+  assert.match(client, /stat\.address/)
+  assert.doesNotMatch(client, /stat\.url && !stat\.copied/)
+  assert.match(client, /fileSeq/)
+  assert.match(client, /if \(n !== fileSeq\.current\) return/)
+  assert.match(client, /withoutAp\.replace\(\/-\/g, ""\)/)
+  assert.match(client, /列表已截断，但未返回下一页标记/)
+  assert.match(host, /对象存储 · 请先配置凭证/)
+})
+
+test('g3.2 object.stat modal is not the presign clipboard-fail dialog', () => {
+  const src = read('src/client.js')
+  const start = src.indexOf('function isPresignStat')
+  const end = src.indexOf('\n    function matchCosRegion', start)
+  assert.ok(start >= 0 && end > start)
+  const helpers = new Function(`
+    ${src.slice(start, end)}
+    return { isPresignStat, detailStatRows };
+  `)() as {
+    isPresignStat: (stat: unknown) => boolean
+    detailStatRows: (stat: unknown) => Array<[string, unknown]>
+  }
+  const stat = {
+    name: 'readme.txt',
+    sizeLabel: '10 B',
+    storageClass: '标准存储',
+    lastModified: '2025-02-01 00:00:00',
+    address: 'https://assets-1250000000.cos.ap-guangzhou.myqcloud.com/readme.txt',
+    url: 'https://assets-1250000000.cos.ap-guangzhou.myqcloud.com/readme.txt',
+  }
+  assert.equal(helpers.isPresignStat(stat), false)
+  const rows = helpers.detailStatRows(stat)
+  assert.deepEqual(rows.map((row) => row[0]), ['名称', '大小', '存储类型', '修改时间', '对象地址'])
+  assert.equal(rows[0][1], 'readme.txt')
+  assert.equal(rows[1][1], '10 B')
+  assert.doesNotMatch(JSON.stringify(rows), /剪贴板不可用/)
+  const presignFail = { url: 'https://signed.example/tmp', copied: false, expiresSec: 900 }
+  assert.equal(helpers.isPresignStat(presignFail), true)
+  assert.deepEqual(helpers.detailStatRows(presignFail), [])
+})
+
+test('g3.1 client region fallback ids and compact tokens stay aligned with COS_REGIONS', () => {
+  const client = read('src/client.js')
+  for (const region of COS_REGIONS) {
+    assert.match(client, new RegExp(`id: "${region.id}"`))
+  }
+  const start = client.indexOf('function normRegion')
+  const end = client.indexOf('\n    function isPresignStat', start)
+  const regionTokens = new Function('region', `${client.slice(start, end)}\nreturn regionTokens(region);`) as (
+    region: { id: string; label: string; aliases?: string[] },
+  ) => string[]
+  const tokens = regionTokens({ id: 'ap-beijing-fsi', label: '北京金融', aliases: ['beijing-fsi'] })
+  assert.equal(tokens.includes('beijingfsi'), true)
+  assert.equal(tokens.includes('ap-beijing-fsi'), true)
+})
+
+test('g1.3 settings card fields and layout stay schema-driven without COS extras', () => {
+  const client = read('src/client.js')
+  const start = client.indexOf('function ConfigCard')
+  const end = client.indexOf('const inject = ["slots"]')
+  const card = client.slice(start, end)
+  assert.match(card, /配置各云厂商 AccessKey，查询域名与解析记录/)
+  assert.match(card, /provider\.fields/)
+  assert.match(card, /SecretId|field\.label/)
+  assert.doesNotMatch(card, /默认地域|defaultRegion|COS 地域/)
+  assert.doesNotMatch(card, /创建存储桶|文件列表|CosRegionCombo/)
+  assert.match(card, /"产品模块"/)
+  assert.match(card, /className: "ci-cfg-mod-list"/)
+  assert.match(card, /写操作免确认（删除仍会确认）/)
+})
+
 test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () => {
   const client = read('src/client.js')
   assert.match(client, /min\(400px,100%\)/)
@@ -184,6 +691,24 @@ test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () =>
   assert.match(client, /function publicErrorMessage/)
   assert.match(client, /写操作免确认（删除仍会确认）/)
   assert.match(client, /未保存/)
+})
+
+test('cdb review fixes: WAN DMC, destroy protect toggle, project form, destructive SQL', () => {
+  const client = read('src/client.js')
+  assert.match(client, /function pickDmcEndpoint/)
+  assert.match(client, /function isDestructiveSql/)
+  assert.match(client, /关闭实例销毁保护/)
+  assert.match(client, /开启实例销毁保护/)
+  assert.match(client, /SqlText/)
+  assert.match(client, /auditOpened/)
+  assert.match(client, /未开外网时需插件主机可达内网/)
+  assert.match(client, /skip && !always/)
+  assert.doesNotMatch(client, /if \(skip && action !== "dmc\.row\.write"\)/)
+  assert.match(client, /onClick: \(\) => onReload\(tab\) \}, "重新检查"\)/)
+  assert.match(client, /tabData\.slowLogError/)
+  assert.match(client, /const body = !detail \? null : \(\(\) =>/)
+  assert.match(client, /loading: true, tab: nextTab/)
+  assert.match(client, /加载中…/)
 })
 
 test('g1.2 g3 image kind renders a chat card with region-first instance wall and search', () => {

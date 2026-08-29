@@ -82,7 +82,8 @@ test('g2.2 list pulls TCR regions from DescribeRegions like the console', async 
   const module = createImageModule(call as never)
   const result = await module.list(ctx({ region: 'ap-guangzhou' }))
   assert.equal(calls.some((row) => row.action === 'DescribeRegions'), true)
-  assert.deepEqual((result.regions || []).map((item) => item.id), [
+  const regionRows = (result.regions || []) as Array<{ id: string; label?: string }>
+  assert.deepEqual(regionRows.map((item) => item.id), [
     'ap-guangzhou',
     'ap-shanghai',
     'ap-nanjing',
@@ -92,7 +93,7 @@ test('g2.2 list pulls TCR regions from DescribeRegions like the console', async 
     'ap-hongkong',
     'ap-singapore',
   ])
-  assert.equal(result.regions?.find((item) => item.id === 'ap-hongkong')?.label, '中国香港')
+  assert.equal(regionRows.find((item) => item.id === 'ap-hongkong')?.label, '中国香港')
 })
 
 test('inferRegion reads 上海 from query and defaults to guangzhou', () => {

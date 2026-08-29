@@ -105,6 +105,7 @@ export function publicMeta(config: PluginConfig, source: Registry = registry): P
     implemented: module.implemented,
     enabled: isModuleEnabled(module, config),
     actions: module.actions,
+    regions: module.regions,
   }))
   return { providers, modules }
 }
@@ -132,3 +133,9 @@ export function credentialMap(provider: CloudProvider, bucket: Record<string, st
 }
 
 export const SETTINGS_HINT = '请在 设置 → 插件 → 云资源 填写对应云厂商的 AccessKey'
+export const CERT_CREDENTIAL_HINT = '请使用已有腾讯云 SecretId/SecretKey'
+
+export function credentialHint(kind?: string): string {
+  return kind === 'cert' ? CERT_CREDENTIAL_HINT : SETTINGS_HINT
+}
+

@@ -1,0 +1,25 @@
+{
+  "Context": "next-page-token",
+  "ListOver": false,
+  "Analysis": false,
+  "Results": [
+    {
+      "Time": 1756385463182,
+      "TopicId": "cce2db26-4a11-43f3-ae7d-3502a4b424fd",
+      "TopicName": "nginx-access",
+      "Source": "10.0.1.8",
+      "FileName": "/var/log/nginx/access.log",
+      "HostName": "web-1",
+      "RawLog": "10.0.1.8 POST /api/pay 500 902ms",
+      "LogJson": "{\"status\":\"500\",\"method\":\"POST\",\"url\":\"/api/pay\"}"
+    },
+    {
+      "Time": 1756385441904,
+      "TopicId": "cce2db26-4a11-43f3-ae7d-3502a4b424fd",
+      "TopicName": "nginx-access",
+      "Source": "127.0.0.1",
+      "RawLog": "127.0.0.1 GET /api 500 183ms",
+      "LogJson": "{\"status\":\"500\",\"method\":\"GET\",\"url\":\"/api\"}"
+    }
+  ]
+}
