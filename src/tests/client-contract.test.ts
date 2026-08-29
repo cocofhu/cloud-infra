@@ -205,6 +205,7 @@ test('g3 COS console two pages use region combo and file list, not an expand tre
   assert.match(client, /下一页/)
   assert.match(client, /id: "ci-cos-file-next"/)
   assert.match(client, /id: "ci-cos-file-prev"/)
+  assert.doesNotMatch(client, /className: "ci-page-btns" \},\)/)
   assert.doesNotMatch(client, /id: "ci-cos-load-more"/)
   assert.doesNotMatch(client, /加载更多/)
   assert.doesNotMatch(client, /一层过多可翻页/)

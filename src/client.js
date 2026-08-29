@@ -1323,7 +1323,7 @@ window.__ModuleLoader__.load({
         }) : null,
         showFiles && (session.hasMore || (session.page || 1) > 1) ? h("div", { key: "file-more", className: "ci-footbar", id: "ci-cos-file-pager" },
           h("div", { className: "ci-page" },
-            h("div", { className: "ci-page-btns" },)
+            h("div", { className: "ci-page-btns" },
               h("button", {
                 id: "ci-cos-file-prev",
                 type: "button",
