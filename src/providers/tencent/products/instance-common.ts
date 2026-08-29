@@ -86,7 +86,7 @@ export function matchInstanceQuery(haystacks: Array<string | undefined>, query: 
 
 export function matchRegion(card: { region?: string; regionName?: string }, region?: string): boolean {
   const want = String(region || '').trim()
-  if (!want) return true
+  if (!want || want === 'all' || want === '*') return true
   return card.region === want || card.regionName === want
 }
 
@@ -103,6 +103,7 @@ export function isGuangzhou(region: { region?: string; regionName?: string } | s
 export function pickRegions(regions: CloudRegion[], wanted?: string): CloudRegion[] {
   if (!regions.length) return []
   const want = String(wanted || '').trim()
+  if (want === 'all' || want === '*') return regions
   if (want) {
     return regions.filter((row) => (
       row.region === want

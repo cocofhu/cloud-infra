@@ -205,6 +205,7 @@ test('pickRegions defaults to Guangzhou and honors an explicit region', () => {
   assert.deepEqual(pickRegions(regions), [{ region: 'ap-guangzhou', regionName: '华南地区（广州）' }])
   assert.equal(pickRegions(regions, '华北地区（北京）')[0].region, 'ap-beijing')
   assert.equal(pickRegions(regions, 'ap-shanghai')[0].region, 'ap-shanghai')
+  assert.equal(pickRegions(regions, 'all').length, 3)
   assert.equal(pickRegions([{ region: 'ap-shanghai', regionName: '华东地区（上海）' }])[0].region, 'ap-shanghai')
 })
 

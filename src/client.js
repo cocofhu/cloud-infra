@@ -370,27 +370,21 @@ window.__ModuleLoader__.load({
       return kind === "cvm" || kind === "lighthouse";
     }
 
-    function shortRegion(name) {
-      const m = String(name || "").match(/（([^）]+)）/);
-      return m ? m[1] : String(name || "");
-    }
-
     function defaultRegionName(names) {
       const list = (Array.isArray(names) ? names : []).filter(Boolean);
       return list.find((name) => /广州/.test(name) || name === "ap-guangzhou") || list[0] || "华南地区（广州）";
     }
 
-    function RegionTabs({ regions, value, onChange }) {
+    function RegionSelect({ regions, value, onChange }) {
       const names = Array.from(new Set((Array.isArray(regions) ? regions : []).filter(Boolean)));
-      if (!names.length) return null;
-      const current = value && names.includes(value) ? value : defaultRegionName(names);
-      return h("div", { className: "ci-tabs" },
-        names.map((name) => h("button", {
-          type: "button",
-          key: name,
-          className: "ci-tab" + (name === current ? " on" : ""),
-          onClick: () => { if (onChange && name !== current) onChange(name); },
-        }, shortRegion(name) || name)),
+      const current = value || defaultRegionName(names);
+      return h("select", {
+        className: "ci-select",
+        value: current,
+        onChange: (e) => onChange && onChange(e.target.value),
+      },
+        h("option", { value: "all" }, "全部地域"),
+        names.map((name) => h("option", { key: name, value: name }, name)),
       );
     }
 
@@ -857,6 +851,7 @@ window.__ModuleLoader__.load({
         h("div", { key: "bar", className: "ci-bar" },
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, "实例"),
+            h(RegionSelect, { regions: regionNames, value: regionValue, onChange: setRegion }),
           ),
           h("div", { className: "ci-search-wrap" },
             h(SearchIcon),
@@ -875,7 +870,6 @@ window.__ModuleLoader__.load({
             }, "×") : null,
           ),
         ),
-        h(RegionTabs, { key: "rtabs", regions: regionNames, value: regionValue, onChange: setRegion }),
         rows.length ? h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
             ["ID/名称", "状态", "可用区", "实例类型", "操作系统", "实例配置", "主IPv4地址", "实例计费模式", "操作"]
@@ -906,61 +900,20 @@ window.__ModuleLoader__.load({
     }
 
     function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, region, regions, onRegion }) {
-      const [mode, setMode] = useState("card");
       const regionValue = region || defaultRegionName(regions);
-      const groups = groupByRegion(items || []);
+      const rows = Array.isArray(items) ? items : [];
       return [
         h("div", { key: "bar", className: "ci-bar" },
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, "服务器"),
-          ),
-          h("div", { className: "ci-ops" },
-            h("button", {
-              type: "button",
-              className: "ci-ghost" + (mode === "card" ? " on" : ""),
-              onClick: () => setMode("card"),
-            }, "卡片视图"),
-            h("button", {
-              type: "button",
-              className: "ci-ghost" + (mode === "table" ? " on" : ""),
-              onClick: () => setMode("table"),
-            }, "列表视图"),
+            h(RegionSelect, { regions, value: regionValue, onChange: onRegion }),
           ),
         ),
-        h(RegionTabs, { key: "rtabs", regions, value: regionValue, onChange: onRegion }),
-        !(items || []).length
-          ? h("div", { key: "empty", className: "ci-empty" }, emptyHint || "没有资源")
-          : mode === "card" ? groups.map((group) => [
-          h("div", { key: group.region + "-g", className: "ci-group" }, group.region),
-          h("div", { key: group.region + "-c", className: "ci-cards" },
-            group.items.map((item) => h("div", { key: item.id, className: "ci-card" },
-              h("div", { className: "ci-card-h" },
-                h("div", { className: "ci-id" },
-                  h("button", {
-                    type: "button",
-                    className: "ci-card-t",
-                    disabled: pendingId === item.id,
-                    onClick: () => onOpen(item),
-                  }, item.title),
-                  h("span", { className: "ci-id-sub" }, item.instanceId || item.id),
-                ),
-                h(StatusCell, { status: item.status, label: item.stateLabel }),
-              ),
-              h("div", { className: "ci-kv" }, "公网 IP ", h("b", null, item.publicIp || cellValue(item, "公网 IP") || "-")),
-              h("div", { className: "ci-kv" }, "套餐 ", h("b", null, cellValue(item, "套餐") || "-")),
-              h("div", { className: "ci-kv" }, "到期时间 ", h("b", null, cellValue(item, "到期时间") || "-")),
-              h("div", { style: { marginTop: 10, textAlign: "right" } }, h(MoreMenu, {
-                item,
-                disabled: pendingId === item.id,
-                onAction,
-              })),
-            )),
-          ),
-        ]) : h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
+        rows.length ? h("div", { key: "tb", className: "ci-scroll" }, h("table", { className: "ci-dense" },
           h("thead", null, h("tr", null,
             ["ID/名称", "状态", "地域", "公网 IP", "套餐", "到期时间", "操作"].map((label) => h("th", { key: label }, label)),
           )),
-          h("tbody", null, (items || []).map((item) => h("tr", { key: item.id },
+          h("tbody", null, rows.map((item) => h("tr", { key: item.id },
             h("td", null, h("div", { className: "ci-id" },
               h("button", {
                 type: "button",
@@ -977,7 +930,7 @@ window.__ModuleLoader__.load({
             h("td", null, cellValue(item, "到期时间") || "-"),
             h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )),
+        )) : h("div", { key: "empty", className: "ci-empty" }, emptyHint || "没有资源"),
       ];
     }
 
