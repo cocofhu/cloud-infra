@@ -231,6 +231,18 @@ test('g2.3 upload folder rename delete and 15-minute presign stay on current pre
     assert.match(String(signed.data?.url || ''), /cos\.ap-guangzhou\.myqcloud.com/)
     assert.equal(signed.data?.expiresSec, 900)
   }
+  const stated = await module.execute?.('object.stat', {
+    key: 'readme.txt',
+    region: 'ap-guangzhou',
+    bucket: 'assets-1250000000',
+  }, ctx())
+  assert.equal(stated?.ok, true)
+  if (stated?.ok) {
+    assert.equal(stated.data?.name, 'readme.txt')
+    assert.equal(stated.data?.sizeLabel, '10 B')
+    assert.equal(stated.data?.url, undefined)
+    assert.match(String(stated.data?.address || ''), /cos\.ap-guangzhou\.myqcloud.com\/readme\.txt/)
+  }
   const removed = await module.execute?.('folder.delete', {
     key: 'images/',
     region: 'ap-guangzhou',

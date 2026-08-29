@@ -278,7 +278,7 @@ async function runAction(
         sizeLabel: formatSize(stat.size),
         storageClass: storageClassLabel(stat.storageClass),
         lastModified: formatTime(stat.lastModified),
-        url: stat.url,
+        address: stat.url,
       },
     }
   }

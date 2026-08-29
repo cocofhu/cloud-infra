@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { COS_REGIONS } from '../providers/tencent/cos-regions.js'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const root = join(dir, '../..')
@@ -199,7 +200,62 @@ test('g3 COS console two pages use region combo and file list, not an expand tre
   assert.match(client, /id: "ci-cos-presign-url"/)
   assert.match(client, /readOnly: true/)
   assert.match(client, /剪贴板不可用/)
+  assert.match(client, /stat\.copied === false && stat\.expiresSec/)
+  assert.match(client, /function isPresignStat/)
+  assert.match(client, /function detailStatRows/)
+  assert.match(client, /stat\.address/)
+  assert.doesNotMatch(client, /stat\.url && !stat\.copied/)
+  assert.match(client, /fileSeq/)
+  assert.match(client, /if \(n !== fileSeq\.current\) return/)
+  assert.match(client, /withoutAp\.replace\(\/-\/g, ""\)/)
+  assert.match(client, /列表已截断，但未返回下一页标记/)
   assert.match(host, /对象存储 · 请先配置凭证/)
+})
+
+test('g3.2 object.stat modal is not the presign clipboard-fail dialog', () => {
+  const src = read('src/client.js')
+  const start = src.indexOf('function isPresignStat')
+  const end = src.indexOf('\n    function matchCosRegion', start)
+  assert.ok(start >= 0 && end > start)
+  const helpers = new Function(`
+    ${src.slice(start, end)}
+    return { isPresignStat, detailStatRows };
+  `)() as {
+    isPresignStat: (stat: unknown) => boolean
+    detailStatRows: (stat: unknown) => Array<[string, unknown]>
+  }
+  const stat = {
+    name: 'readme.txt',
+    sizeLabel: '10 B',
+    storageClass: '标准存储',
+    lastModified: '2025-02-01 00:00:00',
+    address: 'https://assets-1250000000.cos.ap-guangzhou.myqcloud.com/readme.txt',
+    url: 'https://assets-1250000000.cos.ap-guangzhou.myqcloud.com/readme.txt',
+  }
+  assert.equal(helpers.isPresignStat(stat), false)
+  const rows = helpers.detailStatRows(stat)
+  assert.deepEqual(rows.map((row) => row[0]), ['名称', '大小', '存储类型', '修改时间', '对象地址'])
+  assert.equal(rows[0][1], 'readme.txt')
+  assert.equal(rows[1][1], '10 B')
+  assert.doesNotMatch(JSON.stringify(rows), /剪贴板不可用/)
+  const presignFail = { url: 'https://signed.example/tmp', copied: false, expiresSec: 900 }
+  assert.equal(helpers.isPresignStat(presignFail), true)
+  assert.deepEqual(helpers.detailStatRows(presignFail), [])
+})
+
+test('g3.1 client region fallback ids and compact tokens stay aligned with COS_REGIONS', () => {
+  const client = read('src/client.js')
+  for (const region of COS_REGIONS) {
+    assert.match(client, new RegExp(`id: "${region.id}"`))
+  }
+  const start = client.indexOf('function normRegion')
+  const end = client.indexOf('\n    function isPresignStat', start)
+  const regionTokens = new Function('region', `${client.slice(start, end)}\nreturn regionTokens(region);`) as (
+    region: { id: string; label: string; aliases?: string[] },
+  ) => string[]
+  const tokens = regionTokens({ id: 'ap-beijing-fsi', label: '北京金融', aliases: ['beijing-fsi'] })
+  assert.equal(tokens.includes('beijingfsi'), true)
+  assert.equal(tokens.includes('ap-beijing-fsi'), true)
 })
 
 test('g1.3 settings card fields and layout stay schema-driven without COS extras', () => {

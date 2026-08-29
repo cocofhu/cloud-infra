@@ -718,9 +718,26 @@ window.__ModuleLoader__.load({
 
     function regionTokens(region) {
       const id = normRegion(region.id);
-      return [id, id.replace(/-/g, ""), id.replace(/^ap-/, ""), normRegion(region.label)]
+      const compact = id.replace(/-/g, "");
+      const withoutAp = id.replace(/^ap-/, "");
+      return [id, compact, withoutAp, withoutAp.replace(/-/g, ""), normRegion(region.label)]
         .concat((region.aliases || []).map(normRegion))
         .filter(Boolean);
+    }
+
+    function isPresignStat(stat) {
+      return !!(stat && (stat.copied === true || (stat.copied === false && stat.expiresSec)));
+    }
+
+    function detailStatRows(stat) {
+      if (!stat || isPresignStat(stat)) return [];
+      return [
+        ["名称", stat.name],
+        ["大小", stat.sizeLabel],
+        ["存储类型", stat.storageClass],
+        ["修改时间", stat.lastModified],
+        ["对象地址", stat.address],
+      ];
     }
 
     function matchCosRegion(region, needle) {
@@ -927,6 +944,7 @@ window.__ModuleLoader__.load({
       const [stat, setStat] = useState(null);
       const fileRef = useRef(null);
       const seq = useRef(0);
+      const fileSeq = useRef(0);
       const searchTimer = useRef(0);
       useEffect(() => {
         api("meta", {}).then((d) => {
@@ -992,6 +1010,7 @@ window.__ModuleLoader__.load({
         }
       };
       const pickRegion = (region) => {
+        fileSeq.current += 1;
         setSelected(region);
         setInput(displayRegion(region));
         setOpen(false);
@@ -999,6 +1018,7 @@ window.__ModuleLoader__.load({
         fetchBuckets(region, 0, "");
       };
       const onRegionInput = (value) => {
+        fileSeq.current += 1;
         setInput(value);
         setSelected(null);
         setRows([]);
@@ -1008,6 +1028,7 @@ window.__ModuleLoader__.load({
         setHighlight(0);
       };
       const loadFiles = async (item, prefix, marker) => {
+        const n = ++fileSeq.current;
         const append = !!marker;
         setPendingId(item.id);
         setSession((cur) => ({
@@ -1030,6 +1051,7 @@ window.__ModuleLoader__.load({
             prefix: prefix || "",
             marker: marker || "",
           });
+          if (n !== fileSeq.current) return;
           setSession((cur) => {
             const same = cur && cur.item?.id === item.id && (cur.prefix || "") === (detail.prefix || prefix || "");
             const prev = append && same ? (cur.entries || []) : [];
@@ -1044,9 +1066,10 @@ window.__ModuleLoader__.load({
             };
           });
         } catch (e) {
+          if (n !== fileSeq.current) return;
           setSession({ item, prefix: prefix || "", loading: false, detail: null, error: publicErrorMessage(e), entries: [], hasMore: false, nextMarker: "" });
         } finally {
-          setPendingId("");
+          if (n === fileSeq.current) setPendingId("");
         }
       };
       const run = async (action, extra) => {
@@ -1068,7 +1091,7 @@ window.__ModuleLoader__.load({
           setForm(null);
           setConfirm(null);
           setMoreKey("");
-          if (action.id === "object.stat") setStat(result.data || null);
+          if (action.id === "object.stat") setStat({ ...(result.data || {}), kind: "stat" });
           else if (action.id === "object.presign" || action.id === "object.download") {
             const url = result.data && result.data.url;
             if (action.id === "object.download" && url && typeof window !== "undefined") window.open(url, "_blank", "noopener");
@@ -1081,8 +1104,8 @@ window.__ModuleLoader__.load({
                 }
               } catch { copied = false; }
               setStat(copied
-                ? { copied: true, expiresSec: result.data.expiresSec }
-                : { url, expiresSec: result.data?.expiresSec, copied: false });
+                ? { kind: "presign", copied: true, expiresSec: result.data.expiresSec }
+                : { kind: "presign", url, expiresSec: result.data?.expiresSec, copied: false });
             }
           } else if (session?.item) await loadFiles(session.item, session.prefix || "");
           else if (selected) await fetchBuckets(selected, 0, activeQ);
@@ -1269,13 +1292,13 @@ window.__ModuleLoader__.load({
         showFiles && session.hasMore ? h("div", { key: "file-more", className: "ci-footbar", id: "ci-cos-file-pager" },
           h("div", { className: "ci-page" },
             h("span", null, `已加载 ${(session.entries || []).length} 条，一层过多可翻页`),
-            h("button", {
+            session.nextMarker ? h("button", {
               id: "ci-cos-load-more",
               type: "button",
               className: "ci-page-btn",
               disabled: !!session.loading || busy,
               onClick: () => loadFiles(session.item, session.prefix || "", session.nextMarker),
-            }, "加载更多"),
+            }, "加载更多") : h("span", { className: "ci-hint" }, "列表已截断，但未返回下一页标记"),
           ),
         ) : null,
         form ? h(RecordForm, {
@@ -1323,9 +1346,9 @@ window.__ModuleLoader__.load({
           className: "ci-modal-mask",
           onClick: (e) => { if (e.target === e.currentTarget) setStat(null); },
         }, h("div", { className: "ci-modal", role: "dialog" },
-          h("h3", null, stat.copied ? "临时链接" : (stat.url ? "临时链接" : "详情")),
-          stat.copied ? h("p", null, `已复制到剪贴板，约 ${Math.round((stat.expiresSec || 900) / 60)} 分钟有效。`) : null,
-          stat.url && !stat.copied ? [
+          h("h3", null, isPresignStat(stat) ? "临时链接" : "详情"),
+          stat.copied === true ? h("p", null, `已复制到剪贴板，约 ${Math.round((stat.expiresSec || 900) / 60)} 分钟有效。`) : null,
+          stat.copied === false && stat.expiresSec ? [
             h("p", { key: "hint" }, "剪贴板不可用，请手动复制。约 15 分钟有效。"),
             h("input", {
               key: "url",
@@ -1343,16 +1366,13 @@ window.__ModuleLoader__.load({
                 try {
                   if (navigator.clipboard && navigator.clipboard.writeText) {
                     await navigator.clipboard.writeText(stat.url);
-                    setStat({ copied: true, expiresSec: stat.expiresSec });
+                    setStat({ kind: "presign", copied: true, expiresSec: stat.expiresSec });
                   }
                 } catch { /* keep input visible */ }
               },
             }, "复制"),
           ] : null,
-          !stat.copied && !stat.url ? ["名称", "大小", "存储类型", "修改时间", "对象地址"].map((label) => {
-            const map = { 名称: stat.name, 大小: stat.sizeLabel, 存储类型: stat.storageClass, 修改时间: stat.lastModified, 对象地址: stat.url || stat.address };
-            return h("p", { key: label }, `${label}：${map[label] || "-"}`);
-          }) : null,
+          !isPresignStat(stat) ? detailStatRows(stat).map(([label, value]) => h("p", { key: label }, `${label}：${value || "-"}`)) : null,
           h("div", { className: "ci-modal-actions" },
             h("button", { type: "button", className: "ci-mini primary", onClick: () => setStat(null) }, "关闭"),
           ),

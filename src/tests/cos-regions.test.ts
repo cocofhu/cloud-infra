@@ -22,3 +22,10 @@ test('g2.1 resolveCosRegion only accepts exact id/label/alias, not free text', (
   assert.equal(resolveCosRegion('not-a-region'), undefined)
   assert.equal(resolveCosRegion(''), undefined)
 })
+
+test('g2.1 compact tokens include withoutAp hyphen-stripped ids', () => {
+  const fsi = COS_REGIONS.find((item) => item.id === 'ap-beijing-fsi')
+  assert.ok(fsi)
+  assert.equal(matchCosRegion(fsi!, 'beijingfsi'), true)
+  assert.equal(resolveCosRegion('beijingfsi')?.id, 'ap-beijing-fsi')
+})

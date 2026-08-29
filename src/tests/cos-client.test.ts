@@ -72,6 +72,35 @@ test('g2.3 list page maps folders first and short names only', () => {
   assert.equal(shortName('images/logo.png', 'images/'), 'logo.png')
 })
 
+test('g2.3 parseListPage falls back to last key when truncated without NextMarker', () => {
+  const page = parseListPage(`
+    <ListBucketResult>
+      <IsTruncated>true</IsTruncated>
+      <Contents>
+        <Key>a.txt</Key>
+        <Size>1</Size>
+        <StorageClass>STANDARD</StorageClass>
+      </Contents>
+      <Contents>
+        <Key>b.txt</Key>
+        <Size>2</Size>
+        <StorageClass>STANDARD</StorageClass>
+      </Contents>
+    </ListBucketResult>
+  `, '')
+  assert.equal(page.isTruncated, true)
+  assert.equal(page.nextMarker, 'b.txt')
+  const foldersOnly = parseListPage(`
+    <ListBucketResult>
+      <IsTruncated>true</IsTruncated>
+      <CommonPrefixes><Prefix>docs/</Prefix></CommonPrefixes>
+      <CommonPrefixes><Prefix>images/</Prefix></CommonPrefixes>
+    </ListBucketResult>
+  `, '')
+  assert.equal(foldersOnly.isTruncated, true)
+  assert.equal(foldersOnly.nextMarker, 'images/')
+})
+
 test('g2.2 access permission label is read-only ACL mapping', () => {
   assert.equal(aclLabelFromXml('<AccessControlPolicy></AccessControlPolicy>'), '私有读写')
   assert.equal(aclLabelFromXml(`

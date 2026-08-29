@@ -537,9 +537,11 @@ export function parseListPage(xml: string, prefix: string, currentLayer = true):
     }
   }
   const isTruncated = /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml)
-  const nextMarker = xmlText(xml, 'NextMarker') || undefined
+  const entries = currentLayer ? [...folders, ...files] : []
+  const lastKey = keys[keys.length - 1] || entries[entries.length - 1]?.key || ''
+  const nextMarker = xmlText(xml, 'NextMarker') || (isTruncated ? lastKey : '') || undefined
   return {
-    entries: currentLayer ? [...folders, ...files] : [],
+    entries,
     isTruncated,
     nextMarker,
     keys,
