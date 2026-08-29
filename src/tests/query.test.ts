@@ -108,20 +108,24 @@ test('queryResources 精确命中时附带 directItemId', async () => {
   assert.match(renderQuery(result), /自动定位到「cloud-init-1251810746」/)
 })
 
-test('queryResources 未命中时附带 notFoundQuery 并保留全量列表文案', async () => {
+test('queryResources 未命中时附带 notFoundQuery 并回落全量列表', async () => {
   const items = [
     card('tencent.cos:ap-guangzhou:assets-1250000000', 'assets-1250000000'),
     card('tencent.cos:ap-guangzhou:logs-1250000000', 'logs-1250000000'),
   ]
-  // 模块本地过滤后为空：query.ts 仍依据（空的）items 给出 notFoundQuery，客户端回退展示
+  // 模块先按 query 本地过滤（为空），query.ts 检测到未命中后以空 query 重拉回落全量
   const result = await queryResources(
     { kind: 'cos', query: 'no-such-bucket-xyz', region: 'ap-guangzhou' },
     cfg(), undefined, registryWithItems(items),
   )
   assert.equal(result.notFoundQuery, 'no-such-bucket-xyz')
   assert.equal(result.directItemId, undefined)
-  assert.match(renderQuery(result), /no-such-bucket-xyz/)
-  assert.match(renderQuery(result), /完全匹配/)
+  assert.equal(result.items.length, 2)
+  assert.deepEqual(result.items.map((item) => item.title).sort(), ['assets-1250000000', 'logs-1250000000'])
+  const rendered = renderQuery(result)
+  assert.match(rendered, /no-such-bucket-xyz/)
+  assert.match(rendered, /完全匹配/)
+  assert.match(rendered, /全量列表/)
 })
 
 test('queryResources 未命中且模块返回全量时，文案说明回落到全量列表', async () => {
@@ -149,6 +153,68 @@ test('queryResources 未命中且模块返回全量时，文案说明回落到�
   assert.equal(result.items.length, 1)
   assert.match(renderQuery(result), /未找到与您输入的「no-such-cert」完全匹配的资源/)
   assert.match(renderQuery(result), /全量列表/)
+})
+
+test('queryResources 未命中且回落重拉失败时保留原空结果', async () => {
+  const items = [card('tencent.cos:ap-guangzhou:assets-1', 'assets-1')]
+  const source = createRegistry()
+  source.registerProvider({
+    id: 'tencent',
+    title: '腾讯云',
+    fields: [
+      { key: 'secretId', label: 'SecretId' },
+      { key: 'secretKey', label: 'SecretKey' },
+    ],
+  })
+  let calls = 0
+  source.registerModule({
+    id: 'tencent.cos',
+    provider: 'tencent',
+    kind: 'cos',
+    title: '测试 cos',
+    implemented: true,
+    list: async (ctx: ModuleContext) => {
+      calls += 1
+      if (!ctx.query) throw new Error('重拉网络异常')
+      return { items: items.filter((item) => item.title.includes(ctx.query)) }
+    },
+  })
+  const result = await queryResources(
+    { kind: 'cos', query: 'no-such', region: 'ap-guangzhou' },
+    cfg(), undefined, source,
+  )
+  assert.equal(result.notFoundQuery, 'no-such')
+  assert.equal(result.items.length, 0)
+  assert.equal(calls, 2)
+})
+
+test('queryResources 非直达 kind 未命中时不回落重拉', async () => {
+  const items = [card('tencent.domain:example.com', 'example.com', 'domain')]
+  let calls = 0
+  const source = createRegistry()
+  source.registerProvider({
+    id: 'tencent',
+    title: '腾讯云',
+    fields: [
+      { key: 'secretId', label: 'SecretId' },
+      { key: 'secretKey', label: 'SecretKey' },
+    ],
+  })
+  source.registerModule({
+    id: 'tencent.domain',
+    provider: 'tencent',
+    kind: 'domain',
+    title: '测试域名',
+    implemented: true,
+    list: async (ctx: ModuleContext) => {
+      calls += 1
+      return { items: ctx.query ? items.filter((item) => item.title.includes(ctx.query)) : items }
+    },
+  })
+  const result = await queryResources({ kind: 'domain', query: 'no-such-domain' }, cfg(), undefined, source)
+  assert.equal(result.notFoundQuery, 'no-such-domain')
+  assert.equal(result.items.length, 0)
+  assert.equal(calls, 1)
 })
 
 test('queryResources 空 query 不产生直达字段', async () => {

@@ -168,6 +168,7 @@ test('g1.1 list requires runtime region and forwards filters without writeOverla
   const listed = await module.list(ctx({
     query: 'prod',
     filters: { clusterType: '标准集群', status: 'Running', vpcId: 'vpc-demo001', tag: 'env:prod' },
+    clientLocalFilter: false,
   }))
   assert.equal(listed.items[0].title, 'prod-tke')
   const describe = calls.find((row) => row.action === 'DescribeClusters')
@@ -631,6 +632,7 @@ test('buildClusterFilters maps console filter names', () => {
   const filters = buildClusterFilters(ctx({
     query: 'demo',
     filters: { clusterType: 'edge', status: 'Running', vpcId: 'vpc-1', tag: 'team:sre' },
+    clientLocalFilter: false,
   }))
   assert.deepEqual(filters.map((item) => item.Name), ['ClusterName', 'ClusterType', 'ClusterStatus', 'vpc-id', 'tag:team'])
 })

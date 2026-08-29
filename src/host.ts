@@ -222,6 +222,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
         view: method === 'search' ? 'search' : String(body.view || ''),
         title: String(body.title || ''),
         instanceId: body.instanceId != null ? String(body.instanceId) : undefined,
+        clientLocalFilter: body.clientLocalFilter != null ? Boolean(body.clientLocalFilter) : undefined,
       }, cfg)
       return sendJson(res, 200, { ok: true, ...result })
     }

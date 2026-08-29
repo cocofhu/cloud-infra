@@ -29,6 +29,8 @@ export interface QueryInput {
   view?: string
   title?: string
   instanceId?: string
+  /** 见 ModuleContext.clientLocalFilter；host 工具调用缺省按服务端过滤（false），客户端卡片传 true。 */
+  clientLocalFilter?: boolean
 }
 
 export function wantsSearch(input: QueryInput): boolean {
@@ -45,6 +47,9 @@ export function wantsSearch(input: QueryInput): boolean {
   if ((hasWindow || range) && hasTopicHint) return true
   return false
 }
+
+/** 参与「带资源名直达/未命中回落」的模块 kind（其余 kind 的 query 过滤行为保持不变）。 */
+const DIRECT_HIT_KINDS = new Set(['cos', 'cert', 'cdb', 'cluster', 'cvm', 'lighthouse', 'image'])
 
 /**
  * 直达判定：用户带具体资源名时，query 与某条卡片的 title 或 id 最后一段
@@ -151,6 +156,7 @@ export async function queryResources(
         id: input.topicId,
         title: input.title,
         instanceId: input.instanceId,
+        clientLocalFilter: input.clientLocalFilter,
       }
       if (search && module.search) {
         const result = await module.search(ctx)
@@ -174,6 +180,31 @@ export async function queryResources(
         return
       }
       const result = await module.list(ctx)
+      // 未命中回落：带了资源名且模块按 query 过滤后为空时，以空 query 重拉一次当前地域全量列表
+      // （需求 f2/r3 默认方案：卡片展示「该地域全部 X」+ 提示，而不是空表格）。
+      if (!search && DIRECT_HIT_KINDS.has(module.kind) && query && !(result.items || []).length) {
+        const refetch = await module.list({ ...ctx, query: '', offset: 0 }).catch(() => null)
+        if (refetch && (refetch.items || []).length) {
+          lists.push(refetch.items || [])
+          total += refetch.total != null ? refetch.total : (refetch.items?.length || 0)
+          if (refetch.hasMore) hasMore = true
+          extras.view = refetch.view || extras.view || 'list'
+          if (refetch.region) extras.region = refetch.region
+          if (refetch.instanceId && !extras.instanceId) extras.instanceId = refetch.instanceId
+          collectRegions(refetch.regions, extras, regions)
+          if (refetch.needsRegion) needsRegion = true
+          for (const message of refetch.warnings || []) {
+            errors.push({ moduleId: module.id, message })
+          }
+          for (const item of refetch.errors || []) {
+            errors.push({
+              moduleId: item.moduleId || module.id,
+              message: item.message,
+            })
+          }
+          return
+        }
+      }
       lists.push(result.items || [])
       if (result.total != null) total += result.total
       else total += result.items?.length || 0
@@ -313,7 +344,7 @@ export function renderQuery(result: QueryResult): string {
     ? `其中「${directHit.title}」与用户输入完全匹配，对话卡片将自动定位到「${directHit.title}」并直接打开它的详情面板，不要再说让用户自己点进去。`
     : ''
   const missNote = result.notFoundQuery
-    ? `注意：未找到与您输入的「${result.notFoundQuery}」完全匹配的资源（可能是名称打错、资源不存在或不在当前地域）；对话卡片将展示当前地域的全量列表并给出提示，请用户从列表中选择或换个关键字重试。`
+    ? `注意：未找到与您输入的「${result.notFoundQuery}」完全匹配的资源（可能是名称打错、资源不存在或不在当前地域）；对话卡片已在列表上方给出提示并展示当前地域的全量列表，请用户从列表中选择或换个关键字重试。`
     : ''
   return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}${directNote ? ` ${directNote}` : ''}${missNote ? ` ${missNote}` : ''}\n\n${lines.join('\n')}${err}`
 }

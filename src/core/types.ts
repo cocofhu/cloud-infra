@@ -231,6 +231,13 @@ export interface ModuleContext {
   limit: number
   timeoutMs: number
   signal?: AbortSignal
+  /**
+   * query 关键字在哪里过滤：
+   * - true（客户端默认）：模块先按未过滤集合生成卡片，再按 query 本地过滤，供客户端搜索框使用；
+   * - false / 缺省（host 工具调用默认）：模块自行过滤（远端 API 参数或本地过滤），queryResources
+   *   在未命中需要回落全量时直接以空 query 重拉。
+   */
+  clientLocalFilter?: boolean
   id?: string
   title?: string
   group?: string

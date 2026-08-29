@@ -275,6 +275,8 @@ test('handleApi query 响应包含 directItemId / notFoundQuery 字段', async (
     assert.equal(missBody.ok, true)
     assert.equal(missBody.notFoundQuery, 'no-such-bucket-xyz')
     assert.equal(missBody.directItemId, undefined)
+    // 未命中回落：queryResources 以空 query 重拉一次，items 为该地域全量（f2 验收点）
+    assert.equal(missBody.items.length, 2)
   } finally {
     // 恢复真实 cos 模块，避免影响其它用例
     const { tencentCosModule } = await import('../providers/tencent/products/cos.js')

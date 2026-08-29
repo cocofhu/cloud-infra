@@ -165,7 +165,9 @@ export function createCvmModule(call: TencentProductCall = cvmCall): ResourceMod
       const scoped = pickRegions(regions, ctx.region)
       const { items, errors } = await listAcrossRegions(scoped, async (region) => {
         const mapped = await loadCvmRegion(call, ctx, module.id, region)
-        return mapped.filter((card) => matchCvmQuery(card, ctx.query) && matchRegion(card, ctx.region))
+        return ctx.clientLocalFilter === false
+          ? mapped.filter((card) => matchCvmQuery(card, ctx.query) && matchRegion(card, ctx.region))
+          : mapped.filter((card) => matchRegion(card, ctx.region))
       }, module.id)
       return {
         ...paginateItems(items, ctx.offset, ctx.limit),

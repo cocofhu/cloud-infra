@@ -160,7 +160,7 @@ test('createCertModule list/detail/actions talk SSL APIs without writing setting
   const module = createCertModule(call as never)
   assert.equal(module.id, 'tencent.cert')
   assert.equal(module.kind, 'cert')
-  const listed = await module.list({ ...ctx, query: 'example', group: 'issued' })
+  const listed = await module.list({ ...ctx, query: 'example', group: 'issued', clientLocalFilter: false })
   assert.equal(listed.items[0].title, 'QL8k2m')
   assert.equal(listed.items[0].kind, 'cert')
   const statusFilter = calls.find((row) => row.action === 'DescribeCertificates')?.payload as { CertificateStatus?: number[]; SearchKey?: string }

@@ -275,12 +275,12 @@ test('keyword list filter keeps matching instances only', async () => {
     if (action === 'DescribeInstances') return { InstanceSet: [cvmRunning, cvmStopped], TotalCount: 2 }
     throw new Error(`${action}:${region}`)
   })
-  const byIp = await createCvmModule(call).list({ ...ctx, query: '43.138.9.21' })
+  const byIp = await createCvmModule(call).list({ ...ctx, query: '43.138.9.21', clientLocalFilter: false })
   assert.equal(byIp.items.length, 1)
   assert.equal(byIp.items[0].title, 'api-prod')
-  const byId = await createCvmModule(call).list({ ...ctx, query: 'ins-0p9q2c' })
+  const byId = await createCvmModule(call).list({ ...ctx, query: 'ins-0p9q2c', clientLocalFilter: false })
   assert.equal(byId.items[0].title, 'dev-box')
-  const miss = await createCvmModule(call).list({ ...ctx, query: 'not-found-xx' })
+  const miss = await createCvmModule(call).list({ ...ctx, query: 'not-found-xx', clientLocalFilter: false })
   assert.equal(miss.items.length, 0)
 })
 

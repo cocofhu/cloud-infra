@@ -554,7 +554,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       cluster: "集群",
       cvm: "实例",
       lighthouse: "实例",
-      image: "实例",
+      image: "实例/仓库",
     };
 
     function directResourceLabel(kind) {
@@ -578,6 +578,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       if (!item || typeof onOpenDetail !== "function") return false;
       onOpenDetail(item);
       return true;
+    }
+
+    /** 未命中回落提示条文案：items 非空时承诺「以下是该地域的全部 X」，为空时改成「没有可列出的 X」，避免文案与空表格矛盾。 */
+    function notFoundText(label, query, region, itemCount) {
+      const where = regionLabelOf(region) || "当前地域";
+      const head = `未找到与您输入完全匹配的${label}「${query}」（${where}）。`;
+      return itemCount > 0
+        ? `${head}以下是该地域的全部${label}，请在列表中选择。`
+        : `${head}该地域当前没有可列出的${label}，可切换地域或换个关键字重试。`;
     }
 
     /** 未命中回落提示条：可关闭（用户关闭后本次挂载内不再重现）。 */
@@ -2024,6 +2033,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             query: q || "",
             offset: nextOffset,
             limit: pageSize,
+            clientLocalFilter: true,
           });
           if (n !== seq.current) return;
           const errs = Array.isArray(result.errors) ? result.errors.map((e) => e && e.message).filter(Boolean) : [];
@@ -2130,10 +2140,13 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         }
       };
       // 资源直达：payload 带 directItemId 且当前桶列表里能找到该桶时，自动进入它的文件列表（只触发一次）。
+      // 防重 key 带 region：同一资源名换地域重查时能再次直达，不依赖人工 reset。
       useEffect(() => {
         const directId = String(payload?.directItemId || "");
-        if (!directId || directTried.current === directId) return;
-        directTried.current = directId;
+        if (!directId) return;
+        const key = `${payload?.region || ""}|${directId}`;
+        if (directTried.current === key) return;
+        directTried.current = key;
         maybeAutoOpenDetail(payload, rows, (item) => { setDraftQ(""); loadFiles(item, ""); });
       });
       const missQuery = payload?.notFoundQuery && !missDismissed ? String(payload.notFoundQuery) : "";
@@ -2304,7 +2317,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         listErr ? h("div", { key: "lerr", className: "ci-err", id: "ci-cos-cred-err" }, listErr) : null,
         !session && missQuery ? h(NotFoundNotice, {
           key: "miss",
-          text: `未找到与您输入完全匹配的存储桶「${missQuery}」（${regionLabelOf(selected) || "当前地域"}）。以下是该地域的全部存储桶，请在列表中选择。`,
+          text: notFoundText("存储桶", missQuery, selected, rows.length),
           onClose: () => setMissDismissed(true),
         }) : null,
         !session && !selected && !listErr ? h("div", { key: "need-region", className: "ci-empty" }, "请输入并选择地域，再查看该地域下的存储桶。") : null,
@@ -4633,6 +4646,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             filters: nextFilters || filters,
             offset: nextOffset,
             limit: pageSize,
+            clientLocalFilter: true,
           });
           if (n !== seq.current) return;
           setRows(result.items || []);
@@ -4670,8 +4684,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       useEffect(() => {
         if (!directItem) return;
         const directId = directItem.id;
-        if (directTried.current === directId) return;
-        directTried.current = directId;
+        const key = `${payload?.region || ""}|${directId}`;
+        if (directTried.current === key) return;
+        directTried.current = key;
         maybeAutoOpenDetail(payload, rows, (item) => openItem(item));
       });
       const missQuery = payload?.notFoundQuery && !missDismissed ? String(payload.notFoundQuery) : "";
@@ -4803,7 +4818,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             listErr || err ? h("div", { key: "lerr", className: "ci-err" }, listErr || err) : null,
             missQuery ? h(NotFoundNotice, {
               key: "miss",
-              text: `未找到与您输入完全匹配的集群「${missQuery}」（${region}）。以下是该地域的全部集群，请在列表中选择。`,
+              text: notFoundText("集群", missQuery, { id: region }, rows.length),
               onClose: () => setMissDismissed(true),
             }) : null,
             listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ClusterListTable, {
@@ -5516,8 +5531,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       useEffect(() => {
         if (!directItem) return;
         const directId = directItem.id;
-        if (directTried.current === directId) return;
-        directTried.current = directId;
+        const key = `${payload?.region || ""}|${directId}`;
+        if (directTried.current === key) return;
+        directTried.current = key;
         maybeAutoOpenDetail(payload, instances, (item) => selectInstance(item, "repo"));
       });
       const missQuery = payload?.notFoundQuery && !missDismissed ? String(payload.notFoundQuery) : "";
@@ -5802,7 +5818,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           ),
           err ? h("div", { className: "ci-err", style: { fontSize: 12, lineHeight: "18px", fontWeight: 400 } }, err) : null,
           view === "inst" && missQuery ? h(NotFoundNotice, {
-            text: `未找到与您输入完全匹配的实例「${missQuery}」（${regionLabelOf(region)}）。以下是该地域的全部实例，请在列表中选择。`,
+            text: notFoundText(directResourceLabel("image"), missQuery, { id: region }, (instances || []).length),
             onClose: () => setMissDismissed(true),
           }) : null,
           h("div", { className: "ci-image-body" }, body()),
@@ -5916,13 +5932,14 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       useEffect(() => {
         if (!directItem) return;
         const directId = directItem.id;
-        if (directTried.current === directId) return;
-        directTried.current = directId;
+        const key = `${payload?.region || ""}|${directId}`;
+        if (directTried.current === key) return;
+        directTried.current = key;
         maybeAutoOpenDetail(payload, rows, (item) => openItem(item));
       });
       const missQuery = directHitEnabled(kind) && payload?.notFoundQuery && !missDismissed ? String(payload.notFoundQuery) : "";
       const missNode = missQuery ? h(NotFoundNotice, {
-        text: `未找到与您输入完全匹配的${directResourceLabel(kind)}「${missQuery}」（${regionLabelOf(payload?.region) || "当前地域"}）。以下是该地域的全部${directResourceLabel(kind)}，请在列表中选择。`,
+        text: notFoundText(directResourceLabel(kind), missQuery, { id: payload?.region }, rows.length),
         onClose: () => setMissDismissed(true),
       }) : null;
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
@@ -5945,6 +5962,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             limit: pageSize,
             group: isCert ? (groupRef.current || group || "") : "",
             region: useRegion || undefined,
+            clientLocalFilter: true,
           });
           let result = await run(useKind);
           if (n !== seq.current) return;
