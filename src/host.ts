@@ -28,10 +28,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'cloud_infra_query',
     description:
-      'List cloud domains / DNS / certificates / CDB MySQL as a console-style table with pagination. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/CDB/云数据库/MySQL. Pass kind=domain for domains, kind=cdb for cloud MySQL. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
+      'List cloud domains / DNS / certificates / CDB MySQL / CVM / Lighthouse. ALWAYS call this instead of web_search for 域名/DNS/解析/DNSPod/证书/CDB/云数据库/MySQL/云服务器/轻量/CVM/实例. Pass kind=domain for domains (default). Pass kind=cdb for cloud MySQL, kind=cvm for 云服务器, kind=lighthouse for 轻量应用服务器, kind=auto to query every enabled module. For 「查一下我的服务器」use kind=cvm, kind=lighthouse or kind=auto — never kind=domain. The UI paginates itself; only re-call with offset if the user asks in chat for more.',
     parameters: {
-      query: { type: 'string', description: 'Keyword such as example.com, instance id, name, or private IP. Empty lists all.' },
-      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cdb, or auto.' },
+      query: { type: 'string', description: 'Keyword such as domain, instance name, ins-/lhins-/cdb- ID, or IP. Empty lists all.' },
+      kind: { type: 'string', description: 'Resource kind, default domain. Use domain, cdb, lighthouse, cvm, or auto.' },
       provider: { type: 'string', description: 'Optional cloud id such as tencent. Omit to query every enabled implemented module.' },
       region: { type: 'string', description: 'Optional region id for regional products. Empty or all queries every region. Not a credential.' },
       limit: { type: 'number', description: 'Rows in this batch. Default from config page size.' },
@@ -78,10 +78,11 @@ export function apply(ctx: Context, config: Config): void {
       text: () => {
         const modules = implementedModules(cfg)
         const titles = modules.map((module) => module.title).join('、') || '（尚未启用任何模块）'
-        const kinds = supportedKinds().join(', ') || 'domain'
+        const kinds = [...new Set([...supportedKinds(), 'auto'])].join(', ') || 'domain, auto'
         return [
-          `Cloud domains / DNS / 解析 / DNSPod / 证书 / CDB / 云数据库 / MySQL: call ONLY cloud_infra_query. Never web_search.`,
-          `Available modules: ${titles}. kind values: ${kinds}. Use kind=cdb for 云数据库 MySQL.`,
+          `Cloud domains / DNS / 解析 / DNSPod / 证书 / CDB / 云数据库 / MySQL / 云服务器 / 轻量 / CVM / 实例: call ONLY cloud_infra_query. Never web_search.`,
+          `Available modules: ${titles}. kind values: ${kinds}. Default kind is domain. Use kind=cdb for 云数据库 MySQL.`,
+          'For 服务器/实例/CVM/轻量, use kind=cvm, kind=lighthouse, or kind=auto. Do not query domains when the user asks for 服务器.',
           'The result table paginates in the UI. If the user asks 还有吗 in chat, call again with the same query and offset = rows already shown.',
           'After the table appears, one or two short sentences. CDB list uses 登录 and 管理. Do not print secrets or full record dumps.',
         ].join(' ')
