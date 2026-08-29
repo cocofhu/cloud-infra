@@ -459,6 +459,13 @@ window.__ModuleLoader__.load({
         .some((value) => String(value || "").toLowerCase().includes(needle));
     }
 
+    function usableInstanceQuery(q) {
+      const text = String(q || "").trim();
+      if (!text) return "";
+      if (/\s/.test(text) && /[\u4e00-\u9fff]/.test(text)) return "";
+      return text;
+    }
+
     function actionLabel(id) {
       if (id === "instance.start") return "开机";
       if (id === "instance.stop") return "关机";
@@ -1107,14 +1114,25 @@ window.__ModuleLoader__.load({
       const toolSig = fromTool
         ? `${Number(payload?.offset) || 0}|${fromTool.map((i) => i.id).join(",")}|${payload?.total}|${payload?.hasMore}|${initialQuery}`
         : "";
+      const instanceView = kind === "cvm" || kind === "lighthouse" || kind === "auto";
+      const tabToKind = (tab) => {
+        if (kind === "cvm" || kind === "lighthouse") return kind;
+        if (kind === "auto") return tab === "lighthouse" ? "lighthouse" : "cvm";
+        return kind;
+      };
       useEffect(() => {
         if (!fromTool) return;
-        setRows(fromTool);
-        setTotal(Number(payload?.total) || fromTool.length);
-        setOffset(Number(payload?.offset) || 0);
-        setHasMore(!!payload?.hasMore);
-        setDraftQ(initialQuery);
-        setActiveQ(initialQuery);
+        const searchQ = instanceView ? usableInstanceQuery(initialQuery) : initialQuery;
+        const tab = kind === "lighthouse" ? "lighthouse" : "cvm";
+        const seeded = kind === "auto"
+          ? fromTool.filter((row) => row && row.kind === tab)
+          : fromTool;
+        setRows(seeded);
+        setTotal(instanceView ? seeded.length : (Number(payload?.total) || fromTool.length));
+        setOffset(instanceView ? 0 : (Number(payload?.offset) || 0));
+        setHasMore(instanceView ? false : !!payload?.hasMore);
+        setDraftQ(searchQ);
+        setActiveQ(searchQ);
         const names = Array.isArray(payload?.regions) ? payload.regions : [];
         setRegionOptions(names);
         setListRegion((cur) => names.includes(cur) ? cur : defaultRegionName(names));
@@ -1123,38 +1141,42 @@ window.__ModuleLoader__.load({
         setListErr("");
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
-      const fetchList = async (nextOffset, q, region) => {
+      const fetchList = async (nextOffset, q, region, tab) => {
         const n = ++seq.current;
         const trimmed = String(q || "").trim();
+        const useTab = tab || kindTab;
+        const useKind = tabToKind(useTab);
         const useRegion = region !== undefined ? region : (trimmed ? "all" : (listRegion || "华南地区（广州）"));
         setListBusy(true);
         setListErr("");
         try {
-          const result = await api("query", {
+          const run = (nextKind) => api("query", {
             query: trimmed,
-            kind,
+            kind: nextKind,
             provider,
             offset: nextOffset,
             limit: pageSize,
             region: useRegion || undefined,
           });
+          let result = await run(useKind);
           if (n !== seq.current) return;
-          const items = result.items || [];
+          let items = result.items || [];
+          if (trimmed && kind === "auto" && !tab && !items.length) {
+            const other = useKind === "cvm" ? "lighthouse" : "cvm";
+            const alt = await run(other);
+            if (n !== seq.current) return;
+            if ((alt.items || []).length) {
+              result = alt;
+              items = alt.items || [];
+              setKindTab(other);
+            }
+          }
           setRows(items);
           setTotal(Number(result.total) || items.length);
           setHasMore(!!result.hasMore);
           setOffset(Number(result.offset) || nextOffset);
           setActiveQ(trimmed);
           if (Array.isArray(result.regions)) setRegionOptions(result.regions);
-          if (trimmed) {
-            const cvmHit = items.some((row) => row && row.kind === "cvm");
-            const lhHit = items.some((row) => row && row.kind === "lighthouse");
-            setKindTab((cur) => {
-              if (cur === "cvm" && !cvmHit && lhHit) return "lighthouse";
-              if (cur === "lighthouse" && !lhHit && cvmHit) return "cvm";
-              return cur;
-            });
-          }
         } catch (e) {
           if (n !== seq.current) return;
           setListErr(publicErrorMessage(e));
@@ -1162,6 +1184,10 @@ window.__ModuleLoader__.load({
           if (n === seq.current) setListBusy(false);
         }
       };
+      useEffect(() => {
+        if (!fromTool || !instanceView || !toolSig) return;
+        fetchList(0, instanceView ? usableInstanceQuery(initialQuery) : initialQuery, undefined, kind === "lighthouse" ? "lighthouse" : "cvm");
+      }, [toolSig]);
       const runSearch = (q) => {
         const next = String(q || "").trim();
         if (debounce.current) {
@@ -1281,7 +1307,10 @@ window.__ModuleLoader__.load({
           showCvm,
           showLh,
           value: kindTab,
-          onChange: setKindTab,
+          onChange: (next) => {
+            setKindTab(next);
+            fetchList(0, String(activeQ || "").trim(), undefined, next);
+          },
         }),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
         errors.length ? h("div", { key: "perr", className: "ci-err" }, errors.map((e) => e.message).join("；")) : null,
