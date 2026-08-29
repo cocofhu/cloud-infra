@@ -236,7 +236,7 @@ test('list defaults to Guangzhou and does not query other regions', async () => 
   assert.ok(calls.some((row) => row.action === 'DescribeInstances' && row.region === 'ap-guangzhou'))
   assert.equal(calls.filter((row) => row.action === 'DescribeInstances' && row.region === 'ap-beijing').length, 0)
   assert.equal(calls.filter((row) => row.action === 'DescribeInstances' && row.region === 'ap-shanghai').length, 0)
-  assert.ok(listed.regions?.some((name) => /广州/.test(name)))
+  assert.ok(listed.regions?.some((name) => typeof name === 'string' && /广州/.test(name)))
 })
 
 test('list isolates a failed region and still returns the others', async () => {

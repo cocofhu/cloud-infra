@@ -156,7 +156,7 @@ export interface ListResult {
   warnings?: string[]
   errors?: ModuleError[]
   region?: string
-  regions?: string[] | ClsRegionOption[]
+  regions?: Array<string | ClsRegionOption>
   view?: string
 }
 
@@ -176,7 +176,7 @@ export interface QueryResult {
   needsRegion?: boolean
   view?: string
   region?: string
-  regions?: string[] | ClsRegionOption[]
+  regions?: Array<string | ClsRegionOption>
   topicId?: string
   topicName?: string
   queryString?: string

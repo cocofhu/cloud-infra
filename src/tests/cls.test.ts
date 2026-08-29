@@ -156,7 +156,7 @@ test('createClsModule list maps DescribeTopics and skips metric topics (g1.2)', 
   assert.equal(listed.items.some((item) => item.title === 'cpu-metric'), false)
   assert.equal(calls[0]?.action, 'DescribeTopics')
   assert.equal(calls[0]?.region, 'ap-guangzhou')
-  assert.ok(listed.regions?.some((item) => item.group === '金融'))
+  assert.ok(listed.regions?.some((item) => typeof item !== 'string' && item.group === '金融'))
 })
 
 test('createClsModule search sends SearchLog TopicId/From/To/CQL (g1.3)', async () => {

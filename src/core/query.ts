@@ -191,17 +191,17 @@ export async function queryResources(
 }
 
 function collectRegions(
-  incoming: string[] | ClsRegionOption[] | undefined,
+  incoming: Array<string | ClsRegionOption> | undefined,
   extras: Partial<QueryResult>,
   regions: string[],
 ): void {
   if (!incoming?.length) return
   if (typeof incoming[0] === 'object') {
-    extras.regions = incoming as ClsRegionOption[]
+    extras.regions = incoming.filter((item): item is ClsRegionOption => typeof item !== 'string')
     return
   }
-  for (const name of incoming as string[]) {
-    if (name && !regions.includes(name)) regions.push(name)
+  for (const name of incoming) {
+    if (typeof name === 'string' && name && !regions.includes(name)) regions.push(name)
   }
 }
 
