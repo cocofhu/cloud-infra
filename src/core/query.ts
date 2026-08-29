@@ -9,7 +9,7 @@ import {
   registry,
 } from './registry.js'
 import { publicErrorMessage } from './safe-error.js'
-import type { ClsRegionOption, ModuleError, PluginConfig, QueryResult, ResourceCard, ResourceModule } from './types.js'
+import type { ClsRegionOption, ModuleError, PluginConfig, QueryResult, RegionOption, ResourceCard, ResourceModule } from './types.js'
 
 export interface QueryInput {
   kind?: string
@@ -28,6 +28,7 @@ export interface QueryInput {
   context?: string
   view?: string
   title?: string
+  instanceId?: string
 }
 
 export function wantsSearch(input: QueryInput): boolean {
@@ -128,6 +129,7 @@ export async function queryResources(
         view: input.view,
         id: input.topicId,
         title: input.title,
+        instanceId: input.instanceId,
       }
       if (search && module.search) {
         const result = await module.search(ctx)
@@ -157,6 +159,7 @@ export async function queryResources(
       if (result.hasMore) hasMore = true
       extras.view = result.view || extras.view || 'list'
       if (result.region) extras.region = result.region
+      if (result.instanceId && !extras.instanceId) extras.instanceId = result.instanceId
       collectRegions(result.regions, extras, regions)
       if (result.needsRegion) needsRegion = true
       for (const message of result.warnings || []) {
@@ -191,13 +194,13 @@ export async function queryResources(
 }
 
 function collectRegions(
-  incoming: Array<string | ClsRegionOption> | undefined,
+  incoming: Array<string | ClsRegionOption | RegionOption> | undefined,
   extras: Partial<QueryResult>,
   regions: string[],
 ): void {
   if (!incoming?.length) return
   if (typeof incoming[0] === 'object') {
-    extras.regions = incoming.filter((item): item is ClsRegionOption => typeof item !== 'string')
+    extras.regions = incoming.filter((item): item is ClsRegionOption | RegionOption => typeof item !== 'string')
     return
   }
   for (const name of incoming) {
@@ -273,7 +276,9 @@ export function renderQuery(result: QueryResult): string {
           ? '用一两句话概括即可，请用户点击「登录」进入 DMC，或点击「管理」打开实例管理页。不要打印密钥。'
           : instance
             ? '用一两句话概括即可，请用户在列表中查看或点击实例 ID 看详情。不要打印密钥。'
-            : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
+            : result.kind === 'image'
+              ? '请用户在卡片中先选择地域，再点实例卡片查看仓库与版本。不要打印密钥。'
+              : '用一两句话概括即可，请用户点击「解析」或域名进行配置。不要打印密钥。'
   return `找到 ${result.total ?? result.items.length} 条，已显示为可翻页列表。${more} ${hint}\n\n${lines.join('\n')}${err}`
 }
 

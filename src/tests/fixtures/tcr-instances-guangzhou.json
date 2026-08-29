@@ -1,0 +1,13 @@
+{
+  "TotalCount": 1,
+  "Registries": [
+    {
+      "RegistryId": "tcr-prod",
+      "RegistryName": "prod-tcr",
+      "RegistryType": "standard",
+      "Status": "Running",
+      "PublicDomain": "prod-tcr.tencentcloudcr.com",
+      "RegionName": "ap-guangzhou"
+    }
+  ]
+}

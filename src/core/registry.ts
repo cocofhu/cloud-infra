@@ -55,6 +55,19 @@ export function registerModule(module: ResourceModule): void {
   registry.registerModule(module)
 }
 
+/** Resolve module id from an explicit id or a resource id such as tencent.image:personal:ap-guangzhou. */
+export function resolveModuleId(moduleId: string | undefined, resourceId: string, source: Registry = registry): string {
+  const explicit = String(moduleId || '').trim()
+  if (explicit) return explicit
+  const raw = String(resourceId || '').trim()
+  if (!raw) return ''
+  const ids = source.listModules().map((module) => module.id).sort((a, b) => b.length - a.length)
+  for (const id of ids) {
+    if (raw === id || raw.startsWith(`${id}:`)) return id
+  }
+  return ''
+}
+
 export function isModuleEnabled(module: ResourceModule, config: PluginConfig): boolean {
   if (config.modules[module.id] === false) return false
   if (config.modules[module.id] === true) return true
@@ -126,13 +139,3 @@ export function credentialHint(kind?: string): string {
   return kind === 'cert' ? CERT_CREDENTIAL_HINT : SETTINGS_HINT
 }
 
-export function resolveModuleId(moduleId: string, resourceId: string, source: Registry = registry): string {
-  if (moduleId && source.getModule(moduleId)) return moduleId
-  const matches = source.listModules()
-    .map((module) => module.id)
-    .filter((id) => resourceId === id || resourceId.startsWith(`${id}:`))
-    .sort((a, b) => b.length - a.length)
-  if (matches[0]) return matches[0]
-  if (resourceId.includes(':')) return resourceId.slice(0, resourceId.lastIndexOf(':'))
-  return moduleId
-}

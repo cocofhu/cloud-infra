@@ -1,0 +1,13 @@
+{
+  "TotalCount": 8,
+  "Regions": [
+    { "RegionName": "ap-guangzhou", "Alias": "gz", "Status": "alluser" },
+    { "RegionName": "ap-shanghai", "Alias": "sh", "Status": "alluser" },
+    { "RegionName": "ap-beijing", "Alias": "bj", "Status": "alluser" },
+    { "RegionName": "ap-nanjing", "Alias": "nj", "Status": "alluser" },
+    { "RegionName": "ap-chengdu", "Alias": "cd", "Status": "alluser" },
+    { "RegionName": "ap-chongqing", "Alias": "cq", "Status": "alluser" },
+    { "RegionName": "ap-hongkong", "Alias": "hk", "Status": "alluser" },
+    { "RegionName": "ap-singapore", "Alias": "sg", "Status": "alluser" }
+  ]
+}

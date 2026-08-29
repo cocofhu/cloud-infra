@@ -1,0 +1,13 @@
+{
+  "TotalCount": 1,
+  "Registries": [
+    {
+      "RegistryId": "tcr-sh",
+      "RegistryName": "sh-tcr",
+      "RegistryType": "premium",
+      "Status": "Running",
+      "PublicDomain": "sh-tcr.tencentcloudcr.com",
+      "RegionName": "ap-shanghai"
+    }
+  ]
+}

@@ -249,3 +249,24 @@ export function clsCall<T>(
     fetchImpl: opts.fetchImpl,
   })
 }
+
+export function tcrCall<T>(
+  action: string,
+  payload: unknown,
+  creds: TencentCreds,
+  opts: TencentCallContext,
+): Promise<T> {
+  return callTencentApi<T>({
+    service: 'tcr',
+    host: 'tcr.tencentcloudapi.com',
+    version: '2019-09-24',
+    action,
+    payload,
+    secretId: creds.secretId,
+    secretKey: creds.secretKey,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    fetchImpl: opts.fetchImpl,
+    region: opts.region,
+  })
+}

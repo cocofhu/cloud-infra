@@ -710,3 +710,132 @@ test('cdb review fixes: WAN DMC, destroy protect toggle, project form, destructi
   assert.match(client, /loading: true, tab: nextTab/)
   assert.match(client, /加载中…/)
 })
+
+test('g1.2 g3 image kind renders a chat card with region-first instance wall and search', () => {
+  const client = read('src/client.js')
+  const host = read('src/host.ts')
+  assert.match(host, /kind=image/)
+  assert.match(host, /Default kind is domain/)
+  assert.match(host, /kind: args\.kind != null \? String\(args\.kind\) : 'domain'/)
+  assert.match(host, /resourceKind/)
+  assert.match(host, /kind: 'cloud-infra-query'/)
+  assert.match(client, /function ImageToolView/)
+  assert.match(client, /kind === "image"/)
+  assert.match(client, /args\.kind \|\| payload\?\.resourceKind/)
+  assert.match(client, /容器镜像/)
+  assert.match(client, /当前范围内的实例、仓库与版本/)
+  assert.match(client, /"地域"/)
+  assert.match(client, /ap-guangzhou/)
+  assert.match(client, /ap-shanghai/)
+  assert.match(client, /ap-beijing/)
+  assert.match(client, /ap-nanjing/)
+  assert.match(client, /ap-chengdu/)
+  assert.match(client, /ap-hongkong/)
+  assert.match(client, /payload\?\.regions/)
+  assert.match(client, /result\.regions/)
+  assert.match(client, /搜索实例名称/)
+  assert.match(client, /搜索命名空间/)
+  assert.match(client, /搜索仓库名称/)
+  assert.match(client, /搜索镜像版本/)
+  assert.match(client, /className: "ci-grid"/)
+  assert.match(client, /className: "ci-ic"/)
+  assert.match(client, /镜像仓库/)
+  assert.match(client, /版本管理/)
+  assert.match(client, /className: "ci-detail-meta"/)
+  assert.match(client, /className: "ci-act"/)
+  assert.match(client, /function prettyTime/)
+  assert.match(client, /拉取指令/)
+  assert.match(client, /DIGEST_WARNING/)
+  assert.match(client, /相同镜像 ID（SHA256）/)
+  assert.match(client, /docker pull/)
+  assert.match(client, /\.ci-table-wrap\{[^}]*overflow-x:auto/)
+  assert.match(client, /\.ci-list\{[^}]*overflow-x:auto/)
+  assert.match(client, /\.ci-table th,\.ci-table td\{[^}]*white-space:nowrap/)
+  assert.doesNotMatch(client, /\.ci-table td\{word-break:break-all/)
+  assert.doesNotMatch(client, /腾讯云控制台站点|整页控制台/)
+  assert.match(client, /请输入域名关键字/)
+  assert.match(client, /没有解析记录/)
+})
+
+test('review v1-v2 pickPayload binds empty image errors and search box stays empty', () => {
+  const src = read('src/client.js')
+  const start = src.indexOf('function isQueryPayload')
+  assert.ok(start >= 0)
+  const end = src.indexOf('\n    function ChevronDown', start)
+  const fn = new Function('props', `${src.slice(start, end)}\nreturn pickPayload(props)`) as (props: unknown) => {
+    items?: unknown[]
+    errors?: Array<{ message: string }>
+    kind?: string
+  } | null
+  const emptyImage = fn({
+    meta: {
+      kind: 'image',
+      items: [],
+      errors: [{ moduleId: 'tencent.image', message: '腾讯云 未配置 SecretId、SecretKey。请在 设置 → 插件 → 云资源 填写对应云厂商的 AccessKey' }],
+      query: '查一下我的镜像',
+      region: 'ap-guangzhou',
+    },
+  })
+  assert.ok(emptyImage)
+  assert.equal(emptyImage?.items?.length, 0)
+  assert.equal(emptyImage?.errors?.length, 1)
+  const presented = fn({
+    presentationMeta: {
+      kind: 'cloud-infra-query',
+      resourceKind: 'image',
+      items: [],
+      errors: [{ message: 'x' }],
+    },
+  })
+  assert.ok(presented)
+  assert.equal(presented?.kind, 'cloud-infra-query')
+  const imageView = src.slice(src.indexOf('function ImageToolView'))
+  assert.match(imageView, /setDraftQ\(""\)/)
+  assert.doesNotMatch(imageView.slice(0, imageView.indexOf('const loadInstances')), /setDraftQ\(initialQuery/)
+  assert.match(imageView, /query:\s*""/)
+  assert.match(imageView, /无法加载实例/)
+  assert.match(imageView, /className: "ci-err"/)
+  assert.match(imageView, /fontSize:\s*12/)
+  assert.match(src, /\.ci-root \.ci-err,\.ci-panel \.ci-err[\s\S]{0,240}font-size:12px/)
+  assert.match(src, /\.ci-root \.ci-err,\.ci-panel \.ci-err[\s\S]{0,240}font-weight:400/)
+  assert.match(src, /\.ci-tab\{[^}]*font-size:13px/)
+  assert.match(src, /仅显示前 100 条/)
+  assert.match(src, /"Tag 数"/)
+  assert.match(src, /"创建时间"/)
+  assert.match(src, /"更新时间"/)
+})
+
+test('g3.3 instance h3 uses dual-theme title color and ConfigCard stays unchanged', () => {
+  const client = read('src/client.js')
+  assert.match(client, /\.ci-ic h3\{[^}]*color:var\(--ci-title\)/)
+  assert.match(client, /\.ci-ic h3\{[^}]*-webkit-text-fill-color:var\(--ci-title\)/)
+  assert.match(client, /html\[data-theme=light\] \.ci-ic h3\{color:#0f1419;-webkit-text-fill-color:#0f1419\}/)
+  assert.match(client, /html\[data-theme=dark\] \.ci-ic h3\{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb\}/)
+  assert.match(client, /html\[data-theme=dark\] \.ci-image,\.ci-image\[data-theme=dark\]\{[^}]*color-scheme:dark/)
+  assert.match(client, /\[data-theme=dark\] \.ci-chip-sel select option[^}]*background-color:var\(--dsw-alias-bg-layer-2\)/)
+  assert.match(client, /\[data-theme=light\] \.ci-chip-sel select option[^}]*background-color:var\(--dsw-alias-bg-layer-1\)/)
+  assert.match(client, /\[data-theme=dark\] \.ci-chip-sel select[^}]*color-scheme:dark/)
+  assert.match(client, /--ci-title:var\(--dsw-alias-label-primary,#0f1419\)/)
+  const card = client.slice(client.indexOf('function ConfigCard()'))
+  assert.match(card, /function ConfigCard\(/)
+  assert.match(card, /查询域名与解析记录/)
+  assert.match(card, /key:\s*"cloud-infra"/)
+  assert.match(card, /写操作免确认（删除仍会确认）/)
+  assert.doesNotMatch(card, /ap-guangzhou/)
+  assert.doesNotMatch(card, /个人版实例/)
+  const provider = read('src/providers/tencent/index.ts')
+  assert.match(provider, /products\/image/)
+  assert.match(provider, /key: 'secretId'/)
+  assert.match(provider, /key: 'secretKey'/)
+  assert.doesNotMatch(provider, /region/)
+})
+
+test('g4.3 README documents chat card, region-first and TCR CAM', () => {
+  const readme = read('README.md')
+  assert.match(readme, /容器镜像卡片/)
+  assert.match(readme, /先选地域/)
+  assert.match(readme, /kind=image/)
+  assert.match(readme, /个人版实例只出现在广州/)
+  assert.match(readme, /同 Digest/)
+  assert.match(readme, /不在设置页增加地域/)
+})

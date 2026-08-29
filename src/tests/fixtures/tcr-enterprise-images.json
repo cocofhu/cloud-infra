@@ -1,0 +1,11 @@
+{
+  "TotalCount": 1,
+  "ImageInfoList": [
+    {
+      "ImageVersion": "0.9.1",
+      "Digest": "sha256:ddd444",
+      "Size": 2097152,
+      "UpdateTime": "2024-07-01"
+    }
+  ]
+}
