@@ -28,6 +28,7 @@ export interface CdbInstance {
   WanStatus?: number
   WanDomain?: string
   WanPort?: number
+  DestroyProtect?: string | boolean | number
   PayType?: number
   InstanceType?: number
   ProjectId?: number
@@ -222,6 +223,7 @@ export function mapCdbItem(item: CdbInstance, region: string, moduleId = 'tencen
       wanStatus: String(item.WanStatus ?? 0),
       wanDomain: item.WanDomain || '',
       wanPort: item.WanPort != null ? String(item.WanPort) : '',
+      destroyProtect: destroyProtectOn(item) ? 'on' : 'off',
       instanceType: String(item.InstanceType ?? 1),
       zone: item.Zone || '',
       projectId: item.ProjectId != null ? String(item.ProjectId) : '',
@@ -241,6 +243,134 @@ export function parseCdbRef(id: string): { moduleId: string; region: string; ins
 export function isWriteSql(sql: string): boolean {
   const stripped = String(sql || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '').trim()
   return /^(insert|update|delete|replace|drop|alter|create|truncate|grant|revoke|rename|load|call|lock|unlock|set\s+global|set\s+persist)\b/i.test(stripped)
+}
+
+/** DROP/TRUNCATE/DELETE/ALTER always need confirm; skipConfirm must not skip these. */
+export function isDestructiveSql(sql: string): boolean {
+  const stripped = String(sql || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '').trim()
+  return /^(drop|truncate|delete|alter)\b/i.test(stripped)
+}
+
+export function destroyProtectOn(item: Pick<CdbInstance, 'DestroyProtect'> | undefined): boolean {
+  const value = item?.DestroyProtect
+  if (value === true || value === 1) return true
+  const s = String(value ?? '').trim().toLowerCase()
+  return s === 'on' || s === 'true' || s === 'yes' || s === '1'
+}
+
+export function pickDmcEndpoint(input: {
+  vip?: string
+  port?: number | string
+  wanStatus?: number | string
+  wanDomain?: string
+  wanPort?: number | string
+}): { host: string; port: number; viaWan: boolean; wanOpen: boolean } {
+  const wanOpen = Number(input.wanStatus) === 2
+  const wanPort = Number(input.wanPort)
+  const port = Number(input.port)
+  if (wanOpen && String(input.wanDomain || '').trim()) {
+    return {
+      host: String(input.wanDomain).trim(),
+      port: Number.isFinite(wanPort) && wanPort > 0 ? wanPort : 3306,
+      viaWan: true,
+      wanOpen: true,
+    }
+  }
+  return {
+    host: String(input.vip || '').trim(),
+    port: Number.isFinite(port) && port > 0 ? port : 3306,
+    viaWan: false,
+    wanOpen,
+  }
+}
+
+export function isConnectError(err: unknown): boolean {
+  const rec = err && typeof err === 'object' ? err as { code?: unknown; message?: unknown } : {}
+  const code = String(rec.code || '')
+  const message = err instanceof Error ? err.message : String(err ?? '')
+  return /ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNRESET|connect E|getaddrinfo/i.test(`${code} ${message}`)
+}
+
+export function dmcConnectHint(opts: { wanOpen: boolean; viaWan: boolean }): string {
+  if (!opts.wanOpen) return '未开外网：管理页仍可用，DMC 登录需插件主机可达实例内网，或先在管理页开启外网后再登录'
+  if (opts.viaWan) return '外网地址不可达，请检查安全组、白名单或外网是否开通完成'
+  return '无法连接实例地址，请确认网络可达或先开启外网'
+}
+
+export function metricValue(value: unknown): string {
+  if (value == null) return '-'
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed || trimmed === '[object Object]') return '-'
+    return trimmed
+  }
+  if (Array.isArray(value)) {
+    for (let i = value.length - 1; i >= 0; i--) {
+      const found = metricValue(value[i])
+      if (found !== '-') return found
+    }
+    return '-'
+  }
+  if (typeof value === 'object') {
+    const rec = value as Record<string, unknown>
+    if (rec.Current != null) {
+      const found = metricValue(rec.Current)
+      if (found !== '-') return found
+    }
+    if (Array.isArray(rec.Avg)) {
+      const found = metricValue(rec.Avg)
+      if (found !== '-') return found
+    }
+    if (Array.isArray(rec.Values)) {
+      const found = metricValue(rec.Values)
+      if (found !== '-') return found
+    }
+    if (Array.isArray(rec.DataPoints)) {
+      const found = metricValue(rec.DataPoints)
+      if (found !== '-') return found
+    }
+    if (Array.isArray(rec.CpuRate)) {
+      const found = metricValue(rec.CpuRate)
+      if (found !== '-') return found
+    }
+    if (rec.Ratio != null) {
+      const found = metricValue(rec.Ratio)
+      if (found !== '-') return found
+    }
+    if (rec.Used != null && rec.Total != null) {
+      const used = Number(rec.Used)
+      const total = Number(rec.Total)
+      if (Number.isFinite(used) && Number.isFinite(total) && total > 0) {
+        return String(Math.round((used / total) * 1000) / 10)
+      }
+    }
+  }
+  return '-'
+}
+
+export function firstMetric(...values: unknown[]): string {
+  for (const value of values) {
+    const found = metricValue(value)
+    if (found !== '-') return found
+  }
+  return '-'
+}
+
+export function explicitOpened(obj: unknown, keys: string[]): boolean | null {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null
+  const rec = obj as Record<string, unknown>
+  for (const key of keys) {
+    if (!(key in rec)) continue
+    const value = rec[key]
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'number') return value !== 0
+    const s = String(value ?? '').trim().toLowerCase()
+    if (!s) continue
+    if (s === 'on' || s === 'true' || s === 'enabled' || s === 'yes' || s === '1') return true
+    if (s === 'off' || s === 'false' || s === 'disabled' || s === 'no' || s === '0' || s === 'unset') return false
+  }
+  return null
 }
 
 export function looksLikeInstanceId(query: string): boolean {
@@ -281,6 +411,7 @@ function overviewFields(item: CdbInstance, region: string): Array<{ label: strin
     { label: '地域 / 可用区', value: `${regionName} / ${zoneLabel(item.Zone, item.ZoneName)}` },
     { label: '内网地址', value: item.Vip ? `${item.Vip}:${item.Vport ?? 3306}` : '' },
     { label: '外网地址', value: item.WanStatus === 2 && item.WanDomain ? `${item.WanDomain}:${item.WanPort || ''}` : '未开启' },
+    { label: '销毁保护', value: destroyProtectOn(item) ? '开启' : '关闭' },
     { label: '实例配置', value: specLabel(item) },
     { label: '计费模式', value: payLabel(item.PayType) },
     { label: '数据库版本', value: item.EngineVersion || '' },
@@ -375,6 +506,54 @@ function tabKey(tab?: string): string {
   return aliases[value] || value
 }
 
+function parseProtectEnable(value: unknown): boolean {
+  if (value === false || value === 0) return false
+  const s = String(value ?? '').trim().toLowerCase()
+  if (s === 'false' || s === 'off' || s === 'no' || s === '0') return false
+  if (s === 'true' || s === 'on' || s === 'yes' || s === '1') return true
+  return true
+}
+
+async function listRegionInstances(
+  call: CdbApi,
+  ctx: ModuleContext,
+  region: string,
+): Promise<CdbInstance[]> {
+  const pageSize = 100
+  const collected: CdbInstance[] = []
+  const q = ctx.query.trim()
+  let offset = 0
+  let total = Number.POSITIVE_INFINITY
+  while (offset < total) {
+    const payload: Record<string, unknown> = { Offset: offset, Limit: pageSize }
+    if (looksLikeInstanceId(q)) payload.InstanceIds = [q]
+    else if (looksLikeIp(q)) payload.Vips = [q]
+    const data = await call<{ Items?: CdbInstance[]; TotalCount?: number }>('DescribeDBInstances', payload, creds(ctx), opts(ctx, region))
+    const batch = data.Items || []
+    total = data.TotalCount != null ? Number(data.TotalCount) : offset + batch.length
+    collected.push(...batch)
+    if (!batch.length) break
+    offset += batch.length
+    if (batch.length < pageSize) break
+    if (looksLikeInstanceId(q) || looksLikeIp(q)) break
+  }
+  return collected.filter((item) => instanceMatchesQuery(item, ctx.query))
+}
+
+function logRows(items: unknown[]): Array<{ time: string; sql: string; user: string; extra: string }> {
+  return (Array.isArray(items) ? items : []).map((raw) => {
+    const row = raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? raw as Record<string, unknown>
+      : { Content: raw }
+    return {
+      time: String(row.Timestamp ?? row.Time ?? row.ExecTime ?? row.Date ?? ''),
+      sql: String(row.SqlText ?? row.Sql ?? row.Content ?? row.ErrorLog ?? ''),
+      user: String(row.UserName ?? row.UserHost ?? row.User ?? ''),
+      extra: String(row.QueryTime ?? row.QueryTimeMs ?? row.LockTime ?? ''),
+    }
+  })
+}
+
 function lastDayRange(): { StartTime: string; EndTime: string } {
   const end = new Date()
   const start = new Date(end.getTime() - 24 * 3600 * 1000)
@@ -404,12 +583,7 @@ export function createCdbModule(
       const collected: ResourceCard[] = []
       await Promise.all(regions.map(async (region) => {
         try {
-          const payload: Record<string, unknown> = { Offset: 0, Limit: 100 }
-          const q = ctx.query.trim()
-          if (looksLikeInstanceId(q)) payload.InstanceIds = [q]
-          else if (looksLikeIp(q)) payload.Vips = [q]
-          const data = await call<{ Items?: CdbInstance[]; TotalCount?: number }>('DescribeDBInstances', payload, creds(ctx), opts(ctx, region))
-          const raw = (data.Items || []).filter((item) => instanceMatchesQuery(item, ctx.query))
+          const raw = await listRegionInstances(call, ctx, region)
           collected.push(...raw.map((item) => mapCdbItem(item, region, module.id)))
         } catch (err) {
           warnings.push(`${CDB_REGIONS.find((row) => row.id === region)?.name || region}：${publicErrorMessage(err)}`)
@@ -447,6 +621,7 @@ export function createCdbModule(
         instance: raw,
         running: raw.Status === 1,
         wanOpen: raw.WanStatus === 2,
+        destroyProtect: destroyProtectOn(raw),
         readonly: raw.InstanceType === 3,
         dmc: (() => {
           const session = getDmcSession(instanceId, region)
@@ -506,11 +681,10 @@ export function createCdbModule(
           return { ok: true }
         }
         if (actionId === 'instance.protect') {
-          const enable = String(payload.enable || '').toLowerCase() !== 'false' && payload.enable !== false
-          await call('ModifyInstanceTag', {
+          const enable = parseProtectEnable(payload.enable)
+          await call('ModifyInstanceDestroyProtect', {
             InstanceIds: [instanceId],
-            ReplaceTags: enable ? [{ TagKey: 'destroy-protect', TagValue: 'yes' }] : [],
-            DeleteTags: enable ? [] : [{ TagKey: 'destroy-protect' }],
+            ProtectStatus: enable ? 'on' : 'off',
           }, creds(ctx), opts(ctx, region))
           return { ok: true, data: { protect: enable } }
         }
@@ -587,7 +761,7 @@ export function createCdbModule(
           const value = String(payload.value ?? '')
           if (!name) return { ok: false, error: '缺少参数名' }
           await call('ModifyInstanceParam', {
-            InstanceId: instanceId,
+            InstanceIds: [instanceId],
             ParamList: [{ Name: name, CurrentValue: value }],
           }, creds(ctx), opts(ctx, region))
           return { ok: true }
@@ -623,15 +797,34 @@ export function createCdbModule(
         if (actionId === 'dmc.login') {
           const user = String(payload.user || '').trim()
           const password = String(payload.password || '')
-          const host = String(payload.host || payload.vip || '').trim()
-          const port = Number(payload.port || 3306)
           if (!user) return { ok: false, error: '缺少库账号' }
           if (!password) return { ok: false, error: '缺少密码' }
-          if (!host) return { ok: false, error: '缺少连接地址' }
-          const driver = await runDmc()
-          await driver.ping({ host, port, user, password, timeoutMs: ctx.timeoutMs })
-          const pub = putDmcSession({ instanceId, region, host, port, user, password })
-          return { ok: true, data: pub }
+          let instance: CdbInstance | undefined
+          try {
+            const listed = await call<{ Items?: CdbInstance[] }>('DescribeDBInstances', {
+              InstanceIds: [instanceId],
+            }, creds(ctx), opts(ctx, region))
+            instance = listed.Items?.[0]
+          } catch {
+            instance = undefined
+          }
+          const endpoint = pickDmcEndpoint({
+            vip: instance?.Vip || String(payload.vip || payload.host || ''),
+            port: instance?.Vport ?? (payload.port as string | number | undefined),
+            wanStatus: instance?.WanStatus ?? (payload.wanStatus as string | number | undefined),
+            wanDomain: instance?.WanDomain || String(payload.wanDomain || ''),
+            wanPort: instance?.WanPort ?? (payload.wanPort as string | number | undefined),
+          })
+          if (!endpoint.host) return { ok: false, error: '缺少连接地址' }
+          try {
+            const driver = await runDmc()
+            await driver.ping({ host: endpoint.host, port: endpoint.port, user, password, timeoutMs: ctx.timeoutMs })
+          } catch (err) {
+            if (isConnectError(err)) return { ok: false, error: dmcConnectHint(endpoint) }
+            throw err
+          }
+          const pub = putDmcSession({ instanceId, region, host: endpoint.host, port: endpoint.port, user, password })
+          return { ok: true, data: { ...pub, viaWan: endpoint.viaWan, wanOpen: endpoint.wanOpen } }
         }
         if (actionId === 'dmc.logout') {
           deleteDmcSession(instanceId, region)
@@ -723,7 +916,7 @@ async function runLoggedSql(
     sql,
     timeoutMs: ctx.timeoutMs,
   })
-  return { ok: true, data: { ...result, write: isWriteSql(sql) } }
+  return { ok: true, data: { ...result, write: isWriteSql(sql), destructive: isDestructiveSql(sql) } }
 }
 
 function qIdent(value: string): string {
@@ -776,10 +969,10 @@ async function loadTab(
       }
     }))
     return {
-      cpu: numish(device.Cpu ?? device.CpuUseRate ?? points.CpuUseRate),
-      memory: numish(device.Memory ?? device.Mem ?? points.MemoryUseRate),
-      disk: numish(device.Disk ?? device.VolumeRate ?? points.VolumeRate),
-      connections: numish(device.Connections ?? device.ThreadsConnected ?? points.ThreadsConnected),
+      cpu: firstMetric(device.Cpu, device.CpuUseRate, points.CpuUseRate),
+      memory: firstMetric(device.Memory, device.Mem, points.MemoryUseRate),
+      disk: firstMetric(device.Disk, device.VolumeRate, points.VolumeRate),
+      connections: firstMetric(device.Connections, device.ThreadsConnected, points.ThreadsConnected),
       device,
     }
   }
@@ -840,7 +1033,11 @@ async function loadTab(
       c,
       o,
     ).catch(() => ({ Items: [], TotalCount: 0 }))
-    return { slowLogs: slow.Items || [], errorLogs: errors.Items || [], note: '慢查询在日志中心，不是顶栏页签。' }
+    return {
+      slowLogs: logRows(slow.Items || []),
+      errorLogs: logRows(errors.Items || []),
+      note: '慢查询在日志中心，不是顶栏页签。',
+    }
   }
   if (tab === '只读实例') {
     const data = await call<{ RoGroups?: Array<{ RoGroupId?: string; RoInstances?: CdbInstance[] }> }>(
@@ -860,9 +1057,18 @@ async function loadTab(
     return { proxy: data, opened: !('unopened' in data) }
   }
   if (tab === '数据安全') {
-    const features = await call<Record<string, unknown>>('DescribeDBFeatures', { InstanceId: instanceId }, c, o).catch(() => ({}))
-    const audit = await call<Record<string, unknown>>('DescribeAuditConfig', { InstanceId: instanceId }, c, o).catch(() => ({ opened: false }))
-    return { features, audit, note: '展示开通状态；审计全链不在范围内。' }
+    const features = await call<Record<string, unknown>>('DescribeDBFeatures', { InstanceId: instanceId }, c, o).catch(() => ({} as Record<string, unknown>))
+    const audit = await call<Record<string, unknown>>('DescribeAuditConfig', { InstanceId: instanceId }, c, o).catch(() => ({} as Record<string, unknown>))
+    const auditOpened = explicitOpened(audit, ['opened', 'AuditStatus', 'LogAudit', 'AuditEnabled', 'Status'])
+    const encryptionOpened = explicitOpened(features, ['Encryption', 'EncryptionStatus', 'IsEncryption'])
+    return {
+      features,
+      audit,
+      auditOpened,
+      encryptionOpened,
+      opened: auditOpened === true || encryptionOpened === true,
+      note: '展示开通状态；审计全链不在范围内。',
+    }
   }
   if (tab === '连接检查') {
     const vip = raw.Vip || ''
@@ -875,18 +1081,6 @@ async function loadTab(
     return { inner, outer }
   }
   return { note: '未知页签' }
-}
-
-function numish(value: unknown): string {
-  if (value == null) return '-'
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
-  if (typeof value === 'string' && value.trim()) return value
-  if (typeof value === 'object') {
-    const rec = value as Record<string, unknown>
-    if (rec.Current != null) return String(rec.Current)
-    if (Array.isArray(rec.DataPoints) && rec.DataPoints[0] != null) return String(rec.DataPoints[0])
-  }
-  return '-'
 }
 
 export const tencentCdbModule = createCdbModule()

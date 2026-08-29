@@ -9,10 +9,17 @@ import { clearDmcSessions, getDmcSession } from '../providers/tencent/dmc-sessio
 import {
   CDB_OFFICIAL_TABS,
   createCdbModule,
+  dmcConnectHint,
+  explicitOpened,
+  firstMetric,
   instanceMatchesQuery,
+  isConnectError,
+  isDestructiveSql,
   isWriteSql,
   mapCdbItem,
+  metricValue,
   parseCdbRef,
+  pickDmcEndpoint,
   type CdbInstance,
   type DmcDriver,
 } from '../providers/tencent/products/cdb.js'
@@ -50,6 +57,7 @@ test('mapCdbItem aligns console list columns g1.2', () => {
     { label: '计费模式', value: '按量计费' },
   ])
   assert.equal(card.meta?.region, 'ap-guangzhou')
+  assert.equal(card.meta?.destroyProtect, 'off')
   assert.ok(instanceMatchesQuery(item, 'cdb-70zdmgg1'))
   assert.ok(instanceMatchesQuery(item, 'prod-order'))
   assert.ok(instanceMatchesQuery(item, '10.0.1.12'))
@@ -239,6 +247,12 @@ test('dmc login stays in memory and never persists password g3.1', async () => {
   assert.equal(browsed?.ok, true)
   assert.equal(isWriteSql('SELECT 1'), false)
   assert.equal(isWriteSql('UPDATE t SET a=1'), true)
+  assert.equal(isDestructiveSql('SELECT 1'), false)
+  assert.equal(isDestructiveSql('INSERT INTO t VALUES (1)'), false)
+  assert.equal(isDestructiveSql('DROP DATABASE app'), true)
+  assert.equal(isDestructiveSql('DELETE FROM t'), true)
+  assert.equal(isDestructiveSql('TRUNCATE TABLE t'), true)
+  assert.equal(isDestructiveSql('ALTER TABLE t DROP COLUMN a'), true)
 })
 
 test('password never appears in public action errors g2.2', async () => {
@@ -287,3 +301,226 @@ test('settings provider fields stay SecretId/SecretKey g4.1', () => {
   assert.match(index, /key: 'secretKey'/)
   assert.doesNotMatch(index, /region|dbUser|dbPassword|库账号/)
 })
+
+test('list paginates DescribeDBInstances by Offset instead of truncating at 100 g1.1', async () => {
+  const offsets: number[] = []
+  const call = async (action: string, payload: { Offset?: number; Limit?: number }) => {
+    if (action !== 'DescribeDBInstances') return {}
+    offsets.push(payload.Offset || 0)
+    assert.equal(payload.Limit, 100)
+    const offset = payload.Offset || 0
+    const size = offset === 0 ? 100 : 50
+    return {
+      TotalCount: 150,
+      Items: Array.from({ length: size }, (_, i) => ({
+        InstanceId: `cdb-page${offset + i}`,
+        InstanceName: `n${offset + i}`,
+        Status: 1,
+        Vip: '10.0.0.1',
+        Vport: 3306,
+      })),
+    }
+  }
+  const module = createCdbModule(call as never)
+  const listed = await module.list(ctx({ region: 'ap-guangzhou', limit: 12 }))
+  assert.deepEqual(offsets, [0, 100])
+  assert.equal(listed.total, 150)
+  assert.equal(listed.hasMore, true)
+  assert.equal(listed.items.length, 12)
+})
+
+test('destroy protect calls ModifyInstanceDestroyProtect on/off g1.3', async () => {
+  const calls: Array<{ action: string; payload: unknown }> = []
+  const call = async (action: string, payload: unknown) => {
+    calls.push({ action, payload })
+    return {}
+  }
+  const module = createCdbModule(call as never)
+  const on = await module.execute?.('instance.protect', {
+    region: 'ap-guangzhou',
+    instanceId: 'cdb-70zdmgg1',
+    enable: true,
+  }, ctx({ id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1' }))
+  const off = await module.execute?.('instance.protect', {
+    region: 'ap-guangzhou',
+    instanceId: 'cdb-70zdmgg1',
+    enable: false,
+  }, ctx({ id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1' }))
+  assert.equal(on?.ok, true)
+  assert.equal(off?.ok, true)
+  const protect = calls.filter((row) => row.action === 'ModifyInstanceDestroyProtect')
+  assert.equal(protect.length, 2)
+  assert.deepEqual(protect[0]?.payload, { InstanceIds: ['cdb-70zdmgg1'], ProtectStatus: 'on' })
+  assert.deepEqual(protect[1]?.payload, { InstanceIds: ['cdb-70zdmgg1'], ProtectStatus: 'off' })
+  assert.equal(calls.some((row) => row.action === 'ModifyInstanceTag'), false)
+})
+
+test('param.modify sends InstanceIds array g2.3', async () => {
+  const calls: Array<{ action: string; payload: unknown }> = []
+  const call = async (action: string, payload: unknown) => {
+    calls.push({ action, payload })
+    return {}
+  }
+  const module = createCdbModule(call as never)
+  const result = await module.execute?.('param.modify', {
+    region: 'ap-guangzhou',
+    instanceId: 'cdb-70zdmgg1',
+    name: 'max_connections',
+    value: '2000',
+  }, ctx({ id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1' }))
+  assert.equal(result?.ok, true)
+  const modify = calls.find((row) => row.action === 'ModifyInstanceParam')
+  assert.deepEqual(modify?.payload, {
+    InstanceIds: ['cdb-70zdmgg1'],
+    ParamList: [{ Name: 'max_connections', CurrentValue: '2000' }],
+  })
+})
+
+test('monitor tab parses official Avg and DataPoints shapes g2.5', async () => {
+  const call = async (action: string) => {
+    if (action === 'DescribeDBInstances') return { Items: (fixture('cdb-list.json').Items as unknown[]).slice(0, 1) }
+    if (action === 'DescribeDeviceMonitorInfo') {
+      return {
+        Cpu: { Min: [1], Max: [20], Avg: [10, 12.5] },
+        Mem: { Min: [1], Max: [50], Avg: [30] },
+        Disk: { Min: [1], Max: [80], Avg: [40] },
+        Connections: { Min: [1], Max: [20], Avg: [8] },
+      }
+    }
+    return {}
+  }
+  const monitor = async () => ({ DataPoints: [{ Values: [1, 9] }] })
+  const module = createCdbModule(call as never, {
+    async ping() {},
+    async query() { return { columns: [], rows: [] } },
+  }, monitor as never)
+  const mon = await module.detail?.({
+    ...ctx(),
+    id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1',
+    region: 'ap-guangzhou',
+    tab: '实例监控',
+  })
+  const data = mon?.extra?.tabData as { cpu?: string; memory?: string; disk?: string; connections?: string }
+  assert.equal(data.cpu, '12.5')
+  assert.equal(data.memory, '30')
+  assert.equal(data.disk, '40')
+  assert.equal(data.connections, '8')
+  assert.equal(metricValue({ DataPoints: [{ Values: [1, 2, 8] }] }), '8')
+  assert.equal(firstMetric({ Min: [0], Max: [1], Avg: [4] }, { DataPoints: [{ Values: [9] }] }), '4')
+})
+
+test('data security empty objects are not treated as opened g2.5', async () => {
+  const call = async (action: string) => {
+    if (action === 'DescribeDBInstances') return { Items: (fixture('cdb-list.json').Items as unknown[]).slice(0, 1) }
+    if (action === 'DescribeDBFeatures') return {}
+    if (action === 'DescribeAuditConfig') return {}
+    return {}
+  }
+  const module = createCdbModule(call as never)
+  const sec = await module.detail?.({
+    ...ctx(),
+    id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1',
+    region: 'ap-guangzhou',
+    tab: '数据安全',
+  })
+  const data = sec?.extra?.tabData as { opened?: boolean; auditOpened?: boolean | null; encryptionOpened?: boolean | null }
+  assert.equal(data.opened, false)
+  assert.equal(data.auditOpened, null)
+  assert.equal(data.encryptionOpened, null)
+  assert.equal(explicitOpened({}, ['opened']), null)
+  assert.equal(explicitOpened({ opened: false }, ['opened']), false)
+})
+
+test('logs tab maps SqlText and Timestamp g2.4', async () => {
+  const call = async (action: string) => {
+    if (action === 'DescribeDBInstances') return { Items: (fixture('cdb-list.json').Items as unknown[]).slice(0, 1) }
+    if (action === 'DescribeSlowLogData') return { Items: [{ SqlText: 'SELECT 1', Timestamp: '2024-01-01 00:00:00', UserHost: 'app' }] }
+    if (action === 'DescribeErrorLogData') return { Items: [{ Content: 'err', Timestamp: '2024-01-01 00:01:00' }] }
+    return {}
+  }
+  const module = createCdbModule(call as never)
+  const logs = await module.detail?.({
+    ...ctx(),
+    id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1',
+    region: 'ap-guangzhou',
+    tab: '日志中心',
+  })
+  const data = logs?.extra?.tabData as { slowLogs?: Array<{ sql?: string; time?: string }>; errorLogs?: Array<{ sql?: string }> }
+  assert.equal(data.slowLogs?.[0]?.sql, 'SELECT 1')
+  assert.equal(data.slowLogs?.[0]?.time, '2024-01-01 00:00:00')
+  assert.equal(data.errorLogs?.[0]?.sql, 'err')
+})
+
+test('dmc.login prefers WAN and keeps password out of the result g3.1', async () => {
+  clearDmcSessions()
+  const pings: Array<{ host: string; port: number }> = []
+  const driver: DmcDriver = {
+    async ping(opts) { pings.push({ host: opts.host, port: opts.port }) },
+    async query() { return { columns: [], rows: [] } },
+  }
+  const call = async (action: string) => {
+    if (action === 'DescribeDBInstances') {
+      return {
+        Items: [{
+          InstanceId: 'cdb-70zdmgg1',
+          Vip: '10.0.1.12',
+          Vport: 3306,
+          WanStatus: 2,
+          WanDomain: 'cdb-70zdmgg1.sql.tencentcdb.com',
+          WanPort: 20407,
+        }],
+      }
+    }
+    return {}
+  }
+  const module = createCdbModule(call as never, driver)
+  const logged = await module.execute?.('dmc.login', {
+    region: 'ap-guangzhou',
+    instanceId: 'cdb-70zdmgg1',
+    user: 'root',
+    password: 'OnlyInMemory#1',
+    host: '10.0.1.12',
+    port: 3306,
+  }, ctx({ id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1' }))
+  assert.equal(logged?.ok, true)
+  assert.equal(pings[0]?.host, 'cdb-70zdmgg1.sql.tencentcdb.com')
+  assert.equal(pings[0]?.port, 20407)
+  if (logged && logged.ok) {
+    assert.equal((logged.data as { viaWan?: boolean }).viaWan, true)
+    assert.equal((logged.data as { password?: string }).password, undefined)
+  }
+  assert.equal(pickDmcEndpoint({ vip: '10.0.1.12', port: 3306, wanStatus: 2, wanDomain: 'wan.example', wanPort: 20407 }).host, 'wan.example')
+})
+
+test('dmc.login connection failure is not a generic cloud error g3.1', async () => {
+  const driver: DmcDriver = {
+    async ping() {
+      const err = new Error('connect ECONNREFUSED 10.0.1.12:3306') as Error & { code: string }
+      err.code = 'ECONNREFUSED'
+      throw err
+    },
+    async query() { return { columns: [], rows: [] } },
+  }
+  const call = async (action: string) => {
+    if (action === 'DescribeDBInstances') {
+      return { Items: [{ InstanceId: 'cdb-70zdmgg1', Vip: '10.0.1.12', Vport: 3306, WanStatus: 0 }] }
+    }
+    return {}
+  }
+  const module = createCdbModule(call as never, driver)
+  const logged = await module.execute?.('dmc.login', {
+    region: 'ap-guangzhou',
+    instanceId: 'cdb-70zdmgg1',
+    user: 'root',
+    password: 'x',
+  }, ctx({ id: 'tencent.cdb:ap-guangzhou:cdb-70zdmgg1' }))
+  assert.equal(logged?.ok, false)
+  if (logged && !logged.ok) {
+    assert.match(logged.error, /未开外网/)
+    assert.doesNotMatch(logged.error, /云厂商请求失败/)
+  }
+  assert.equal(isConnectError({ code: 'ETIMEDOUT', message: 'timeout' }), true)
+  assert.match(dmcConnectHint({ wanOpen: false, viaWan: false }), /未开外网/)
+  assert.equal(publicErrorMessage(new Error('未开外网：管理页仍可用，DMC 登录需插件主机可达实例内网，或先在管理页开启外网后再登录')), '未开外网：管理页仍可用，DMC 登录需插件主机可达实例内网，或先在管理页开启外网后再登录')
+})
+

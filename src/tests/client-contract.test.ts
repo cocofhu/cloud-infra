@@ -182,3 +182,17 @@ test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () =>
   assert.match(client, /写操作免确认（删除仍会确认）/)
   assert.match(client, /未保存/)
 })
+
+test('cdb review fixes: WAN DMC, destroy protect toggle, project form, destructive SQL', () => {
+  const client = read('src/client.js')
+  assert.match(client, /function pickDmcEndpoint/)
+  assert.match(client, /function isDestructiveSql/)
+  assert.match(client, /关闭实例销毁保护/)
+  assert.match(client, /开启实例销毁保护/)
+  assert.match(client, /setListForm/)
+  assert.match(client, /SqlText/)
+  assert.match(client, /auditOpened/)
+  assert.match(client, /未开外网时需插件主机可达内网/)
+  assert.match(client, /skip && !always/)
+  assert.doesNotMatch(client, /if \(skip && action !== "dmc\.row\.write"\)/)
+})

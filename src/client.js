@@ -725,6 +725,24 @@ window.__ModuleLoader__.load({
       return /^(insert|update|delete|replace|drop|alter|create|truncate|grant|revoke|rename|load|call|lock|unlock|set\s+global|set\s+persist)\b/i.test(stripped);
     }
 
+    function isDestructiveSql(sql) {
+      const stripped = String(sql || "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "").trim();
+      return /^(drop|truncate|delete|alter)\b/i.test(stripped);
+    }
+
+    function pickDmcEndpoint(meta) {
+      const row = meta || {};
+      const wanOpen = String(row.wanStatus) === "2";
+      if (wanOpen && row.wanDomain) {
+        return { host: row.wanDomain, port: Number(row.wanPort) || 3306, wanOpen: true, viaWan: true };
+      }
+      return { host: row.vip || "", port: Number(row.port) || 3306, wanOpen: false, viaWan: false };
+    }
+
+    function destroyProtectOn(item) {
+      return String(cdbMeta(item).destroyProtect || "").toLowerCase() === "on";
+    }
+
     function CdbTable({ items, pendingId, selected, onToggle, onLogin, onManage, onMore, moreId, moreMenus }) {
       const rows = Array.isArray(items) ? items.filter(Boolean) : [];
       if (!rows.length) return h("div", { className: "ci-empty" }, "没有实例");
@@ -764,7 +782,7 @@ window.__ModuleLoader__.load({
                 type: "button",
                 className: "ci-drop-item" + (row.danger ? " ci-link danger" : ""),
                 onClick: () => row.onClick(item),
-              }, row.label))) : null,
+              }, typeof row.label === "function" ? row.label(item) : row.label))) : null,
             ),
           )),
         ))),
@@ -1040,12 +1058,20 @@ window.__ModuleLoader__.load({
         if (tab === "日志中心") {
           const slow = tabData.slowLogs || [];
           const errors = tabData.errorLogs || [];
+          const logTable = (rows, empty) => rows.length ? h("div", { className: "ci-table-wrap" }, h("table", { className: "ci-table" },
+            h("thead", null, h("tr", null, h("th", null, "时间"), h("th", null, "SQL / 内容"), h("th", null, "用户"))),
+            h("tbody", null, rows.slice(0, 50).map((row, idx) => h("tr", { key: idx },
+              h("td", null, row.time || row.Timestamp || "-"),
+              h("td", { title: row.sql || row.SqlText || "" }, row.sql || row.SqlText || row.Content || "-"),
+              h("td", null, row.user || row.UserName || "-"),
+            ))),
+          )) : h("div", { className: "ci-empty" }, empty);
           return h("div", { className: "ci-pane" },
             h("p", { className: "ci-hint" }, "慢查询在日志中心，不是顶栏页签。"),
             h("div", { className: "ci-sec-t" }, "慢日志"),
-            slow.length ? h("pre", { className: "ci-hint" }, JSON.stringify(slow.slice(0, 8), null, 2)) : h("div", { className: "ci-empty" }, "没有慢日志"),
+            logTable(slow, "没有慢日志"),
             h("div", { className: "ci-sec-t" }, "错误日志"),
-            errors.length ? h("pre", { className: "ci-hint" }, JSON.stringify(errors.slice(0, 8), null, 2)) : h("div", { className: "ci-empty" }, "没有错误日志"),
+            logTable(errors, "没有错误日志"),
           );
         }
         if (tab === "只读实例") {
@@ -1060,16 +1086,17 @@ window.__ModuleLoader__.load({
           )) : h("div", { className: "ci-empty" }, tabData.empty || "暂无只读实例");
         }
         if (tab === "数据库代理" || tab === "数据安全") {
-          const opened = tab === "数据库代理" ? !!tabData.opened : !!(tabData.audit && tabData.audit.opened !== false && tabData.features);
+          const openedLabel = (value) => value === true ? "已开通" : value === false ? "未开通" : "未查询到开通状态";
           return h("div", { className: "ci-pane" },
             h("p", null, tab === "数据库代理" ? (tabData.opened ? "已开通数据库代理" : (tabData.proxy && tabData.proxy.note) || "未开通数据库代理") : "数据安全开通状态"),
             tab === "数据安全" ? h("div", { className: "ci-kv" },
               h("div", { className: "ci-k" }, "审计"),
-              h("div", null, tabData.audit && tabData.audit.opened === false ? "未开通" : "见实例特性"),
+              h("div", null, openedLabel(tabData.auditOpened)),
+              h("div", { className: "ci-k" }, "加密"),
+              h("div", null, openedLabel(tabData.encryptionOpened)),
               h("div", { className: "ci-k" }, "说明"),
-              h("div", null, tabData.note || "展示开通状态"),
+              h("div", null, tabData.note || "仅在接口返回明确字段时展示已开通。"),
             ) : null,
-            opened ? null : null,
           );
         }
         if (tab === "连接检查") {
@@ -1144,11 +1171,16 @@ window.__ModuleLoader__.load({
       const [err, setErr] = useState("");
       const [confirm, setConfirm] = useState(null);
       const [form, setForm] = useState(null);
+      const endpoint = pickDmcEndpoint(meta);
       const payloadBase = () => ({
         region: meta.region,
         instanceId: item.title,
-        host: meta.vip,
-        port: meta.port,
+        host: endpoint.host,
+        port: endpoint.port,
+        vip: meta.vip,
+        wanStatus: meta.wanStatus,
+        wanDomain: meta.wanDomain,
+        wanPort: meta.wanPort,
       });
       const run = async (action, payload) => {
         setBusy(true);
@@ -1175,7 +1207,9 @@ window.__ModuleLoader__.load({
           skip = !!d.skipConfirm;
           if (onSkipConfirm) onSkipConfirm(skip);
         } catch { /* keep */ }
-        if (skip && action !== "dmc.row.write") return run(action, payload);
+        const always = (action === "dmc.row.write" && payload && payload.op === "delete")
+          || isDestructiveSql(payload && payload.sql);
+        if (skip && !always) return run(action, payload);
         setConfirm({ action, payload, text, danger: true });
       };
       const login = async () => {
@@ -1196,7 +1230,11 @@ window.__ModuleLoader__.load({
         if (out && out.data) setRows({ table, ...out.data });
       };
       const execSql = async () => {
-        if (isWriteSql(sql)) return requestWrite("dmc.sql", { sql, database: db }, "该 SQL 会修改数据，确认执行？");
+        if (isWriteSql(sql)) {
+          const out = await requestWrite("dmc.sql", { sql, database: db }, "该 SQL 会修改数据，确认执行？");
+          if (out && out.data) setResult(out.data);
+          return;
+        }
         const out = await run("dmc.sql", { sql, database: db });
         if (out && out.data) setResult(out.data);
       };
@@ -1219,7 +1257,9 @@ window.__ModuleLoader__.load({
               h("button", { type: "button", className: "ci-mini", onClick: onBack }, "取消"),
               h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: login }, busy ? "登录中" : "登录"),
             ),
-            h("p", { className: "ci-hint", style: { marginTop: 10 } }, "登录后才进入 SQL 窗口与库表管理。账密不写设置。"),
+            h("p", { className: "ci-hint", style: { marginTop: 10 } }, endpoint.wanOpen
+              ? "将优先使用外网地址登录。账密不写设置。"
+              : "未开外网时需插件主机可达内网；可先在管理页开启外网再登录。账密不写设置。"),
           ),
         ];
       }
@@ -1352,6 +1392,7 @@ window.__ModuleLoader__.load({
       const [moreId, setMoreId] = useState("");
       const [notice, setNotice] = useState("");
       const [listConfirm, setListConfirm] = useState(null);
+      const [listForm, setListForm] = useState(null);
       const [listBusyAct, setListBusyAct] = useState(false);
       const seq = useRef(0);
       const debounce = useRef(0);
@@ -1478,6 +1519,7 @@ window.__ModuleLoader__.load({
             payload: { region: cdbMeta(item).region, instanceId: item.title, ...payload },
           });
           setListConfirm(null);
+          setListForm(null);
           await fetchList(offset, String(activeQ || "").trim());
         } catch (e) {
           setListErr(publicErrorMessage(e));
@@ -1535,7 +1577,10 @@ window.__ModuleLoader__.load({
         : null;
       const cdbMore = [
         { id: "sg", label: "配置安全组", onClick: (item) => openItem(item, "安全组") },
-        { id: "protect", label: "设置实例销毁保护", onClick: (item) => askListAction(item, "instance.protect", "确认开启实例销毁保护？", { enable: true }) },
+        { id: "protect", label: (item) => destroyProtectOn(item) ? "关闭实例销毁保护" : "开启实例销毁保护", onClick: (item) => {
+          const on = destroyProtectOn(item);
+          askListAction(item, "instance.protect", on ? "确认关闭实例销毁保护？" : "确认开启实例销毁保护？", { enable: !on });
+        } },
         { id: "destroy", label: "销毁实例", danger: true, onClick: (item) => askListAction(item, "instance.destroy", `确定销毁实例 ${item.title}？此操作不可撤销。`, {}, true) },
         { id: "buySame", label: "购买相同配置", onClick: () => setNotice(buyNotice) },
       ];
@@ -1576,7 +1621,14 @@ window.__ModuleLoader__.load({
                   h("button", { key: "proj", type: "button", className: "ci-mini", onClick: () => {
                     const target = selectedItems[0];
                     if (!target) return setNotice("请先选择实例");
-                    openItem(target, "实例详情");
+                    setMoreId("");
+                    setListForm({
+                      item: target,
+                      title: "分配至项目",
+                      fields: [{ key: "projectId", label: "项目 ID", placeholder: "0" }],
+                      initial: { projectId: cdbMeta(target).projectId || "0" },
+                      action: "instance.project",
+                    });
                   } }, "分配至项目"),
                 ] : null,
                 h("div", { className: "ci-search-wrap" },
@@ -1644,6 +1696,16 @@ window.__ModuleLoader__.load({
               text: notice,
               onClose: () => setNotice(""),
             }),
+            listForm ? h(GenericForm, {
+              key: "lform",
+              title: listForm.title,
+              fields: listForm.fields,
+              initial: listForm.initial,
+              busy: listBusyAct,
+              err: listErr,
+              onCancel: () => { if (!listBusyAct) setListForm(null); },
+              onSubmit: (draft) => runListAction(listForm.item, listForm.action, { ...listForm.initial, ...draft }),
+            }) : null,
             h(ConfirmDialog, {
               key: "lconfirm",
               open: !!listConfirm,
