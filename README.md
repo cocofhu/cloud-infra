@@ -1,6 +1,6 @@
 # cloud-infra
 
-DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、证书、对象存储、TKE 集群、云服务器、云数据库与容器镜像，以对齐各产品控制台的列表展示；在设置页配置各云 AccessKey。
+DeepSeek Harness 腾讯云资源插件。在对话中查询腾讯云上的域名、证书、对象存储、TKE 集群、云服务器、云数据库与容器镜像，以对齐各产品控制台的列表展示；在设置页配置腾讯云 SecretId / SecretKey。
 
 已实现 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427/56194) 域名与解析记录，[腾讯云 SSL「我的证书」](https://cloud.tencent.com/document/product/400/55741)（列表、完整详情、申请/上传/部署/下载/更多），对话卡片内的 [腾讯云域名注册](https://cloud.tencent.com/document/product/242/9595)（查询、立即加购、购物车、提交订单、核对信息、账户余额支付、我的域名），[腾讯云 COS](https://cloud.tencent.com/document/product/436/8291) 存储桶列表与文件列表，[腾讯云 TKE](https://cloud.tencent.com/document/product/457/31824) 控制台「集群」配置树，[CVM](https://cloud.tencent.com.cn/document/product/213/16533) 与 [轻量应用服务器](https://cloud.tencent.com/document/product/1207/44574)，以及 [腾讯云 TCR](https://cloud.tencent.com/document/product/1141/39271) 容器镜像（个人版 + 企业版）、[腾讯云 CLS](https://cloud.tencent.com/document/product/614/56447) 日志主题查看与检索分析、[腾讯云 CDB MySQL](https://cloud.tencent.com/document/product/236/3131) 的实例列表、11 个官方管理页签与 DMC 登录 / SQL。架构按厂商 / 凭证 / 产品三层解耦；Host / Query 不按厂商名分支。地域只在对话参数或资源 UI 会话中传递，不写回设置。
 
@@ -31,7 +31,6 @@ DeepSeek Harness 多云资源插件。在对话中查询云厂商上的域名、
 - 缺凭证或企业版列表失败时在卡片内显示错误（`.ci-err`），不用「该地域没有实例」顶替；仓库/版本超过 100 条时提示仅显示前 100 条
 - 删除镜像版本始终二次确认，并提示官方同 Digest 警告
 - 设置页按厂商 schema 填写 AKSK，并开关 `tencent.tke`；无必填地域字段。密钥只保存在本机。不新增地域、库账号或电源控件；新产品只出现在既有产品模块勾选。证书操作不改设置。**不在设置页增加地域**等字段
-- 预留阿里云凭证字段，产品模块尚未实现
 
 ## 环境要求
 
