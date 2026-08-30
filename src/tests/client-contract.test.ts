@@ -234,11 +234,11 @@ test('g2-g3 list chrome and in-card DetailView replace fullscreen drawer', () =>
   assert.doesNotMatch(client, /2147483|86vh/)
 })
 
-test('g6 dbbrain stays in the chat card with type+region filters and tabs', () => {
+test('g6 dbbrain stays in the chat card with type+region filters and tabs (全地域 removed, 默认广州)', () => {
   const client = read('src/client.js')
   assert.match(client, /kind === "dbbrain"/)
   assert.match(client, /实例管理/)
-  assert.match(client, /全地域/)
+  assert.doesNotMatch(client, /\["", "全地域"\]/)
   assert.match(client, /诊断优化/)
   assert.match(client, /function DbbrainDetailView/)
   assert.match(client, /function DbbrainTable/)

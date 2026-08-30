@@ -1,28 +1,19 @@
 import type { RegionOption } from '../../core/types.js'
+import {
+  TENCENT_REGIONS,
+  resolveRegion,
+  regionLabel as sharedRegionLabel,
+} from './regions-shared.js'
 
-export const COS_REGIONS: RegionOption[] = [
-  { id: 'ap-beijing', label: '北京', aliases: ['bj', 'beijing', 'pek'] },
-  { id: 'ap-beijing-fsi', label: '北京金融', aliases: ['beijing-fsi'] },
-  { id: 'ap-nanjing', label: '南京', aliases: ['nj', 'nanjing'] },
-  { id: 'ap-shanghai', label: '上海', aliases: ['sh', 'shanghai'] },
-  { id: 'ap-shanghai-fsi', label: '上海金融', aliases: ['shanghai-fsi'] },
-  { id: 'ap-guangzhou', label: '广州', aliases: ['gz', 'guangzhou', 'canton'] },
-  { id: 'ap-shenzhen-fsi', label: '深圳金融', aliases: ['sz-fsi', 'shenzhen-fsi'] },
-  { id: 'ap-chengdu', label: '成都', aliases: ['cd', 'chengdu'] },
-  { id: 'ap-chongqing', label: '重庆', aliases: ['cq', 'chongqing'] },
-  { id: 'ap-hongkong', label: '中国香港', aliases: ['hk', 'hongkong', 'hong kong', '香港'] },
-  { id: 'ap-singapore', label: '新加坡', aliases: ['sg', 'singapore'] },
-  { id: 'ap-mumbai', label: '孟买', aliases: ['in', 'mumbai', 'india'] },
-  { id: 'ap-jakarta', label: '雅加达', aliases: ['id', 'jakarta'] },
-  { id: 'ap-seoul', label: '首尔', aliases: ['kr', 'seoul'] },
-  { id: 'ap-bangkok', label: '曼谷', aliases: ['th', 'bangkok'] },
-  { id: 'ap-tokyo', label: '东京', aliases: ['jp', 'tokyo'] },
-  { id: 'na-siliconvalley', label: '硅谷', aliases: ['usw', 'siliconvalley', 'silicon valley'] },
-  { id: 'na-ashburn', label: '弗吉尼亚', aliases: ['use', 'ashburn', 'virginia'] },
-  { id: 'na-toronto', label: '多伦多', aliases: ['ca', 'toronto'] },
-  { id: 'sa-saopaulo', label: '圣保罗', aliases: ['br', 'saopaulo', 'sao paulo'] },
-  { id: 'eu-frankfurt', label: '法兰克福', aliases: ['de', 'frankfurt'] },
-]
+/**
+ * 共享 COS 地域视图。`RegionOption` 的 `label` 字段与共享 source 的 `label` 保持一致；
+ * 同时把共享 source 的 `group` 透传出去（`core/types.ts` 的 `RegionOption` 也允许缺省 `group`，这里仅做结构化映射）。
+ */
+export const COS_REGIONS: RegionOption[] = TENCENT_REGIONS.map((region) => ({
+  id: region.id,
+  label: region.label,
+  aliases: region.aliases,
+}))
 
 function norm(value: string): string {
   return String(value || '').trim().toLowerCase().replace(/\s+/g, '')
@@ -52,13 +43,17 @@ export function filterCosRegions(needle: string, source: RegionOption[] = COS_RE
   return source.filter((region) => matchCosRegion(region, needle))
 }
 
-/** Only exact id / label / alias counts as a selected region. Substring input is not sent to COS. */
+/**
+ * 仅接受完整 id / label / alias（不支持下拉「模糊子串」匹配命中即视为合法 region）。
+ * 实现委托给共享 `resolveRegion`：返回值是共享 source 中的 RegionOption，保持共享 label / aliases。
+ */
 export function resolveCosRegion(raw: string | undefined, source: RegionOption[] = COS_REGIONS): RegionOption | undefined {
-  const q = norm(raw || '')
-  if (!q) return undefined
-  return source.find((region) => tokens(region).includes(q))
+  const id = resolveRegion(raw)
+  if (!id) return undefined
+  return source.find((region) => region.id === id) || TENCENT_REGIONS.find((region) => region.id === id)
 }
 
 export function regionLabel(id: string, source: RegionOption[] = COS_REGIONS): string {
-  return source.find((region) => region.id === id)?.label || id
+  const hit = source.find((region) => region.id === id)
+  return hit?.label || sharedRegionLabel(id)
 }

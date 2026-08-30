@@ -89,6 +89,10 @@ window.__ModuleLoader__.load({
 .ci-actions{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 .ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;margin:8px 14px}
 .ci-root .ci-err,.ci-panel .ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;font-weight:400;line-height:18px;margin:8px 14px}
+.ci-region-notice{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:400;line-height:18px;padding:3px 8px;border-radius:4px}
+.ci-region-notice-error{color:var(--dsw-alias-state-error-primary);background:var(--dsw-alias-state-error-bg,rgba(235,87,87,.08))}
+.ci-region-notice-static{color:var(--dsw-alias-label-caption);background:var(--dsw-alias-fill-l2,rgba(127,127,127,.08))}
+.ci-region-notice .ci-mini{margin:0}
 .ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
 .ci-list-body{min-height:160px}
 .ci-list-body .ci-load{min-height:160px;box-sizing:border-box}
@@ -2235,28 +2239,39 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ];
     }
 
+    // 与 src/providers/tencent/regions-shared.ts 共享数据源对齐(不冗余维护 aliases,
+    // 让二者保持一致)。这里包含共享 source 全部 id,UI 即便在运行时拉取失败前,也能展示完整清单。
     const COS_REGION_FALLBACK = [
-      { id: "ap-beijing", label: "北京", aliases: ["bj", "beijing", "pek"] },
-      { id: "ap-beijing-fsi", label: "北京金融", aliases: ["beijing-fsi"] },
-      { id: "ap-nanjing", label: "南京", aliases: ["nj", "nanjing"] },
-      { id: "ap-shanghai", label: "上海", aliases: ["sh", "shanghai"] },
-      { id: "ap-shanghai-fsi", label: "上海金融", aliases: ["shanghai-fsi"] },
-      { id: "ap-guangzhou", label: "广州", aliases: ["gz", "guangzhou", "canton"] },
-      { id: "ap-shenzhen-fsi", label: "深圳金融", aliases: ["sz-fsi", "shenzhen-fsi"] },
-      { id: "ap-chengdu", label: "成都", aliases: ["cd", "chengdu"] },
-      { id: "ap-chongqing", label: "重庆", aliases: ["cq", "chongqing"] },
-      { id: "ap-hongkong", label: "中国香港", aliases: ["hk", "hongkong", "hong kong", "香港"] },
-      { id: "ap-singapore", label: "新加坡", aliases: ["sg", "singapore"] },
-      { id: "ap-mumbai", label: "孟买", aliases: ["in", "mumbai", "india"] },
-      { id: "ap-jakarta", label: "雅加达", aliases: ["id", "jakarta"] },
-      { id: "ap-seoul", label: "首尔", aliases: ["kr", "seoul"] },
-      { id: "ap-bangkok", label: "曼谷", aliases: ["th", "bangkok"] },
-      { id: "ap-tokyo", label: "东京", aliases: ["jp", "tokyo"] },
-      { id: "na-siliconvalley", label: "硅谷", aliases: ["usw", "siliconvalley", "silicon valley"] },
-      { id: "na-ashburn", label: "弗吉尼亚", aliases: ["use", "ashburn", "virginia"] },
-      { id: "na-toronto", label: "多伦多", aliases: ["ca", "toronto"] },
-      { id: "sa-saopaulo", label: "圣保罗", aliases: ["br", "saopaulo", "sao paulo"] },
-      { id: "eu-frankfurt", label: "法兰克福", aliases: ["de", "frankfurt"] },
+      { id: "ap-guangzhou", label: "广州", aliases: ["gz", "guangzhou", "canton", "广州"] },
+      { id: "ap-beijing", label: "北京", aliases: ["bj", "beijing", "pek", "北京"] },
+      { id: "ap-shanghai", label: "上海", aliases: ["sh", "shanghai", "上海"] },
+      { id: "ap-shenzhen", label: "深圳", aliases: ["sz", "shenzhen", "深圳"] },
+      { id: "ap-qingyuan", label: "清远", aliases: ["qy", "qingyuan", "清远"] },
+      { id: "ap-chengdu", label: "成都", aliases: ["cd", "chengdu", "成都"] },
+      { id: "ap-nanjing", label: "南京", aliases: ["nj", "nanjing", "南京"] },
+      { id: "ap-chongqing", label: "重庆", aliases: ["cq", "chongqing", "重庆"] },
+      { id: "ap-hangzhou", label: "杭州", aliases: ["hz", "hangzhou", "杭州"] },
+      { id: "ap-qingdao", label: "青岛", aliases: ["qd", "qingdao", "青岛"] },
+      { id: "ap-tianjin", label: "天津", aliases: ["tj", "tianjin", "天津"] },
+      { id: "ap-zhongwei", label: "中卫", aliases: ["zhongwei", "zw", "中卫"] },
+      { id: "ap-hongkong", label: "中国香港", aliases: ["hk", "hongkong", "hong kong", "香港", "中国香港"] },
+      { id: "ap-taipei", label: "中国台北", aliases: ["taipei", "tw", "tp", "台北", "台湾", "中国台北"] },
+      { id: "ap-singapore", label: "新加坡", aliases: ["sg", "singapore", "新加坡"] },
+      { id: "ap-bangkok", label: "曼谷", aliases: ["th", "bangkok", "曼谷"] },
+      { id: "ap-tokyo", label: "东京", aliases: ["jp", "tokyo", "东京"] },
+      { id: "ap-seoul", label: "首尔", aliases: ["kr", "seoul", "首尔"] },
+      { id: "ap-jakarta", label: "雅加达", aliases: ["id", "jakarta", "雅加达"] },
+      { id: "ap-mumbai", label: "孟买", aliases: ["in", "mumbai", "india", "孟买"] },
+      { id: "sa-saopaulo", label: "圣保罗", aliases: ["br", "saopaulo", "sao paulo", "圣保罗"] },
+      { id: "eu-frankfurt", label: "法兰克福", aliases: ["de", "frankfurt", "法兰克福"] },
+      { id: "na-siliconvalley", label: "硅谷", aliases: ["usw", "siliconvalley", "silicon valley", "美西", "硅谷"] },
+      { id: "na-ashburn", label: "弗吉尼亚", aliases: ["use", "ashburn", "virginia", "美东", "弗吉尼亚"] },
+      { id: "na-toronto", label: "多伦多", aliases: ["ca", "toronto", "多伦多"] },
+      { id: "me-riyadh", label: "利雅得", aliases: ["riyadh", "me-saudi-arabia", "saudi", "沙特", "利雅得"] },
+      { id: "ap-shanghai-fsi", label: "上海金融", aliases: ["sh-fsi", "shanghai-fsi", "上海金融"] },
+      { id: "ap-shenzhen-fsi", label: "深圳金融", aliases: ["sz-fsi", "shenzhen-fsi", "深圳金融"] },
+      { id: "ap-beijing-fsi", label: "北京金融", aliases: ["bj-fsi", "beijing-fsi", "北京金融"] },
+      { id: "ap-shanghai-adc", label: "上海自动驾驶云", aliases: ["sh-adc", "shanghai-adc", "自动驾驶", "上海自动驾驶云"] },
     ];
 
     function normRegion(value) {
@@ -2461,6 +2476,38 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ));
     }
 
+    // 运行时按产品从云 API 拉取最新地域清单。
+    // 返回结构化状态(不抛出),让卡片 UI 能区分三种情形并给出可见标识:
+    //   - "api":    云 API 拉取成功,用返回清单替换现有列表;
+    //   - "shared": 未配置云凭证,服务端回退共享静态清单(非实时拉取,UI 需标识);
+    //   - "error":  网络/5xx/权限等失败,保留现有列表但 UI 必须显示「拉取失败,点击重试」。
+    function fetchRuntimeRegions(product) {
+      return api("regions", { product }).then((d) => {
+        if (d && d.ok && Array.isArray(d.regions) && d.regions.length) {
+          return { status: d.source === "shared" ? "shared" : "api", regions: d.regions, error: "" };
+        }
+        const message = (d && d.error) || "地域列表拉取失败";
+        return { status: "error", regions: null, error: message };
+      }).catch((e) => ({ status: "error", regions: null, error: publicErrorMessage(e) || "地域列表拉取失败" }));
+    }
+
+    // 地域拉取状态提示条:error 时给「重试」按钮;shared 时静态标识。正常(api/null)不渲染。
+    function RegionFetchNotice({ fetch, onRetry }) {
+      if (!fetch || fetch.status === "api") return null;
+      if (fetch.status === "shared") {
+        return h("div", { className: "ci-region-notice ci-region-notice-static", role: "note" },
+          "未配置云凭证，当前显示内置静态地域清单（非云 API 实时拉取）。");
+      }
+      if (fetch.status === "loading") {
+        return h("div", { className: "ci-region-notice ci-region-notice-static", role: "status" },
+          "正在从云 API 拉取最新地域列表…");
+      }
+      return h("div", { className: "ci-region-notice ci-region-notice-error", role: "alert" },
+        h("span", null, `地域列表拉取失败，请稍后重试。${fetch.error ? `（${fetch.error}）` : ""}`),
+        onRetry ? h("button", { type: "button", className: "ci-mini", onClick: onRetry }, "重试") : null,
+      );
+    }
+
     function CosConsoleView({ payload, args, skipConfirm, onSkipConfirm }) {
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const [regions, setRegions] = useState(COS_REGION_FALLBACK);
@@ -2484,11 +2531,20 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [err, setErr] = useState("");
       const [stat, setStat] = useState(null);
       const [missDismissed, setMissDismissed] = useState(false);
+      const [regionFetch, setRegionFetch] = useState(null);
       const fileRef = useRef(null);
       const seq = useRef(0);
       const fileSeq = useRef(0);
       const searchTimer = useRef(0);
       const directTried = useRef("");
+      const loadRegions = () => {
+        // 运行时拉取云 API 最新地域清单(失败即报错展示,不做本地快照兜底)。
+        setRegionFetch((prev) => (prev && prev.status === "error" ? { status: "loading", regions: null, error: "" } : prev));
+        return fetchRuntimeRegions("cos").then((result) => {
+          setRegionFetch(result);
+          if (result.regions) setRegions(result.regions);
+        });
+      };
       useEffect(() => {
         api("meta", {}).then((d) => {
           const mods = Array.isArray(d.modules) ? d.modules : [];
@@ -2496,6 +2552,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           if (cos) setRegions(cos.regions);
           if (onSkipConfirm) onSkipConfirm(!!d.skipConfirm);
         }).catch(() => {});
+        loadRegions().catch((e) => {
+          console.warn("[cloud-infra] regions(cos) 拉取失败", e);
+        });
         return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
       }, []);
       const seedSig = `${payload?.kind || ""}|${args.region || ""}|${(payload?.items || []).map((i) => i.id).join(",")}`;
@@ -2741,6 +2800,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             onInput: onRegionInput,
             onPick: pickRegion,
           }),
+          session ? null : h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadRegions }),
           h("div", { className: "ci-tool-left" },
             session ? [
               h("button", {
@@ -5326,13 +5386,19 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ["custom", "自定义"],
     ];
 
+    // 与 src/providers/tencent/regions-shared.ts 共享数据源对齐(差别:client 字段名是 name 而非 label)。
     const FALLBACK_CLS_REGIONS = [
       { id: "ap-guangzhou", name: "广州", group: "大陆" },
       { id: "ap-beijing", name: "北京", group: "大陆" },
       { id: "ap-shanghai", name: "上海", group: "大陆" },
+      { id: "ap-shenzhen", name: "深圳", group: "大陆" },
+      { id: "ap-qingyuan", name: "清远", group: "大陆" },
       { id: "ap-chengdu", name: "成都", group: "大陆" },
       { id: "ap-nanjing", name: "南京", group: "大陆" },
       { id: "ap-chongqing", name: "重庆", group: "大陆" },
+      { id: "ap-hangzhou", name: "杭州", group: "大陆" },
+      { id: "ap-qingdao", name: "青岛", group: "大陆" },
+      { id: "ap-tianjin", name: "天津", group: "大陆" },
       { id: "ap-zhongwei", name: "中卫", group: "大陆" },
       { id: "ap-hongkong", name: "中国香港", group: "港澳台" },
       { id: "ap-taipei", name: "中国台北", group: "港澳台" },
@@ -5341,10 +5407,12 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       { id: "ap-tokyo", name: "东京", group: "海外" },
       { id: "ap-seoul", name: "首尔", group: "海外" },
       { id: "ap-jakarta", name: "雅加达", group: "海外" },
+      { id: "ap-mumbai", name: "孟买", group: "海外" },
       { id: "sa-saopaulo", name: "圣保罗", group: "海外" },
       { id: "eu-frankfurt", name: "法兰克福", group: "海外" },
       { id: "na-siliconvalley", name: "硅谷", group: "海外" },
       { id: "na-ashburn", name: "弗吉尼亚", group: "海外" },
+      { id: "na-toronto", name: "多伦多", group: "海外" },
       { id: "me-riyadh", name: "利雅得", group: "海外" },
       { id: "ap-shenzhen-fsi", name: "深圳金融", group: "金融" },
       { id: "ap-shanghai-fsi", name: "上海金融", group: "金融" },
@@ -5481,6 +5549,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [logMore, setLogMore] = useState(!!payload?.hasMore && startSearch);
       const [logBusy, setLogBusy] = useState(false);
       const [pendingId, setPendingId] = useState("");
+      const [regionFetch, setRegionFetch] = useState(null);
       const seq = useRef(0);
       const debounce = useRef(0);
       const toolSig = fromTool
@@ -5509,6 +5578,19 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         setListErr((payload?.errors || []).map((e) => e.message).join("；"));
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
+      // 运行时拉取云 API 最新地域清单(失败即报错展示,不做本地快照兜底)。
+      const loadRegions = () => {
+        setRegionFetch((prev) => (prev && prev.status === "error" ? { status: "loading", regions: null, error: "" } : prev));
+        return fetchRuntimeRegions("cls").then((result) => {
+          setRegionFetch(result);
+          if (result.regions) setRegions(result.regions.map((row) => ({ id: row.id, name: row.label, group: row.group })));
+        });
+      };
+      useEffect(() => {
+        loadRegions().catch((e) => {
+          console.warn("[cloud-infra] regions(cls) 拉取失败", e);
+        });
+      }, []);
       const fetchList = async (nextOffset, q, nextRegion) => {
         const n = ++seq.current;
         const usedRegion = nextRegion || region;
@@ -5634,6 +5716,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("div", { className: "ci-cls-filter" },
               h("span", null, "地域"),
               h(ClsRegionSelect, { value: region, regions, disabled: logBusy, onChange: onRegion }),
+              h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadRegions }),
             ),
           ),
           h("div", { className: "ci-query" },
@@ -5744,6 +5827,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("div", { className: "ci-cls-filter" },
               h("span", null, "地域"),
               h(ClsRegionSelect, { value: region, regions, disabled: listBusy, onChange: onRegion }),
+              h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadRegions }),
             ),
             h("div", { className: "ci-search-wrap" },
               h(SearchIcon),
@@ -6333,8 +6417,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ["dbbrain-mysql", "自建 MySQL"],
     ];
     // Keep in sync with src/providers/tencent/products/dbbrain-catalog.ts
+    // 移除「全地域」占位,默认选中广州。labels 统一收敛到与共享数据源一致(如「中国香港」)。
     const DBBRAIN_REGIONS = [
-      ["", "全地域"],
       ["ap-guangzhou", "广州"],
       ["ap-qingyuan", "清远"],
       ["ap-shenzhen", "深圳"],
@@ -6347,8 +6431,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ["ap-chengdu", "成都"],
       ["ap-chongqing", "重庆"],
       ["ap-zhongwei", "中卫"],
-      ["ap-hongkong", "香港"],
-      ["ap-taipei", "台北"],
+      ["ap-hongkong", "中国香港"],
+      ["ap-taipei", "中国台北"],
       ["ap-shanghai-fsi", "上海金融"],
       ["ap-shenzhen-fsi", "深圳金融"],
       ["ap-beijing-fsi", "北京金融"],
@@ -6780,7 +6864,26 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const isCert = kind === "cert";
       const isDbbrain = kind === "dbbrain";
       const [dbProduct, setDbProduct] = useState(() => safeText(fromTool && fromTool[0] && fromTool[0].product) || "mysql");
-      const [dbRegion, setDbRegion] = useState("");
+      const [dbRegion, setDbRegion] = useState("ap-guangzhou");
+      const [dbRegions, setDbRegions] = useState(DBBRAIN_REGIONS);
+      const [regionFetch, setRegionFetch] = useState(null);
+      // 运行时拉取云 API 最新地域清单(失败即报错展示,不做本地快照兜底)。
+      const loadDbRegions = () => {
+        setRegionFetch((prev) => (prev && prev.status === "error" ? { status: "loading", regions: null, error: "" } : prev));
+        return fetchRuntimeRegions("dbbrain").then((result) => {
+          setRegionFetch(result);
+          if (!result.regions) return;
+          setDbRegions(result.regions
+            .filter((row) => row.group !== "特殊")
+            .map((row) => [row.id, row.label]));
+        });
+      };
+      useEffect(() => {
+        if (kind !== "dbbrain") return;
+        loadDbRegions().catch((e) => {
+          console.warn("[cloud-infra] regions(dbbrain) 拉取失败", e);
+        });
+      }, [kind]);
       const refreshSkip = () => {
         api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
       };
@@ -7431,7 +7534,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                   setDbRegion(next);
                   fetchList(0, String(activeQ || "").trim(), undefined, undefined, { product: dbProduct, region: next });
                 },
-              }, DBBRAIN_REGIONS.map((row) => h("option", { key: row[0] || "all", value: row[0] }, row[1]))),
+              }, dbRegions.map((row) => h("option", { key: row[0] || "all", value: row[0] }, row[1]))),
+              h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadDbRegions }),
               h("div", { className: "ci-search-wrap" },
                 h(SearchIcon),
                 h("input", {

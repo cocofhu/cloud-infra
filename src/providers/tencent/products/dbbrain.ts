@@ -11,12 +11,14 @@ import type {
   ResourceStatus,
 } from '../../../core/types.js'
 import { dbbrainCall } from '../client.js'
+import { DEFAULT_REGION, regionLabel as sharedRegionLabel, resolveRegion } from '../regions-shared.js'
 import { DBBRAIN_PRODUCTS, DBBRAIN_REGIONS } from './dbbrain-catalog.js'
 
 export { DBBRAIN_PRODUCTS, DBBRAIN_REGIONS } from './dbbrain-catalog.js'
 
 export const LIST_REGION = 'ap-guangzhou'
-export const MISSING_REGION = '缺少实例地域，无法发起诊断。不会默认使用广州。'
+// 注: 原 MISSING_REGION 常量已随「默认广州」语义移除——空 region 由 requireRegion
+// 收敛为 DEFAULT_REGION(ap-guangzhou),不再有「缺地域报错」的消费路径。
 export const MODULE_ID = 'tencent.dbbrain'
 export const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000
 export const DIAG_HISTORY_MAX_MS = 2 * 24 * 60 * 60 * 1000
@@ -118,7 +120,7 @@ export function parseInstanceRef(id: string): { moduleId: string; product: strin
 export function regionLabel(region?: string): string {
   const id = String(region || '').trim()
   if (!id) return ''
-  return DBBRAIN_REGIONS.find((item) => item.id === id)?.label || id
+  return sharedRegionLabel(id)
 }
 
 export function productLabel(product?: string): string {
@@ -316,8 +318,8 @@ export function timeRange(key: string, custom?: { start?: string; end?: string }
 
 export function requireRegion(ctx: ModuleContext, payload?: Record<string, unknown>): string {
   const parsed = parseInstanceRef(String(ctx.id || ''))
-  const region = parsed.region || String(ctx.filters?.region || payload?.region || '').trim()
-  if (!region) throw new Error(MISSING_REGION)
+  const raw = parsed.region || String(ctx.filters?.region || payload?.region || '').trim()
+  const region = resolveRegion(raw) || DEFAULT_REGION
   return region
 }
 

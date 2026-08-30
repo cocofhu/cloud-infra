@@ -8,6 +8,8 @@ import { credentialHint, credentialMap, implementedModules, missingCredentialKey
 import { actionErrorMessage, publicErrorMessage } from './core/safe-error.js'
 import { isPost, trustedUiRequest } from './core/trusted-request.js'
 import type { PluginConfig, QueryResult } from './core/types.js'
+import { fetchSharedRegions, sharedRegionsFor } from './providers/tencent/regions-fetch.js'
+import type { RegionProduct } from './providers/tencent/regions-shared.js'
 import './providers/index.js'
 
 export const name = 'cloud-infra'
@@ -177,6 +179,32 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, cfg: 
     }
     if (method === 'meta') {
       return sendJson(res, 200, { ok: true, ...publicMeta(cfg), skipConfirm: cfg.skipConfirm })
+    }
+    if (method === 'regions') {
+      // 运行时按产品从云 API 拉取最新地域清单(失败即报错,不使用本地快照兜底,用户明确选择该语义)。
+      const product = String(body.product || url.searchParams.get('product') || '') as RegionProduct | ''
+      if (!product) {
+        return sendJson(res, 400, { ok: false, error: '缺少 product(cls / cos / dbbrain / ...)' })
+      }
+      const tencent = registry.getProvider('tencent')
+      const creds = credentialMap(tencent!, cfg.providers?.tencent)
+      if (!creds.secretId || !creds.secretKey) {
+        return sendJson(res, 200, {
+          ok: true,
+          product,
+          source: 'shared',
+          regions: sharedRegionsFor(product || undefined),
+          hint: '未配置腾讯云凭证,回退共享静态清单',
+        })
+      }
+      try {
+        const regions = await fetchSharedRegions(product, { secretId: creds.secretId, secretKey: creds.secretKey }, {
+          timeoutMs: cfg.timeoutMs ?? 20000,
+        })
+        return sendJson(res, 200, { ok: true, product, source: 'api', regions })
+      } catch (err) {
+        return sendJson(res, 502, { ok: false, error: publicErrorMessage(err) })
+      }
     }
     if (method === 'config') {
       if (body.save) {
