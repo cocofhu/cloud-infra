@@ -9,7 +9,6 @@ import { overlayPath, withDefaults } from '../core/config-store.js'
 import { handleApi } from '../host.js'
 import {
   LIST_REGION,
-  MISSING_REGION,
   SLOW_RANGES,
   createDbbrainModule,
   encodeInstanceRef,

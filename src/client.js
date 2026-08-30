@@ -89,6 +89,10 @@ window.__ModuleLoader__.load({
 .ci-actions{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 .ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;margin:8px 14px}
 .ci-root .ci-err,.ci-panel .ci-err{color:var(--dsw-alias-state-error-primary);font-size:12px;font-weight:400;line-height:18px;margin:8px 14px}
+.ci-region-notice{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:400;line-height:18px;padding:3px 8px;border-radius:4px}
+.ci-region-notice-error{color:var(--dsw-alias-state-error-primary);background:var(--dsw-alias-state-error-bg,rgba(235,87,87,.08))}
+.ci-region-notice-static{color:var(--dsw-alias-label-caption);background:var(--dsw-alias-fill-l2,rgba(127,127,127,.08))}
+.ci-region-notice .ci-mini{margin:0}
 .ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
 .ci-list-body{min-height:160px}
 .ci-list-body .ci-load{min-height:160px;box-sizing:border-box}
@@ -2376,13 +2380,36 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       ));
     }
 
+    // 运行时按产品从云 API 拉取最新地域清单。
+    // 返回结构化状态(不抛出),让卡片 UI 能区分三种情形并给出可见标识:
+    //   - "api":    云 API 拉取成功,用返回清单替换现有列表;
+    //   - "shared": 未配置云凭证,服务端回退共享静态清单(非实时拉取,UI 需标识);
+    //   - "error":  网络/5xx/权限等失败,保留现有列表但 UI 必须显示「拉取失败,点击重试」。
     function fetchRuntimeRegions(product) {
-      // 运行时按产品从云 API 拉取最新地域清单;失败时保留现有列表并在控制台告警,
-      // 不做本地"再兜底一份硬编码快照"(共享 source 已是基础)。
       return api("regions", { product }).then((d) => {
-        if (!d || !d.ok || !Array.isArray(d.regions) || !d.regions.length) return null;
-        return d.regions;
-      });
+        if (d && d.ok && Array.isArray(d.regions) && d.regions.length) {
+          return { status: d.source === "shared" ? "shared" : "api", regions: d.regions, error: "" };
+        }
+        const message = (d && d.error) || "地域列表拉取失败";
+        return { status: "error", regions: null, error: message };
+      }).catch((e) => ({ status: "error", regions: null, error: publicErrorMessage(e) || "地域列表拉取失败" }));
+    }
+
+    // 地域拉取状态提示条:error 时给「重试」按钮;shared 时静态标识。正常(api/null)不渲染。
+    function RegionFetchNotice({ fetch, onRetry }) {
+      if (!fetch || fetch.status === "api") return null;
+      if (fetch.status === "shared") {
+        return h("div", { className: "ci-region-notice ci-region-notice-static", role: "note" },
+          "未配置云凭证，当前显示内置静态地域清单（非云 API 实时拉取）。");
+      }
+      if (fetch.status === "loading") {
+        return h("div", { className: "ci-region-notice ci-region-notice-static", role: "status" },
+          "正在从云 API 拉取最新地域列表…");
+      }
+      return h("div", { className: "ci-region-notice ci-region-notice-error", role: "alert" },
+        h("span", null, `地域列表拉取失败，请稍后重试。${fetch.error ? `（${fetch.error}）` : ""}`),
+        onRetry ? h("button", { type: "button", className: "ci-mini", onClick: onRetry }, "重试") : null,
+      );
     }
 
     function CosConsoleView({ payload, args, skipConfirm, onSkipConfirm }) {
@@ -2408,11 +2435,20 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [err, setErr] = useState("");
       const [stat, setStat] = useState(null);
       const [missDismissed, setMissDismissed] = useState(false);
+      const [regionFetch, setRegionFetch] = useState(null);
       const fileRef = useRef(null);
       const seq = useRef(0);
       const fileSeq = useRef(0);
       const searchTimer = useRef(0);
       const directTried = useRef("");
+      const loadRegions = () => {
+        // 运行时拉取云 API 最新地域清单(失败即报错展示,不做本地快照兜底)。
+        setRegionFetch((prev) => (prev && prev.status === "error" ? { status: "loading", regions: null, error: "" } : prev));
+        return fetchRuntimeRegions("cos").then((result) => {
+          setRegionFetch(result);
+          if (result.regions) setRegions(result.regions);
+        });
+      };
       useEffect(() => {
         api("meta", {}).then((d) => {
           const mods = Array.isArray(d.modules) ? d.modules : [];
@@ -2420,8 +2456,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           if (cos) setRegions(cos.regions);
           if (onSkipConfirm) onSkipConfirm(!!d.skipConfirm);
         }).catch(() => {});
-        // 运行时拉取云 API 最新地域清单(失败即报错,不做本地快照兜底)。
-        fetchRuntimeRegions("cos").then((list) => { if (list) setRegions(list); }).catch((e) => {
+        loadRegions().catch((e) => {
           console.warn("[cloud-infra] regions(cos) 拉取失败", e);
         });
         return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
@@ -2669,6 +2704,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             onInput: onRegionInput,
             onPick: pickRegion,
           }),
+          session ? null : h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadRegions }),
           h("div", { className: "ci-tool-left" },
             session ? [
               h("button", {
@@ -5415,6 +5451,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [logMore, setLogMore] = useState(!!payload?.hasMore && startSearch);
       const [logBusy, setLogBusy] = useState(false);
       const [pendingId, setPendingId] = useState("");
+      const [regionFetch, setRegionFetch] = useState(null);
       const seq = useRef(0);
       const debounce = useRef(0);
       const toolSig = fromTool
@@ -5442,12 +5479,16 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         setListErr((payload?.errors || []).map((e) => e.message).join("；"));
       }, [toolSig]);
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
-      // 运行时拉取云 API 最新地域清单(失败即报错,不做本地快照兜底)。
+      // 运行时拉取云 API 最新地域清单(失败即报错展示,不做本地快照兜底)。
+      const loadRegions = () => {
+        setRegionFetch((prev) => (prev && prev.status === "error" ? { status: "loading", regions: null, error: "" } : prev));
+        return fetchRuntimeRegions("cls").then((result) => {
+          setRegionFetch(result);
+          if (result.regions) setRegions(result.regions.map((row) => ({ id: row.id, name: row.label, group: row.group })));
+        });
+      };
       useEffect(() => {
-        fetchRuntimeRegions("cls").then((list) => {
-          if (!list) return;
-          setRegions(list.map((row) => ({ id: row.id, name: row.label, group: row.group })));
-        }).catch((e) => {
+        loadRegions().catch((e) => {
           console.warn("[cloud-infra] regions(cls) 拉取失败", e);
         });
       }, []);
@@ -5576,6 +5617,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("div", { className: "ci-cls-filter" },
               h("span", null, "地域"),
               h(ClsRegionSelect, { value: region, regions, disabled: logBusy, onChange: onRegion }),
+              h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadRegions }),
             ),
           ),
           h("div", { className: "ci-query" },
@@ -5686,6 +5728,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("div", { className: "ci-cls-filter" },
               h("span", null, "地域"),
               h(ClsRegionSelect, { value: region, regions, disabled: listBusy, onChange: onRegion }),
+              h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadRegions }),
             ),
             h("div", { className: "ci-search-wrap" },
               h(SearchIcon),
@@ -6707,15 +6750,21 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [dbProduct, setDbProduct] = useState((fromTool && fromTool[0] && fromTool[0].product) || "mysql");
       const [dbRegion, setDbRegion] = useState("ap-guangzhou");
       const [dbRegions, setDbRegions] = useState(DBBRAIN_REGIONS);
-      // 运行时拉取云 API 最新地域清单(失败即报错,不做本地快照兜底)。
-      useEffect(() => {
-        if (kind !== "dbbrain") return;
-        fetchRuntimeRegions("dbbrain").then((list) => {
-          if (!list) return;
-          setDbRegions(list
+      const [regionFetch, setRegionFetch] = useState(null);
+      // 运行时拉取云 API 最新地域清单(失败即报错展示,不做本地快照兜底)。
+      const loadDbRegions = () => {
+        setRegionFetch((prev) => (prev && prev.status === "error" ? { status: "loading", regions: null, error: "" } : prev));
+        return fetchRuntimeRegions("dbbrain").then((result) => {
+          setRegionFetch(result);
+          if (!result.regions) return;
+          setDbRegions(result.regions
             .filter((row) => row.group !== "特殊")
             .map((row) => [row.id, row.label]));
-        }).catch((e) => {
+        });
+      };
+      useEffect(() => {
+        if (kind !== "dbbrain") return;
+        loadDbRegions().catch((e) => {
           console.warn("[cloud-infra] regions(dbbrain) 拉取失败", e);
         });
       }, [kind]);
@@ -7364,6 +7413,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                   fetchList(0, String(activeQ || "").trim(), undefined, undefined, { product: dbProduct, region: next });
                 },
               }, dbRegions.map((row) => h("option", { key: row[0] || "all", value: row[0] }, row[1]))),
+              h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadDbRegions }),
               h("div", { className: "ci-search-wrap" },
                 h(SearchIcon),
                 h("input", {

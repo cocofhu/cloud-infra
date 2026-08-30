@@ -269,13 +269,33 @@ export function resolveRegion(input?: string): string | undefined {
 
 /**
  * 老用法兼容：在一段文本里找第一个命中的 alias。
- * 为了防止「商业化广州的实例」这类文本被「商业」错误命中，只允许长度 ≥ 2 的 alias 参与匹配。
+ *
+ * 语义边界：这是「自由文本抠地域提示」，与 `resolveRegion` 的精确匹配不同——
+ * 只允许 **长度 ≥ 3** 的 alias 参与子串匹配。
+ *
+ * 原因：TENCENT_REGIONS 的 aliases 含大量 2 字母拼音/英文/国家代码缩写
+ * （sh/gz/hk/jp/de/th/in/id/br/ca/tw 等）。这些缩写在英文查询里随处可见
+ * （"show me logs" 含 "sh"、"india" 含 "in"、"the" 含 "th"），
+ * 放任参与会把用户的自由查询词啃掉、错命中地域（CLS 查询路径回归）。
+ * 旧 CLS 实现只做「中文名 + 完整 id」子串命中，本函数保持同等克制：
+ *   - 含非 ASCII（中文名）的 alias 任意长度均可参与（「广州」「香港」仍是 2 字）；
+ *   - 纯 ASCII alias 仅放行完整 region id 形态（如 ap-guangzhou / eu-frankfurt /
+ *     me-saudi-arabia）——带「-」前缀结构，不会与普通英文单词相撞；
+ *   - 其余英文/拼音单词型 alias（guangzhou/sh/india/de/th/usw 等）不参与自由文本
+ *     抽取，避免 "show me logs"、"india logs" 这类查询被啃字错命中。
+ * 上述英文 alias 仍可通过 `resolveRegion` 精确匹配命中，只是不参与自由文本抽取。
  */
+const REGION_ID_SHAPE = /^[a-z]{2,3}-[a-z0-9][a-z0-9-]*$/
+function hintKeyAllowed(key: string): boolean {
+  if (/[^\x00-\x7f]/.test(key)) return true
+  return REGION_ID_SHAPE.test(key)
+}
+
 export function parseRegionHint(text: string): { region?: string; rest: string } {
   const src = String(text || '').trim()
   if (!src) return { rest: '' }
   for (const key of ALIAS_KEYS) {
-    if (key.length < 2) continue
+    if (!hintKeyAllowed(key)) continue
     const idx = src.toLowerCase().indexOf(key.toLowerCase())
     if (idx < 0) continue
     const rest = `${src.slice(0, idx)} ${src.slice(idx + key.length)}`

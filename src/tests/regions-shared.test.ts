@@ -160,6 +160,30 @@ test('parseRegionHint 在文本中命中 alias,返回剩余文本', () => {
   assert.equal(gzHit.region, 'ap-guangzhou')
 })
 
+test('parseRegionHint: 英文/拼音 alias 不参与自由文本子串命中(英文查询回归防护)', () => {
+  // 评审回归: "show me logs" 含 "sh"(上海)、 "india" 既含 "in" 又是孟买完整 alias,均不得啃查询词。
+  for (const query of [
+    'show me logs',
+    'india logs',
+    'find the error',     // 含 "th"(曼谷)
+    'get identity',       // 含 "id"(雅加达)
+    'error code de',      // 含 "de"(法兰克福)
+    'ca bundle issue',    // 含 "ca"(多伦多)
+    'use the tokyo api',  // use(弗吉尼亚)/tokyo(东京) 同为单词型 alias,不参与
+  ]) {
+    const hit = parseRegionHint(query)
+    assert.equal(hit.region, undefined, `「${query}」不应命中任何地域`)
+    assert.equal(hit.rest, query, `「${query}」的 rest 应保持原文不变`)
+  }
+  // 英文 alias 仍可通过 resolveRegion 精确匹配(语义区分: 精确 vs 自由文本抽取)
+  assert.equal(resolveRegion('sh'), 'ap-shanghai')
+  assert.equal(resolveRegion('gz'), 'ap-guangzhou')
+  assert.equal(resolveRegion('tokyo'), 'ap-tokyo')
+  // 中文别名与完整 region id 仍参与自由文本抽取
+  assert.equal(parseRegionHint('帮忙查一下上海 CLS 的日志').region, 'ap-shanghai')
+  assert.equal(parseRegionHint('查 ap-guangzhou 的日志').region, 'ap-guangzhou')
+})
+
 test('regionGroups 按 CLS 分组顺序返回,不出现空分组', () => {
   const groups = regionGroups()
   assert.deepEqual(groups.map((row) => row.group), ['大陆', '港澳台', '海外', '金融', '特殊'])

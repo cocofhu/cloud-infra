@@ -17,7 +17,8 @@ import { DBBRAIN_PRODUCTS, DBBRAIN_REGIONS } from './dbbrain-catalog.js'
 export { DBBRAIN_PRODUCTS, DBBRAIN_REGIONS } from './dbbrain-catalog.js'
 
 export const LIST_REGION = 'ap-guangzhou'
-export const MISSING_REGION = '缺少实例地域，无法发起诊断。不会默认使用广州。'
+// 注: 原 MISSING_REGION 常量已随「默认广州」语义移除——空 region 由 requireRegion
+// 收敛为 DEFAULT_REGION(ap-guangzhou),不再有「缺地域报错」的消费路径。
 export const MODULE_ID = 'tencent.dbbrain'
 export const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000
 export const DIAG_HISTORY_MAX_MS = 2 * 24 * 60 * 60 * 1000
