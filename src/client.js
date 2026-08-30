@@ -74,12 +74,12 @@ window.__ModuleLoader__.load({
 .ci-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
 .ci-sec-t{font-size:13px;font-weight:650}
 .ci-sec-empty{display:flex;align-items:center;gap:8px;padding:0 14px 14px;font-size:13px;color:var(--dsw-alias-label-secondary);line-height:22px}
-.ci-table-wrap{width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
-.ci-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
-.ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle;white-space:nowrap;word-break:normal}
+.ci-table-wrap{width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;isolation:isolate}
+.ci-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px;table-layout:fixed}
+.ci-table th,.ci-table td{text-align:left;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-table td.ci-ops-cell,.ci-table th.ci-ops-cell{overflow:visible;text-overflow:clip}
 .ci-table th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px}
-.ci-panel:not(.ci-image) .ci-table td {word-break:break-all;color:var(--dsw-alias-label-secondary)}
-.ci-table td.ci-ops-cell{white-space:nowrap;word-break:normal}
+.ci-panel:not(.ci-image) .ci-table td{color:var(--dsw-alias-label-secondary)}
 .ci-table tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-rec-page{margin:0}
 .ci-mini{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px;white-space:nowrap;flex-shrink:0}
@@ -187,9 +187,9 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-id{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
 .ci-id-sub{color:var(--dsw-alias-label-tertiary);font-size:12px;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .ci-ip{display:block;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
-.ci-scroll{width:100%;overflow:auto}
-.ci-dense{width:100%;min-width:980px;border-collapse:collapse;font-size:13px}
-.ci-dense th,.ci-dense td{text-align:left;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:top;white-space:nowrap}
+.ci-scroll{width:100%;overflow:auto;isolation:isolate}
+.ci-dense{width:100%;min-width:980px;border-collapse:collapse;font-size:13px;table-layout:fixed}
+.ci-dense th,.ci-dense td{text-align:left;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:top;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ci-dense th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px;background:var(--dsw-alias-bg-layer-2)}
 .ci-dense tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-more{position:relative;display:inline-block}
@@ -361,8 +361,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-cls .ci-kv{display:inline-block;margin:4px 6px 0 0;background:var(--dsw-alias-bg-layer-2);border-radius:6px;padding:1px 6px;font-size:12px}
 .ci-raw{font-family:ui-monospace,Menlo,monospace;font-size:12px;margin-top:4px;word-break:break-all}
 .ci-tiny{font-size:12px;color:var(--dsw-alias-label-tertiary)}
-.ci-table-scroll{overflow-x:auto;overflow-y:hidden;width:100%;max-width:100%;min-width:0;-webkit-overflow-scrolling:touch}
-.ci-cls .ci-table{width:max-content;min-width:100%;border-collapse:collapse}
+.ci-table-scroll{overflow-x:auto;overflow-y:hidden;width:100%;max-width:100%;min-width:0;-webkit-overflow-scrolling:touch;isolation:isolate}
+.ci-cls .ci-table{width:100%;min-width:100%;border-collapse:collapse}
 .ci-foot-note{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;color:var(--dsw-alias-label-tertiary);font-size:12px;border-top:1px solid var(--dsw-alias-border-l1);flex-wrap:wrap}
 .ci-cls{--cls-blue:#0052d9;--cls-blue-h:#266fe8;--cls-line:#e7e7e7;--cls-head:#f3f3f3;--cls-sub:#888}
 .ci-cls .ci-panel{border-color:var(--cls-line)}
