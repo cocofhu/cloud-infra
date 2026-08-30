@@ -1085,3 +1085,23 @@ test('RegionComboById typing only filters and never clears selection; all-region
   assert.doesNotMatch(client, /\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:[0-9]+px/)
   assert.match(client, /\.ci-cls \.ci-region,\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:var\(--ci-radius-lg\)/)
 })
+
+test('g1/g2 列表横向滚动 hover 连续与 .ci-mini 品牌色 hover 契约', () => {
+  const client = read('src/client.js')
+  // 横向滚动容器仍允许溢出滚动,hover 背景随内容宽度延展
+  assert.match(client, /\.ci-table-wrap\{[^}]*overflow-x:auto/)
+  assert.match(client, /\.ci-list\{[^}]*overflow-x:auto/)
+  // 三类列表 hover 背景覆盖整行(含横向滚动后区域):行宽随内容延展 + td 上下同色 box-shadow 弥合接缝
+  assert.match(client, /\.ci-table\{[^}]*width:max-content/)
+  assert.match(client, /\.ci-row\{[^}]*min-width:max-content/)
+  assert.match(client, /\.ci-table tbody tr:hover td\{[^}]*box-shadow:[^}]*var\(--dsw-alias-interactive-bg-hover\)/)
+  assert.match(client, /\.ci-dense tbody tr:hover td\{[^}]*box-shadow:[^}]*var\(--dsw-alias-interactive-bg-hover\)/)
+  // .ci-mini 默认 hover:品牌色浅色底(color-mix 品牌色 8-12%)+ 品牌主色文字;disabled 不响应
+  assert.match(client, /\.ci-mini:hover:not\(:disabled\)\{[^}]*background:var\(--ci-brand-soft\)[^}]*color:var\(--dsw-alias-brand-primary\)/)
+  assert.match(client, /--ci-brand-soft:color-mix\(in srgb,var\(--dsw-alias-brand-primary\) 12%,transparent\)/)
+  // primary / danger 变体 hover 各符合语义,无 filter 硬编码
+  assert.match(client, /\.ci-mini\.primary:hover:not\(:disabled\)\{[^}]*background:color-mix\(in srgb,var\(--dsw-alias-button-primary-fill\)/)
+  assert.match(client, /\.ci-mini\.danger:hover:not\(:disabled\)\{[^}]*color-mix\(in srgb,var\(--dsw-alias-state-error-primary\) 10%,transparent\)/)
+  const miniHover = client.match(/\.ci-mini[^,{]*:hover[^}]*\}/g)!.join('\n')
+  assert.doesNotMatch(miniHover, /filter:/)
+})
