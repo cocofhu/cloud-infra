@@ -759,6 +759,48 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return message;
     }
 
+    // —— 渲染兜底:上游 payload/props 可能把 {id,label} 这类对象塞进本应渲染字符串的位置,
+    // 直接交给 React 会变成 [object Object] 或受控组件告警。safeText 统一在进 state/渲染前归一:
+    // null/undefined → ""、字符串/数字/布尔 → 原样字符串、其余对象 → 安全回退(绝不返回 "[object Object]")。
+    function safeText(value) {
+      if (value == null) return "";
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return String(value);
+      // 数组/对象:只兜底,不猜测结构(如 {id,label} 的语义化展示交给控件内部完成)
+      return "";
+    }
+    // asString 是 safeText 的语义化别名,给「取对象里的字段渲染」处使用,便于阅读与检索。
+    const asString = safeText;
+
+    // 列表条目在进 UI 状态前做一次浅归一:id/title/region/regionName/description 与 columns[].value
+    // 统一为字符串,React 侧永远只拿到可渲染值;对象型字段取 label/name 否则安全回退为空串。
+    function safeField(value) {
+      if (typeof value === "string") return value;
+      if (value && typeof value === "object") {
+        const named = typeof value.label === "string" ? value.label : (typeof value.name === "string" ? value.name : "");
+        if (named) return named;
+      }
+      return safeText(value);
+    }
+    function normalizeListItem(item) {
+      if (!item || typeof item !== "object") return item;
+      const out = { ...item };
+      out.id = safeText(item.id);
+      out.title = safeField(item.title);
+      out.region = safeText(item.region);
+      out.regionName = safeField(item.regionName);
+      out.description = safeText(item.description);
+      if (Array.isArray(item.columns)) {
+        out.columns = item.columns.map((col) => col && typeof col === "object"
+          ? { ...col, value: safeText(col.value) }
+          : col);
+      }
+      return out;
+    }
+    function normalizeListItems(list) {
+      return (Array.isArray(list) ? list : []).map((item) => normalizeListItem(item));
+    }
+
     async function api(method, payload) {
       const res = await fetch(pluginUrl("/cloud-infra"), {
         method: "POST",
@@ -958,13 +1000,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
     }
 
     function SearchField({ value, onChange, onSubmit, placeholder }) {
+      // 受控值必须是字符串;上游传入对象时兜底为空串,避免 React 渲染 [object Object]
+      const text = safeText(value);
       return h("div", { className: "ci-search-wrap" },
         h(SearchIcon),
         h("input", {
           className: "ci-search",
           type: "search",
           placeholder: placeholder || "搜索 ID / 名称 / IP",
-          value: value || "",
+          value: text || "",
           onChange: (e) => onChange && onChange(e.target.value),
           onKeyDown: (e) => {
             if (e.key !== "Enter") return;
@@ -972,7 +1016,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             onSubmit && onSubmit(e.target.value);
           },
         }),
-        value ? h("button", {
+        text ? h("button", {
           type: "button",
           className: "ci-search-x",
           onClick: () => {
@@ -1020,7 +1064,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
 
     function cellValue(item, label) {
       const col = inferColumns(item).find((c) => c && c.label === label);
-      return col && col.value != null ? String(col.value) : "";
+      return col && col.value != null ? safeText(col.value) : "";
     }
 
     function pageWindow(current, pages) {
@@ -1066,15 +1110,19 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
     function RegionCombo({ items, groups, value, display, onDisplay, placeholder, allowAll, disabled, style, inputId, chosenText, onChange }) {
       const [open, setOpen] = useState(false);
       const [highlight, setHighlight] = useState(0);
+      // 脏数据兜底:{id,label} 字段为对象时取内部字符串,绝不把对象交给 React 渲染。
+      const safeItem = (item) => item ? { ...item, id: safeText(item.id), label: safeField(item.label) } : item;
+      const safeValue = safeItem(value);
+      const displayText = safeText(display);
       const visibleGroups = useMemo(() => {
         const all = allowAll ? [{ id: REGION_ALL_ID, label: "全部地域", aliases: ["all"] }] : [];
         const source = Array.isArray(groups) && groups.length
-          ? groups.map((group) => ({ title: group.title, items: (Array.isArray(group.items) ? group.items : []).filter(Boolean) }))
-          : [{ title: "", items: (Array.isArray(items) ? items : []).filter(Boolean) }];
+          ? groups.map((group) => ({ title: safeText(group.title), items: (Array.isArray(group.items) ? group.items : []).filter(Boolean).map(safeItem) }))
+          : [{ title: "", items: (Array.isArray(items) ? items : []).filter(Boolean).map(safeItem) }];
         // 输入恰为已选项展示文本时视为未输入,展示全量(沿用旧 comboNeedle 语义)
-        let comboNeedle = String(display || "");
-        if (value && value.id !== REGION_ALL_ID) {
-          const chosen = source.flatMap((group) => group.items).find((item) => item.id === value.id);
+        let comboNeedle = String(displayText || "");
+        if (safeValue && safeValue.id !== REGION_ALL_ID) {
+          const chosen = source.flatMap((group) => group.items).find((item) => item.id === safeValue.id);
           if (chosen && (comboNeedle === `${chosen.label}（${chosen.id}）` || comboNeedle === chosen.label)) comboNeedle = "";
         }
         const hitGroups = source.map((group) => ({
@@ -1083,7 +1131,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         })).filter((group) => group.items.length);
         if (allowAll && matchRegionItems(all, comboNeedle).length) hitGroups.unshift({ title: "", items: all });
         return hitGroups;
-      }, [items, groups, display, value, allowAll]);
+      }, [items, groups, displayText, safeValue && safeValue.id, allowAll]);
       const flat = useMemo(() => visibleGroups.flatMap((group) => group.items), [visibleGroups]);
       const placeholderText = placeholder || (allowAll ? "全部地域" : "输入地域名称或 ID 补全");
       // 选中项回显格式:默认 label（id)(COS 视觉),ById 薄封装传 label-only,保证失焦/Esc 与 pick 后一致
@@ -1101,7 +1149,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       };
       const close = () => {
         setOpen(false);
-        onDisplay(value ? formatChosen(value) : String(display || ""));
+        onDisplay(safeValue ? formatChosen(safeValue) : String(displayText || ""));
       };
       return h("div", { className: "ci-combo", style },
         h("input", {
@@ -1110,13 +1158,13 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           autoComplete: "off",
           disabled,
           "aria-label": "地域",
-          value: display,
+          value: displayText,
           id: inputId || undefined,
           key: inputId ? `${inputId}:root` : undefined,
           onChange: (e) => { onDisplay(e.target.value); setHighlight(0); if (!open) setOpen(true); },
           onFocus: (e) => {
             if (disabled) return;
-            const idx = value ? flat.findIndex((item) => item.id === value.id) : 0;
+            const idx = safeValue ? flat.findIndex((item) => item.id === safeValue.id) : 0;
             setHighlight(Math.max(0, idx));
             setOpen(true);
             if (e.target && e.target.select) e.target.select();
@@ -1137,7 +1185,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             } else if (e.key === "Escape") {
               e.preventDefault();
               setOpen(false);
-              onDisplay(value ? formatChosen(value) : "");
+              onDisplay(safeValue ? formatChosen(safeValue) : "");
             }
           },
         }),
@@ -1160,16 +1208,18 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
     // 旧地域 select 的薄封装:仅靠 id 解析选项;内部自持文本状态,输入仅更新文本与过滤、不清空选中,
     // 仅在选中新项/清空时经 onChange 回调,供服务器/TCR/CLS/CDB 等 Caller 复用。
     function RegionComboById({ options, groups, value, text, onText, placeholder, allowAll, disabled, style, onChange }) {
-      const list = Array.isArray(groups) && groups.length
+      const valueId = safeText(value);
+      const list = (Array.isArray(groups) && groups.length
         ? groups.flatMap((group) => (Array.isArray(group.items) ? group.items : []).filter(Boolean))
-        : (Array.isArray(options) ? options : []).filter(Boolean);
-      const hit = list.find((item) => item.id === value) || null;
-      const isAll = allowAll && value === REGION_ALL_ID;
+        : (Array.isArray(options) ? options : []).filter(Boolean))
+        .map((item) => item && typeof item === "object" ? { ...item, id: safeText(item.id), label: safeField(item.label) } : item);
+      const hit = list.find((item) => item.id === valueId) || null;
+      const isAll = allowAll && valueId === REGION_ALL_ID;
       const allItem = isAll ? { id: REGION_ALL_ID, label: "全部地域" } : null;
       // null 表示跟随外部 value;输入时接管,选中/外部 value 变化时复位
       const [inner, setInner] = useState(null);
-      const derived = hit ? hit.label : (allItem ? allItem.label : (value ? String(value) : ""));
-      const shown = text !== undefined ? text : (inner !== null ? inner : derived);
+      const derived = hit ? hit.label : (allItem ? allItem.label : (valueId ? String(valueId) : ""));
+      const shown = text !== undefined ? safeText(text) : (inner !== null ? inner : derived);
       const setShown = (next) => {
         if (onText) onText(next);
         else setInner(next);
@@ -1177,7 +1227,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       useEffect(() => { setInner(null); }, [value]);
       return h(RegionCombo, {
         items: list,
-        groups,
+        groups: Array.isArray(groups) && groups.length
+          ? groups.map((group) => ({ ...group, title: safeText(group.title), items: (Array.isArray(group.items) ? group.items : []).filter(Boolean).map((item) => item && typeof item === "object" ? { ...item, id: safeText(item.id), label: safeField(item.label) } : item) }))
+          : groups,
         value: hit || allItem,
         display: shown,
         onDisplay: setShown,
@@ -1185,7 +1237,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         allowAll,
         disabled,
         style,
-        chosenText: (item) => (item && item.label) || "",
+        chosenText: (item) => (item && safeField(item.label)) || "",
         onChange: (item) => { setShown(item.label); onChange && onChange(item.id); },
       });
     }
@@ -1228,7 +1280,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
 
     // 服务器 CVM/轻量地域选择:统一改用 RegionCombo,并按控制台全称归一去重。
     function RegionSelect({ regions, value, onChange }) {
-      const raw = (Array.isArray(regions) ? regions : []).filter(Boolean);
+      // 上游 regions 可能是对象数组({id,label})或对象本身,先取可读字符串再归一。
+      const raw = (Array.isArray(regions) ? regions : []).filter(Boolean).map((item) => safeField(item && typeof item === "object" ? (item.label ?? item.id) : item)).filter(Boolean);
       const seen = new Set();
       const names = [];
       for (const item of raw) {
@@ -1239,7 +1292,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         }
       }
       const items = names.map((name) => ({ id: name, label: name }));
-      const current = canonicalRegionName(value) || defaultRegionName(names);
+      const current = canonicalRegionName(safeField(value && typeof value === "object" ? (value.label ?? value.id) : value)) || defaultRegionName(names);
       return h(RegionComboById, {
         options: items,
         value: current === "all" ? REGION_ALL_ID : current,
@@ -1387,10 +1440,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           h("div", { className: "ci-cell" }, h("button", {
             type: "button",
             className: "ci-name",
-            title: item.title,
+            title: safeField(item.title),
             disabled: pendingId === item.id,
             onClick: () => onOpen(item),
-          }, item.title)),
+          }, safeField(item.title))),
           showProvider ? h("div", { className: "ci-cell" }, item.provider) : null,
           h("div", { className: "ci-cell" }, h(StatusCell, { status: item.status })),
           extraCols.map((label) => h("div", {
@@ -1648,10 +1701,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("div", { className: "ci-cell" }, h("button", {
               type: "button",
               className: "ci-name",
-              title: item.title,
+              title: safeField(item.title),
               disabled: pendingId === item.id,
               onClick: () => onOpen(item),
-            }, item.title)),
+            }, safeField(item.title))),
             h("div", { className: "ci-cell" }, h("button", {
               type: "button",
               className: "ci-name",
@@ -1984,7 +2037,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
           h(BackButton, { onClick: onBack }),
-          h("span", { className: "ci-head-t", title: item.title }, "证书详情 · " + item.title),
+          h("span", { className: "ci-head-t", title: safeField(item.title) }, "证书详情 · " + safeField(item.title)),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
         !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
@@ -2083,15 +2136,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
           h(BackButton, { onClick: onBack }),
-          h("span", { className: "ci-head-t", title: item.title }, item.title),
+          h("span", { className: "ci-head-t", title: safeField(item.title) }, safeField(item.title)),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
         !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
         !loading && detail ? [
           h("div", { key: "chips", className: "ci-chips" },
-            (detail.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" },
-              row.label,
-              h("b", null, row.value),
+            (detail.fields || []).map((row) => h("span", { key: safeText(row.label), className: "ci-chip" },
+              safeField(row.label),
+              h("b", null, safeText(row.value)),
             )),
           ),
           h("div", { key: "sec", className: "ci-sec" },
@@ -2255,7 +2308,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
     }
 
     function displayRegion(region) {
-      return region ? `${region.label}（${region.id}）` : "";
+      if (!region) return "";
+      return `${safeField(region.label)}（${safeText(region.id)}）`;
     }
 
     const DEFAULT_COS_REGION_ID = "ap-guangzhou";
@@ -2315,13 +2369,16 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
 
     // COS 地域选择:收敛复用统一 RegionCombo,保留默认地域与 region 提示解析。
     function CosRegionCombo({ regions, input, selected, onInput, onPick }) {
+      // meta 接口或上游可能返回对象字段,进控件前统一字符串化
+      const safeRegions = (Array.isArray(regions) ? regions : []).filter(Boolean).map((region) =>
+        region && typeof region === "object" ? { ...region, id: safeText(region.id), label: safeField(region.label) } : region);
       return h("div", { className: "ci-regionbar" },
         h("label", { htmlFor: "ci-cos-region" }, "地域"),
         h(RegionCombo, {
           id: "ci-cos-region",
           inputId: "ci-cos-region",
-          items: regions,
-          value: selected,
+          items: safeRegions,
+          value: selected && typeof selected === "object" ? { ...selected, id: safeText(selected.id), label: safeField(selected.label) } : selected,
           display: input,
           onDisplay: onInput,
           placeholder: "输入地域名称或 ID 补全",
@@ -2347,7 +2404,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             className: "ci-name",
             disabled: pendingId === item.id,
             onClick: () => onOpen(item),
-          }, item.title)),
+          }, safeField(item.title))),
           h("td", null, cellValue(item, "地域") || item.description || "-"),
           h("td", null, cellValue(item, "创建时间") || "-"),
           h("td", null, cellValue(item, "访问权限") || "-"),
@@ -2553,7 +2610,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           const detail = await api("detail", {
             moduleId: item.moduleId,
             id: item.id,
-            title: item.title,
+            title: safeField(item.title),
             bucket: item.title,
             region: selected?.id || args.region,
             prefix: prefix || "",
@@ -2664,7 +2721,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return [
         session ? h("div", { key: "crumb", className: "ci-crumb" },
           h(BackButton, { onClick: () => { setSession(null); setDraftQ(""); setErr(""); } }),
-          h("span", { className: "ci-head-t" }, session.item.title),
+          h("span", { className: "ci-head-t" }, safeField(session.item.title)),
         ) : null,
         session ? h("div", { key: "path", className: "ci-crumbs" },
           crumbs.map((crumb, idx) => [
@@ -2732,7 +2789,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               className: "ci-search",
               type: "search",
               placeholder: session ? "搜索文件名" : "请输入存储桶名称",
-              value: draftQ,
+              value: safeText(draftQ),
               onChange: (e) => {
                 const value = e.target.value;
                 setDraftQ(value);
@@ -3005,7 +3062,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             onChange: () => onToggle(item),
           })),
           h("td", null, h("div", { className: "ci-idcell" },
-            h("button", { type: "button", className: "ci-name", onClick: () => onManage(item) }, item.title),
+            h("button", { type: "button", className: "ci-name", onClick: () => onManage(item) }, safeField(item.title)),
             h("span", { className: "ci-sub" }, item.description || ""),
           )),
           h("td", null, h("span", { className: "ci-status" },
@@ -3130,7 +3187,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         if (tab === "实例详情") {
           return [
             h("div", { key: "kv", className: "ci-kv" }, (detail.fields || []).map((row) => [
-              h("div", { key: row.label + "k", className: "ci-k" }, row.label),
+              h("div", { key: safeText(row.label) + "k", className: "ci-k" }, safeField(row.label)),
               h("div", { key: row.label + "v" },
                 row.value,
                 row.label === "实例名称" ? h("button", { type: "button", className: "ci-link", style: { marginLeft: 8 }, onClick: () => setForm({
@@ -3348,7 +3405,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
           h(BackButton, { onClick: onBack }),
-          h("span", { className: "ci-head-t" }, item.title),
+          h("span", { className: "ci-head-t" }, safeField(item.title)),
           h("span", { className: "ci-sub" }, `${item.description || ""} · ${regionName(region)}`),
         ),
         h("div", { key: "nav" },
@@ -3665,7 +3722,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                 disabled: pendingId === item.id,
                 onClick: () => onOpen(item),
               }, item.instanceId || item.id),
-              h("span", { className: "ci-id-sub" }, item.title),
+              h("span", { className: "ci-id-sub" }, safeField(item.title)),
             )),
             h("td", null, h(StatusCell, { status: item.status, label: item.stateLabel })),
             h("td", null, cellValue(item, "可用区") || "-"),
@@ -3695,7 +3752,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                 disabled: pendingId === item.id,
                 onClick: () => onOpen(item),
               }, item.instanceId || item.id),
-              h("span", { className: "ci-id-sub" }, item.title),
+              h("span", { className: "ci-id-sub" }, safeField(item.title)),
             )),
             h("td", null, h(StatusCell, { status: item.status, label: item.stateLabel })),
             h("td", null, cellValue(item, "可用区") || "-"),
@@ -3756,7 +3813,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         h("div", { key: "crumb", className: "ci-crumb" },
           h(BackButton, { onClick: onBack }),
           h("div", { className: "ci-crumb-meta" },
-            h("span", { className: "ci-head-t", title: card.title }, card.title),
+            h("span", { className: "ci-head-t", title: safeField(card.title) }, safeField(card.title)),
             h(StatusCell, { status: card.status, label: card.stateLabel }),
           ),
           h("div", { className: "ci-power" },
@@ -3806,9 +3863,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         !loading && detail && activeTab !== "实例监控" ? groups.map((group) => [
           h("div", { key: group.title + "-t", className: "ci-sec-t" }, group.title),
           h("div", { key: group.title + "-g", className: "ci-grid" },
-            (group.fields || []).map((row) => h("div", { key: row.label, className: "ci-f" },
-              row.label,
-              h("b", null, row.value),
+            (group.fields || []).map((row) => h("div", { key: safeText(row.label), className: "ci-f" },
+              safeField(row.label),
+              h("b", null, safeText(row.value)),
             )),
           ),
         ]) : null,
@@ -3873,7 +3930,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           const addable = canAddCart(item);
           const inCart = (cartTitles || []).includes(item.title);
           return h("div", { key: item.id, className: "ci-row", style: { gridTemplateColumns: template } },
-            h("div", { className: "ci-cell" }, h("span", { className: "ci-name", title: item.title, style: { cursor: "default" } }, item.title)),
+            h("div", { className: "ci-cell" }, h("span", { className: "ci-name", title: safeField(item.title), style: { cursor: "default" } }, safeField(item.title))),
             h("div", { className: "ci-cell" }, cellValue(item, "状态") || item.description || "-"),
             h("div", { className: "ci-cell num" }, cellValue(item, "价格") || "-"),
             h("div", { className: "ci-cell ci-ops" }, addable
@@ -3909,10 +3966,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("div", { className: "ci-cell" }, h("button", {
               type: "button",
               className: "ci-name",
-              title: item.title,
+              title: safeField(item.title),
               disabled: pendingId === item.id,
               onClick: () => onOpen(item),
-            }, item.title)),
+            }, safeField(item.title))),
             h("div", { className: "ci-cell" }, cellValue(item, "状态") || item.description || "-"),
             h("div", { className: "ci-cell num" }, cellValue(item, "到期") || item.expiresAt || "-"),
             h("div", { className: "ci-cell" }, h("button", {
@@ -4175,7 +4232,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
           h(BackButton, { onClick: onBack }),
-          h("span", { className: "ci-head-t", title: item.title }, item.title),
+          h("span", { className: "ci-head-t", title: safeField(item.title) }, safeField(item.title)),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
         !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
@@ -4391,11 +4448,11 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             h("button", {
               type: "button",
               className: "ci-name",
-              title: col(item, "集群ID") || item.title,
+              title: col(item, "集群ID") || safeField(item.title),
               disabled: pendingId === item.id,
               onClick: () => onOpen(item),
-            }, col(item, "集群ID") || item.title),
-            h("div", { style: { fontSize: 12, color: "var(--dsw-alias-label-tertiary)" } }, item.title),
+            }, col(item, "集群ID") || safeField(item.title)),
+            h("div", { style: { fontSize: 12, color: "var(--dsw-alias-label-tertiary)" } }, safeField(item.title)),
           ),
           h("div", { className: "ci-cell" }, h(StatusCell, { status: item.status })),
           h("div", { className: "ci-cell" }, col(item, "Kubernetes 版本") || "-"),
@@ -4585,7 +4642,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
           h(BackButton, { onClick: onBack }),
-          h("span", { className: "ci-head-t" }, "删除集群 · " + item.title),
+          h("span", { className: "ci-head-t" }, "删除集群 · " + safeField(item.title)),
         ),
         h("div", { key: "wiz", className: "ci-wizard" },
           step === 1 ? [
@@ -4659,7 +4716,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
           h(BackButton, { onClick: onBack }),
-          h("span", { className: "ci-head-t", title: item.title }, item.title),
+          h("span", { className: "ci-head-t", title: safeField(item.title) }, safeField(item.title)),
         ),
         loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
         !loading && error && !detail ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
@@ -4673,7 +4730,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           h("div", { className: "ci-side-main" },
             page === "basic" ? blocks.map((block) => h("div", { key: block.id, className: "ci-block" },
               h("h4", null, block.title),
-              h("div", { className: "ci-chips" }, (block.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" }, row.label, h("b", null, row.value)))),
+              h("div", { className: "ci-chips" }, (block.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" }, safeField(row.label), h("b", null, safeText(row.value))))),
               block.id === "cluster" ? h("div", { className: "ci-actions" },
                 h("button", { type: "button", className: "ci-mini", onClick: () => setPanel({ type: "upgrade-master", version: String(flags.kubernetesVersion || "") }) }, "Master 升级"),
                 h("button", { type: "button", className: "ci-mini", onClick: () => setPanel({ type: "upgrade-node", version: String(flags.kubernetesVersion || ""), upgradeType: "reset" }) }, "Node 升级"),
@@ -4880,7 +4937,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                 h("button", { type: "button", className: "ci-np-id", onClick: () => setPanel({ type: "pool-detail", pool, desired: String(pool.flags?.desired || 0) }) }, pool.id),
                 h("div", { className: "ci-head-t" }, pool.title),
                 h("div", { className: "ci-hint" }, (pool.badges || []).join(" · ")),
-                h("div", { className: "ci-chips" }, (pool.columns || []).map((row) => h("span", { key: row.label, className: "ci-chip" }, row.label, h("b", null, row.value)))),
+                h("div", { className: "ci-chips" }, (pool.columns || []).map((row) => h("span", { key: row.label, className: "ci-chip" }, safeField(row.label), h("b", null, safeText(row.value))))),
                 h("div", { className: "ci-ops" },
                   isSuperPool(pool) ? null : h("button", { type: "button", className: "ci-link", onClick: () => setPanel({ type: "pool-detail", pool, desired: String(pool.flags?.desired || 0) }) }, "调整数量"),
                   h("button", { type: "button", className: "ci-link", onClick: () => onAction("nodepool.autoscale", { nodePoolId: pool.id, enable: !pool.flags?.autoscaling }, pool.flags?.autoscaling ? "关闭弹性伸缩？" : "开启弹性伸缩？") }, "弹性伸缩"),
@@ -5013,7 +5070,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const provider = String(args.provider || "");
       const pageSize = Math.max(1, Number(args.limit) || 12);
       const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");
-      const [region, setRegion] = useState(String(payload?.region || args.region || "ap-guangzhou"));
+      const [region, setRegion] = useState(safeText(payload?.region) || String(args.region || "ap-guangzhou"));
       const [filters, setFilters] = useState({ clusterType: "", status: "", vpcId: "", tag: "" });
       const [rows, setRows] = useState(fromTool || []);
       const [total, setTotal] = useState(Number(payload?.total) || (fromTool || []).length);
@@ -5078,7 +5135,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         setSession({ item, loading: true, detail: null });
         setScreen("detail");
         try {
-          const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: item.title, region });
+          const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: safeField(item.title), region });
           setSession({ item, loading: false, detail });
         } catch (e) {
           setSession({ item, loading: false, detail: null, error: publicErrorMessage(e) });
@@ -5218,7 +5275,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               ),
             ),
             h("div", { key: "filters", className: "ci-filters" },
-              h("input", { className: "ci-search", style: { width: 160, paddingLeft: 10 }, placeholder: "名称", value: draftQ, onChange: (e) => setDraftQ(e.target.value), onKeyDown: (e) => { if (e.key === "Enter") fetchList(0, draftQ, region, filters); } }),
+              h("input", { className: "ci-search", style: { width: 160, paddingLeft: 10 }, placeholder: "名称", value: safeText(draftQ), onChange: (e) => setDraftQ(e.target.value), onKeyDown: (e) => { if (e.key === "Enter") fetchList(0, draftQ, region, filters); } }),
               h("select", { value: filters.clusterType, onChange: (e) => { const next = { ...filters, clusterType: e.target.value }; setFilters(next); fetchList(0, draftQ, region, next); } }, CLUSTER_TYPES.map((item) => h("option", { key: item.id, value: item.id }, item.label))),
               h("select", { value: filters.status, onChange: (e) => { const next = { ...filters, status: e.target.value }; setFilters(next); fetchList(0, draftQ, region, next); } }, CLUSTER_STATUS.map((item) => h("option", { key: item.id, value: item.id }, item.label))),
               h("input", { placeholder: "VPC", value: filters.vpcId, onChange: (e) => setFilters({ ...filters, vpcId: e.target.value }), onBlur: () => fetchList(0, draftQ, region, filters) }),
@@ -5352,12 +5409,12 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
     // CLS 地域选择:统一改用 RegionCombo,沿用 clsRegionGroups 的分组(原 optgroup 语义)。
     function ClsRegionSelect({ value, regions, disabled, onChange }) {
       const groups = clsRegionGroups(regions).map((group) => ({
-        title: group.group,
-        items: group.items.map((item) => ({ id: item.id, label: item.name })),
+        title: safeText(group.group),
+        items: group.items.map((item) => ({ id: safeText(item && item.id), label: safeField(item && item.name) })),
       }));
       return h(RegionComboById, {
         groups,
-        value: value || "ap-guangzhou",
+        value: safeText(value) || "ap-guangzhou",
         disabled,
         placeholder: "输入地域名称或 ID 补全",
         onChange: (next) => onChange(next),
@@ -5383,7 +5440,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               className: "ci-name",
               disabled: pendingId === item.id,
               onClick: () => onOpen(item),
-            }, item.title),
+            }, safeField(item.title)),
             h("div", { className: "ci-id" }, clsTopicId(item)),
           )),
           h("td", null, cellValue(item, "日志集") || "-"),
@@ -5403,8 +5460,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
     function ClsCard({ payload, args, fromTool, pageSize, initialQuery }) {
       const provider = String(args.provider || "");
       const startSearch = payload?.view === "search" || Array.isArray(payload?.logs);
-      const [region, setRegion] = useState(payload?.region || args.region || "ap-guangzhou");
-      const [regions, setRegions] = useState(payload?.regions || FALLBACK_CLS_REGIONS);
+      const [region, setRegion] = useState(safeText(payload?.region) || String(args.region || "ap-guangzhou"));
+      const [regions, setRegions] = useState(() => normalizeClsRegions(payload?.regions) || FALLBACK_CLS_REGIONS);
       const [view, setView] = useState(startSearch ? "search" : "list");
       const [topic, setTopic] = useState(startSearch ? (fromTool && fromTool[0]) || null : null);
       const [rows, setRows] = useState(fromTool || []);
@@ -5431,14 +5488,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         : "";
       useEffect(() => {
         if (!fromTool && !payload) return;
-        setRows(fromTool || []);
+        setRows(normalizeListItems(fromTool || []));
         setTotal(Number(payload?.total) || (fromTool || []).length);
         setOffset(Number(payload?.offset) || 0);
         setHasMore(!!payload?.hasMore);
         setDraftQ(initialQuery);
         setActiveQ(initialQuery);
-        if (payload?.region) setRegion(payload.region);
-        if (payload?.regions) setRegions(payload.regions);
+        const payloadRegion = safeText(payload?.region);
+        if (payloadRegion) setRegion(payloadRegion);
+        if (Array.isArray(payload?.regions)) setRegions(normalizeClsRegions(payload.regions) || payload.regions);
         if (payload?.view === "search" || Array.isArray(payload?.logs)) {
           setView("search");
           setTopic((fromTool && fromTool[0]) || null);
@@ -5496,7 +5554,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             moduleId: item.moduleId,
             topicId: item.id,
             id: item.id,
-            title: item.title,
+            title: safeField(item.title),
             region,
             queryString: nextCql,
             range: nextRange,
@@ -5693,7 +5751,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                 className: "ci-search",
                 type: "search",
                 placeholder: "主题名 / ID / 日志集",
-                value: draftQ,
+                value: safeText(draftQ),
                 onChange: (e) => onDraft(e.target.value),
                 onKeyDown: (e) => {
                   if (e.key === "Enter") {
@@ -5770,12 +5828,23 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const seen = new Set();
       const rows = [];
       for (const item of list) {
-        const id = String(item && item.id || "").trim();
+        // 脏数据兜底:item 本身或 item.id 为对象时取字符串化后的值,取不到则跳过
+        const raw = item && typeof item === "object" ? item : { id: item, label: item };
+        const id = safeText(raw.id).trim();
         if (!id || seen.has(id)) continue;
         seen.add(id);
         const known = TCR_REGIONS.find((row) => row.id === id);
-        rows.push({ id, label: String(item.label || known?.label || id) });
+        rows.push({ id, label: safeField(raw.label) || known?.label || id });
       }
+      return rows.length ? rows : null;
+    }
+
+    // CLS 地域列表({id,name,group})归一化:脏字段转字符串,未知结构回退 null。
+    function normalizeClsRegions(list) {
+      if (!Array.isArray(list) || !list.length) return null;
+      const rows = list.filter(Boolean).map((item) => item && typeof item === "object"
+        ? { ...item, id: safeText(item.id), name: safeField(item.name), group: safeText(item.group) }
+        : item);
       return rows.length ? rows : null;
     }
 
@@ -5828,7 +5897,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
     function ImageToolView({ payload, args, fromTool, initialQuery }) {
       const provider = String(args.provider || "");
       const errors = payload?.errors || [];
-      const [region, setRegion] = useState(payload?.region || inferImageRegion(initialQuery, "ap-guangzhou"));
+      const [region, setRegion] = useState(() => safeText(payload?.region) || inferImageRegion(initialQuery, "ap-guangzhou"));
       const [regions, setRegions] = useState(normalizeRegions(payload?.regions) || TCR_REGIONS);
       const [instances, setInstances] = useState(Array.isArray(fromTool) ? fromTool : []);
       const [instanceId, setInstanceId] = useState((fromTool && fromTool[0] && fromTool[0].id) || "");
@@ -5853,20 +5922,21 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const directTried = useRef("");
       const current = (Array.isArray(instances) ? instances : []).find((item) => item && item.id === instanceId) || instances[0];
 
-      const toolSig = `${payload?.region || ""}|${(fromTool || []).map((i) => i.id).join(",")}|${(payload?.errors || []).length}|${args.kind || payload?.resourceKind || ""}`;
+      const toolSig = `${safeText(payload?.region) || ""}|${(fromTool || []).map((i) => safeText(i && i.id)).join(",")}|${(payload?.errors || []).length}|${args.kind || payload?.resourceKind || ""}`;
       useEffect(() => {
-        if (payload?.region) setRegion(payload.region);
+        const payloadRegion = safeText(payload?.region);
+        if (payloadRegion) setRegion(payloadRegion);
         const nextRegions = normalizeRegions(payload?.regions);
         if (nextRegions) setRegions(nextRegions);
         setDraftQ("");
         setErr(errors.map((e) => e.message).join("；"));
         if (fromTool && fromTool.length) {
-          setInstances(fromTool);
-          if (fromTool[0]?.id) setInstanceId(fromTool[0].id);
+          setInstances(normalizeListItems(fromTool));
+          if (fromTool[0]?.id) setInstanceId(safeText(fromTool[0].id));
           setTruncated(!!payload?.hasMore);
           return;
         }
-        loadInstances(payload?.region || region);
+        loadInstances(payloadRegion || region);
       }, [toolSig]);
       useEffect(() => () => {
         if (debounce.current) clearTimeout(debounce.current);
@@ -5880,7 +5950,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         try {
           const result = await api("query", { kind: "image", query: "", provider, region: nextRegion, limit: 80 });
           if (n !== seq.current) return;
-          const items = result.items || [];
+          const items = normalizeListItems(result.items || []);
           setInstances(items);
           const nextId = keepId && items.some((item) => item.id === keepId) ? keepId : (items[0]?.id || "");
           setInstanceId(nextId);
@@ -6089,7 +6159,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               onClick: () => selectInstance(item, "repo"),
             },
               h(ImageIcon),
-              h("h3", null, item.title),
+              h("h3", null, safeField(item.title)),
               h("div", { className: "ci-tags" },
                 h("span", { className: "ci-tag ok" }, item.status === "enable" ? "运行中" : (item.status || "未知")),
                 h("span", { className: "ci-tag blue" }, imageEdition(item)),
@@ -6199,7 +6269,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                   },
                 },
                   instances.length
-                    ? instances.map((item) => h("option", { key: item.id, value: item.id }, item.title))
+                    ? instances.map((item) => h("option", { key: item.id, value: item.id }, safeField(item.title)))
                     : h("option", { value: "" }, "无实例"),
                 ),
               ),
@@ -6222,7 +6292,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               h("input", {
                 type: "search",
                 placeholder,
-                value: draftQ,
+                value: safeText(draftQ),
                 onChange: (e) => onDraft(e.target.value),
               }),
             ),
@@ -6299,9 +6369,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
 
     function instanceIdentity(item) {
       return {
-        product: item && item.product || "",
-        region: item && item.region || "",
-        instanceId: String(item && item.id || "").split(":").slice(3).join(":") || String(item && item.title || ""),
+        product: safeText(item && item.product) || "",
+        region: safeText(item && item.region) || "",
+        instanceId: safeText(item && item.id).split(":").slice(3).join(":") || safeField(item && item.title) || "",
       };
     }
 
@@ -6326,10 +6396,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           h("div", { className: "ci-cell" }, h("button", {
             type: "button",
             className: "ci-name",
-            title: item.title,
+            title: safeField(item.title),
             disabled: pendingId === item.id,
             onClick: () => onOpen(item, "diag"),
-          }, item.title)),
+          }, safeField(item.title))),
           h("div", { className: "ci-cell" }, cellValue(item, "状态") || statusText(item.status) || "-"),
           h("div", { className: "ci-cell" }, h("button", {
             type: "button",
@@ -6546,15 +6616,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return [
         h("div", { key: "crumb", className: "ci-crumb" },
           h(BackButton, { onClick: onBack }),
-          h("span", { className: "ci-head-t", title: item.title }, item.title),
+          h("span", { className: "ci-head-t", title: safeField(item.title) }, safeField(item.title)),
         ),
         !detail && loading ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载详情…") : null,
         !detail && !loading && error ? h("div", { key: "ferr", className: "ci-err" }, error) : null,
         detail ? [
           h("div", { key: "chips", className: "ci-chips" },
-            (detail.fields || []).map((row) => h("span", { key: row.label, className: "ci-chip" },
-              row.label,
-              h("b", null, row.value),
+            (detail.fields || []).map((row) => h("span", { key: safeText(row.label), className: "ci-chip" },
+              safeField(row.label),
+              h("b", null, safeText(row.value)),
             )),
           ),
           h(DbbrainNav, {
@@ -6657,17 +6727,18 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const args = parseToolArgs(props);
       const fromTool = Array.isArray(payload?.items) ? payload.items : null;
       const running = !!(props?.block && !("kind" in props.block));
-      const kind = payload?.resourceKind
+      const kindRaw = payload?.resourceKind
         || (payload?.kind && payload.kind !== "cloud-infra-query" ? payload.kind : "")
         || args.kind
         || "domain";
+      const kind = safeText(kindRaw) || "domain";
       const provider = String(args.provider || "");
       const pageSize = Math.max(1, Number(args.limit) || 12);
-      const initialQuery = payload?.query != null ? String(payload.query) : String(args.query || "");
+      const initialQuery = payload?.query != null ? safeText(payload.query) : String(args.query || "");
       const [skipConfirm, setSkipConfirm] = useState(false);
       const [session, setSession] = useState(null);
       const [pendingId, setPendingId] = useState("");
-      const [rows, setRows] = useState(fromTool || []);
+      const [rows, setRows] = useState(() => normalizeListItems(fromTool || []));
       const [total, setTotal] = useState(Number(payload?.total) || (fromTool || []).length);
       const [offset, setOffset] = useState(Number(payload?.offset) || 0);
       const [hasMore, setHasMore] = useState(!!payload?.hasMore);
@@ -6681,7 +6752,11 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const [wizardErr, setWizardErr] = useState("");
       const [confirm, setConfirm] = useState(null);
       const [listRegion, setListRegion] = useState("华南地区（广州）");
-      const [regionOptions, setRegionOptions] = useState(Array.isArray(payload?.regions) ? payload.regions : []);
+      // regions 可能是字符串数组或 {id,label} 对象数组,统一取可读字符串再进 state
+      const [regionOptions, setRegionOptions] = useState(() =>
+        (Array.isArray(payload?.regions) ? payload.regions : [])
+          .map((item) => safeField(item && typeof item === "object" ? (item.label ?? item.id) : item))
+          .filter(Boolean));
       const [kindTab, setKindTab] = useState(kind === "lighthouse" ? "lighthouse" : "cvm");
       const [cart, setCart] = useState([]);
       const [flow, setFlow] = useState("");
@@ -6704,7 +6779,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       const directTried = useRef("");
       const isCert = kind === "cert";
       const isDbbrain = kind === "dbbrain";
-      const [dbProduct, setDbProduct] = useState((fromTool && fromTool[0] && fromTool[0].product) || "mysql");
+      const [dbProduct, setDbProduct] = useState(() => safeText(fromTool && fromTool[0] && fromTool[0].product) || "mysql");
       const [dbRegion, setDbRegion] = useState("");
       const refreshSkip = () => {
         api("meta", {}).then((d) => setSkipConfirm(!!d.skipConfirm)).catch(() => {});
@@ -6717,7 +6792,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         return () => window.removeEventListener(CONFIG_EVENT, onCfg);
       }, []);
       const toolSig = fromTool
-        ? `${Number(payload?.offset) || 0}|${fromTool.map((i) => i.id).join(",")}|${payload?.total}|${payload?.hasMore}|${initialQuery}`
+        ? `${Number(payload?.offset) || 0}|${fromTool.map((i) => safeText(i && i.id)).join(",")}|${payload?.total}|${payload?.hasMore}|${initialQuery}`
         : "";
       const instanceView = kind === "cvm" || kind === "lighthouse" || kind === "auto";
       const tabToKind = (tab) => {
@@ -6732,13 +6807,16 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         const seeded = kind === "auto"
           ? fromTool.filter((row) => row && row.kind === tab)
           : fromTool;
-        setRows(seeded);
+        setRows(normalizeListItems(seeded));
         setTotal(instanceView ? seeded.length : (Number(payload?.total) || fromTool.length));
         setOffset(instanceView ? 0 : (Number(payload?.offset) || 0));
         setHasMore(instanceView ? false : !!payload?.hasMore);
         setDraftQ(searchQ);
         setActiveQ(searchQ);
-        const names = Array.isArray(payload?.regions) ? payload.regions : [];
+        // regions 可能是字符串数组或 {id,label} 对象数组,统一取可读字符串
+        const names = (Array.isArray(payload?.regions) ? payload.regions : [])
+          .map((item) => safeField(item && typeof item === "object" ? (item.label ?? item.id) : item))
+          .filter(Boolean);
         setRegionOptions(names);
         setListRegion((cur) => names.includes(cur) ? cur : defaultRegionName(names));
         if (kind === "lighthouse") setKindTab("lighthouse");
@@ -6758,9 +6836,9 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         directTried.current = key;
         maybeAutoOpenDetail(payload, rows, (item) => openItem(item));
       });
-      const missQuery = directHitEnabled(kind) && payload?.notFoundQuery && !missDismissed ? String(payload.notFoundQuery) : "";
+      const missQuery = directHitEnabled(kind) && payload?.notFoundQuery && !missDismissed ? safeText(payload.notFoundQuery) : "";
       const missNode = missQuery ? h(NotFoundNotice, {
-        text: notFoundText(directResourceLabel(kind), missQuery, { id: payload?.region }, rows.length),
+        text: notFoundText(directResourceLabel(kind), missQuery, { id: safeText(payload?.region) }, rows.length),
         onClose: () => setMissDismissed(true),
       }) : null;
       useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current); }, []);
@@ -6785,8 +6863,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             region: useRegion || undefined,
             clientLocalFilter: false,
             filters: isDbbrain ? {
-              product: (filterOverride && filterOverride.product) || dbProduct,
-              region: (filterOverride && filterOverride.region != null) ? filterOverride.region : dbRegion,
+              product: (filterOverride && safeText(filterOverride.product)) || dbProduct,
+              region: (filterOverride && filterOverride.region != null) ? safeText(filterOverride.region) : dbRegion,
             } : undefined,
           });
           let result = await run(useKind);
@@ -6805,12 +6883,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           const warns = (result.errors || []).map((e) => e.message).filter(Boolean).join("；");
           if (kind === "cdb" && warns && !items.length) throw new Error(warns);
           if (kind === "cdb" && warns && items.length) setListErr(warns);
-          setRows(items);
+          setRows(normalizeListItems(items));
           setTotal(Number(result.total) || items.length);
           setHasMore(!!result.hasMore);
           setOffset(Number(result.offset) || nextOffset);
           setActiveQ(trimmed);
-          if (Array.isArray(result.regions)) setRegionOptions(result.regions);
+          if (Array.isArray(result.regions)) {
+            // 服务端可能返回 {id,label} 对象数组,统一取可读字符串
+            setRegionOptions(result.regions.map((item) => safeField(item && typeof item === "object" ? (item.label ?? item.id) : item)).filter(Boolean));
+          }
         } catch (e) {
           if (n !== seq.current) return;
           setListErr(publicErrorMessage(e));
@@ -6854,7 +6935,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           setSession({ item, loading: true, detail: null, filters });
           refreshSkip();
           try {
-            const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: item.title, filters });
+            const detail = await api("detail", { moduleId: item.moduleId, id: item.id, title: safeField(item.title), filters });
             if (n !== detailSeq.current) return;
             setSession({ item, loading: false, detail, filters });
           } catch (e) {
@@ -6874,7 +6955,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           const detail = await api("detail", {
             moduleId: item.moduleId,
             id: item.id,
-            title: item.title,
+            title: safeField(item.title),
             region: isCdbItem ? cdbMeta(item).region : item.region,
             tab: (isCdbItem || isInstance) ? nextTab : undefined,
             range: (isCdbItem || isInstance) ? "1h" : undefined,
@@ -7102,7 +7183,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         setCart((cur) => {
           if (cur.some((row) => row.title === item.title)) return cur;
           return [...cur, {
-            title: item.title,
+            title: safeField(item.title),
             price: Number(extraOf(item, "price", 0) || 0),
             id: item.id,
             moduleId: item.moduleId,
@@ -7357,7 +7438,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                   className: "ci-search",
                   type: "search",
                   placeholder: "实例 ID / 名称",
-                  value: draftQ,
+                  value: safeText(draftQ),
                   onChange: (e) => onDraft(e.target.value),
                   onKeyDown: (e) => {
                     if (e.key === "Enter") {
@@ -7409,7 +7490,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
                     className: "ci-search",
                     type: "search",
                     placeholder: isCert ? "搜索证书 ID / 备注 / 域名" : (kind === "domain" ? "请输入域名关键字" : "搜索"),
-                    value: draftQ,
+                    value: safeText(draftQ),
                     onChange: (e) => onDraft(e.target.value),
                     onKeyDown: (e) => {
                       if (e.key === "Enter") {
@@ -7691,7 +7772,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               askListAction(target, "instance.restart", `确认重启实例 ${target.title}？`);
             } }, "重启"),
             h(SearchField, {
-              value: draftQ,
+              value: safeText(draftQ),
               onChange: onDraft,
               onSubmit: runSearch,
               placeholder: "实例 ID / 实例名 / 内网 IP",
@@ -7760,7 +7841,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             }),
           ),
           h(SearchField, {
-            value: draftQ,
+            value: safeText(draftQ),
             onChange: onDraft,
             onSubmit: runSearch,
             placeholder: "搜索 ID / 名称 / IP",
@@ -7857,7 +7938,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             }, `购物车${cart.length ? `(${cart.length})` : ""}`) : null,
           ),
           h(SearchField, {
-            value: draftQ,
+            value: safeText(draftQ),
             onChange: onDraft,
             onSubmit: runSearch,
             placeholder: searchPlaceholderOf(kind),
