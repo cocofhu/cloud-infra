@@ -916,13 +916,13 @@ test('g3.3 instance h3 uses dual-theme title color and ConfigCard stays unchange
   const client = read('src/client.js')
   assert.match(client, /\.ci-ic h3\{[^}]*color:var\(--ci-title\)/)
   assert.match(client, /\.ci-ic h3\{[^}]*-webkit-text-fill-color:var\(--ci-title\)/)
-  assert.match(client, /html\[data-theme=light\] \.ci-ic h3\{color:#0f1419;-webkit-text-fill-color:#0f1419\}/)
-  assert.match(client, /html\[data-theme=dark\] \.ci-ic h3\{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb\}/)
-  assert.match(client, /html\[data-theme=dark\] \.ci-image,\.ci-image\[data-theme=dark\]\{[^}]*color-scheme:dark/)
-  assert.match(client, /\[data-theme=dark\] \.ci-chip-sel select option[^}]*background-color:var\(--dsw-alias-bg-layer-2\)/)
-  assert.match(client, /\[data-theme=light\] \.ci-chip-sel select option[^}]*background-color:var\(--dsw-alias-bg-layer-1\)/)
-  assert.match(client, /\[data-theme=dark\] \.ci-chip-sel select[^}]*color-scheme:dark/)
-  assert.match(client, /--ci-title:var\(--dsw-alias-label-primary,#0f1419\)/)
+  // G1.3:ci-image/ci-ic 反色 fallback 与 prefers-color-scheme 特例已统一下沉到 --ci-title(指向 --dsw-alias-label-primary),
+  // 不再保留独立的 html[data-theme] 兜底规则,也不再有硬编码 hex
+  assert.doesNotMatch(client, /html\[data-theme=light\] \.ci-ic h3\{color:#0f1419/)
+  assert.doesNotMatch(client, /html\[data-theme=dark\] \.ci-ic h3\{color:#f7f8fb/)
+  assert.doesNotMatch(client, /html\[data-theme=light\] \.ci-image/)
+  assert.doesNotMatch(client, /html\[data-theme=dark\] \.ci-image/)
+  assert.match(client, /--ci-title:var\(--ci-fg\)/)
   const card = client.slice(client.indexOf('function ConfigCard()'))
   assert.match(card, /function ConfigCard\(/)
   assert.match(card, /查询域名与解析记录/)
@@ -988,6 +988,80 @@ test('region pickers unify on RegionCombo with grouping and 全部地域 support
   assert.match(client, /全部地域/)
 })
 
+test('G2.6 RegionPicker 共享组件存在并被 6+ 个产品卡片接入', () => {
+  const client = read('src/client.js')
+  // 组件本身存在且创建 Portal 到 body(避免被 overflow:hidden 母容器裁切)
+  assert.match(client, /function RegionPicker\(/)
+  assert.match(client, /createPortal/)
+  assert.match(client, /ci-regionpop/)
+  assert.match(client, /ci-regionpick-btn/)
+  // 胶囊模式 + 地球 icon + 选中指示 ▾
+  assert.match(client, /🌍/)
+  assert.match(client, /▾/)
+  // 模糊搜索:input / placeholder 中专有字符串
+  assert.match(client, /搜索地域:中文 \/ 拼音 \/ 缩写 \/ id/)
+  // A11y:listbox/option/combobox 语义
+  assert.match(client, /aria-expanded/)
+  assert.match(client, /aria-haspopup.*listbox|aria-haspopup="listbox"/)
+  assert.match(client, /role: "listbox"/)
+  assert.match(client, /role: "option"/)
+  assert.match(client, /role: "tablist"/)
+  // Esc 关闭、键盘 ↑↓、Enter 选中
+  assert.match(client, /e\.key === "Escape"/)
+  assert.match(client, /e\.key === "ArrowDown"/)
+  assert.match(client, /e\.key === "ArrowUp"/)
+  assert.match(client, /e\.key === "Enter"/)
+  // 至少 6 处实例化(COS/TKE/CLS/CDB/TCR/DBbrain/CVM 等);所有实例化点共享同一 RegionPicker
+  const pickers = client.split('h(RegionPicker').length - 1
+  assert.ok(pickers >= 6, `expected >= 6 RegionPicker instantiation sites, got ${pickers}`)
+  // 默认地域值仍兼容:空 value → fallback 到调用方传入的 "ap-guangzhou"
+  assert.match(client, /ap-guangzhou/)
+})
+
+test('G4.1 深色模式:0 处硬编码 hex 与 prefers-color-scheme 已下沉', () => {
+  const client = read('src/client.js')
+  // 除 echarts 内部色板与 inject 的 SVG data URI 外,UI 不允许出现 #xxxxxx
+  // 已确认 echarts 走构建期打包,src/client.js 不含 echarts dist;脚本 sources 不动 echarts 二进制
+  const hexes = client.match(/#[0-9a-fA-F]{3,8}\b/g) || []
+  // 唯一允许:#000/#fff 在 mask SVG data URI / fallback 数组,已由 color-mix / dsw 收编
+  assert.ok(hexes.length === 0, `expected 0 hardcoded hex, got ${hexes.slice(0,8).join(",")}`)
+  // 不允许出现 prefers-color-scheme 媒体查询兜底(明/暗由宿主 dsw 全量驱动)
+  // 注意 src 中允许 [data-theme=...] 属性选择器
+  assert.doesNotMatch(client, /@media \(prefers-color-scheme/)
+})
+
+test('G4.2 / G4.3 a11y:dialog 角色 + focus-visible + Esc 链 + aria-modal', () => {
+  const client = read('src/client.js')
+  // Modal 已带 role=dialog / aria-modal + Esc + focus 归还
+  assert.match(client, /role: "dialog"/)
+  assert.match(client, /aria-modal/)
+  // focus-visible 至少出现于 Button/Tab/RegionPicker/搜索等
+  const n = (client.match(/:focus-visible/g) || []).length
+  assert.ok(n >= 4, `expected >= 4 :focus-visible rules, got ${n}`)
+  // Esc 出现在 Modal(全局) 与 RegionPicker
+  assert.match(client, /e\.key === "Escape"/)
+  // RegionPicker a11y 完整链
+  assert.match(client, /aria-haspopup.*listbox|aria-haspopup="listbox"/)
+  assert.match(client, /aria-expanded/)
+  assert.match(client, /role: "listbox"/)
+  assert.match(client, /role: "option"/)
+})
+
+test('G2.3 Tabs/SubTabs 统一蓝色下划线样式并应用到所有 ci-tab 用法', () => {
+  const client = read('src/client.js')
+  // 蓝色下划线已应用于统一 .ci-tab(G2.3 / FR-3):border-bottom:2px solid transparent + on 时 border-bottom-color:var(--ci-brand)
+  assert.match(client, /\.ci-tab\{[^}]*border-bottom:2px solid transparent/)
+  assert.match(client, /\.ci-tab\.on,{0,1}\.ci-tab\.active\{[^}]*border-bottom-color:var\(--ci-brand\)/)
+  assert.match(client, /\.ci-tab-v2\{[^}]*border-bottom:2px solid transparent/)
+  assert.match(client, /\.ci-tab-v2\.on\{[^}]*border-bottom-color:var\(--ci-brand\)/)
+  // 共享 Tabs 组件存在(role=tablist + aria-selected)
+  assert.match(client, /function Tabs\(\{ items, active, onPick/)
+  assert.match(client, /role: "tablist"/)
+  assert.match(client, /aria-selected/)
+  // TS 端 TKE/CDB/DBbrain/CLS 等详情确实在用 ci-tab
+  assert.match(client, /className:\s*"ci-tab"/)
+})
+
 test('RegionComboById typing only filters and never clears selection; all-region maps back to label', () => {
   const client = read('src/client.js')
   // 内部自持文本状态:输入仅更新文本(setInner),不再在打字时清空父级 region
@@ -997,16 +1071,17 @@ test('RegionComboById typing only filters and never clears selection; all-region
   assert.match(byId, /useEffect\(\(\) => \{ setInner\(null\); \}, \[value\]\)/)
   assert.doesNotMatch(byId, /onChange && onChange\(""\)/)
   assert.doesNotMatch(byId, /onChange\(""\)/)
-  // 选中『全部地域』时 label 正确回显(不显示字面 all)
+  // 选中『全部地域』时 label 正确回显(不显示字面 all);RegionSelect 已统一切到共享 RegionPicker,"all" 作为特殊 id 保留。
   const regionSel = client.match(/function RegionSelect[\s\S]*?\n    \}/)![0]
-  assert.match(regionSel, /current === "all" \? REGION_ALL_ID/)
+  assert.match(regionSel, /RegionPicker/)
+  assert.match(regionSel, /全部地域/)
   // 失焦/Esc 回显与 pick 一致的格式(chosenText 回显策略)
   const combo = client.match(/function RegionCombo\([\s\S]*?\n    \}/)![0]
   assert.match(combo, /formatChosen/)
   assert.match(combo, /chosenText/)
   // 未传 inputId 时不输出固定默认 id,避免同屏重复
   assert.match(combo, /id: inputId \|\| undefined/)
-  // CLS 圆角已归一到统一 8px
-  assert.doesNotMatch(client, /\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:3px/)
-  assert.match(client, /\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:8px/)
+  // CLS 圆角已纳入统一 --ci-radius-lg(G1.2/g1.4),不再是独立硬编码
+  assert.doesNotMatch(client, /\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:[0-9]+px/)
+  assert.match(client, /\.ci-cls \.ci-region,\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:var\(--ci-radius-lg\)/)
 })
