@@ -205,20 +205,25 @@ test('contract: MonitorPanel 渲染指标级错误清单与卡内不可用说明
   const { buildMonitorSeriesMap, MonitorPanel } = await loadClientInternals()
   const React = require('react') as { createElement: (...args: unknown[]) => unknown }
   const { renderToStaticMarkup } = require('react-dom/server') as { renderToStaticMarkup: (node: unknown) => string }
-  // 有数据指标 + 官方未提供指标 + agent 缺失指标 的混合场景
-  const series = HOST_METRICS.map((m) => ({
+  // 指标集已不再含磁盘 IOPS 的 unavailable 占位
+  assert.ok(!HOST_METRICS.some((m) => m.key === 'diskRead' || m.key === 'diskWrite'))
+  // 在指标集末尾附带一个 unavailable 占位指标,验证 perChartNote 通用分支仍可渲染说明
+  const placeholder = { key: 'futurePlaceholder', metricName: 'FutureMetric', label: '未来占位', unit: '-', color: '#000', unavailable: '官方暂未提供该指标' }
+  const metrics = [...HOST_METRICS, placeholder]
+  // 有数据指标 + METRIC_NOT_FOUND 真实接口错 + agent 缺失指标 的混合场景
+  const series = metrics.map((m) => ({
     key: m.key,
     metric: m.metricName,
     timestamps: m.key === 'cpu' ? [1000, 1060] : [],
     values: m.key === 'cpu' ? [12, 13] : [],
   }))
   const errors = [
-    { key: 'diskRead', metric: 'DiskReadIops', errorType: 'METRIC_NOT_FOUND', message: '官方未提供主机级磁盘读 IOPS 指标', suggestion: '云监控未提供该指标' },
+    { key: 'lanIn', metric: 'LanIntraffic', errorType: 'METRIC_NOT_FOUND', message: '云监控返回内网入带宽指标不存在', suggestion: '云监控未提供该指标' },
     { key: 'memory', metric: 'MemUsage', errorType: 'AGENT_MISSING', suggestion: '请到控制台安装或启动监控组件(barad_agent)后重试' },
   ]
   const html = renderToStaticMarkup(React.createElement(MonitorPanel as never, {
-    metrics: HOST_METRICS,
-    seriesMap: buildMonitorSeriesMap(HOST_METRICS, series),
+    metrics,
+    seriesMap: buildMonitorSeriesMap(metrics, series),
     range: '1h',
     onRangeChange: () => {},
     note: `部分指标拉取失败（${errors.length} 项）`,
@@ -227,8 +232,8 @@ test('contract: MonitorPanel 渲染指标级错误清单与卡内不可用说明
   assert.match(html, /ci-monitor-errs/, '应渲染指标级错误清单容器')
   assert.match(html, /指标不可用/, 'METRIC_NOT_FOUND 应显示中文标签')
   assert.match(html, /监控组件未安装/, 'AGENT_MISSING 应显示中文标签')
-  assert.match(html, /官方未提供主机级磁盘读 IOPS 指标/, '应展示具体失败项与原因')
+  assert.match(html, /云监控返回内网入带宽指标不存在/, '应展示具体失败项与原因')
   assert.match(html, /barad_agent/, '组件未装类文案应含可操作引导')
-  // 不可用指标卡内应显示说明而非笼统「暂无监控数据」
-  assert.match(html, /官方未提供主机级磁盘写 IOPS 指标/, 'unavailable 指标卡内应渲染说明')
+  // 不可用指标卡内应显示说明而非笼统「暂无监控数据」(perChartNote 通用分支)
+  assert.match(html, /官方暂未提供该指标/, 'unavailable 指标卡内应渲染说明')
 })
