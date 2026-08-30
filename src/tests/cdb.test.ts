@@ -83,7 +83,7 @@ test('official manage tabs stay the 11 console names g2', () => {
   assert.equal(CDB_OFFICIAL_TABS.includes('慢查询' as never), false)
 })
 
-test('list maps fixtures and isolates region failures g1.1', async () => {
+test('list maps fixtures and defaults to Guangzhou without all-regions fanout g1.1', async () => {
   const calls: Array<{ action: string; region?: string }> = []
   const call = async (action: string, _payload: unknown, _creds: unknown, opts: { region?: string }) => {
     calls.push({ action, region: opts.region })
@@ -95,12 +95,16 @@ test('list maps fixtures and isolates region failures g1.1', async () => {
     async ping() {},
     async query() { return { columns: [], rows: [] } },
   })
+  // 「全部地域」已下线:不传 region 时默认首个可用地域(广州),不再遍历全部地域
   const listed = await module.list(ctx({ query: 'prod-order' }))
   assert.ok(listed.items.some((item) => item.title === 'cdb-70zdmgg1'))
   assert.ok(listed.items.every((item) => item.kind === 'cdb'))
-  assert.ok((listed.warnings || []).some((row) => row.includes('东京')))
+  assert.ok(calls.every((row) => row.region !== 'ap-tokyo'))
   assert.ok(calls.some((row) => row.region === 'ap-guangzhou'))
-  assert.ok(calls.some((row) => row.region === 'ap-tokyo'))
+  // 传给「all」也不再展开为全部地域,仍只走默认地域
+  const legacyAll = await module.list(ctx({ query: 'prod-order', region: 'all' }))
+  assert.ok(legacyAll.items.some((item) => item.title === 'cdb-70zdmgg1'))
+  // 显式指定单个地域时只查该地域
   const named = await module.list(ctx({ query: '10.0.1.12', region: 'ap-guangzhou' }))
   assert.equal(named.items[0]?.title, 'cdb-70zdmgg1')
   assert.equal(named.items[0]?.columns?.find((col) => col.label === '内网地址')?.value, '10.0.1.12:3306')

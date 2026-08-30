@@ -130,7 +130,7 @@ test('cvm 卡片:对象型 regions 注入 RegionSelect 不渲染 [object Object]
   assert.match(html, /web-01/)
 })
 
-test('cdb 卡片:对象型 region 不进入 RegionComboById 受控值', async () => {
+test('cdb 卡片:对象型 region 不进入 RegionPicker 受控值', async () => {
   const view = await loadSearchToolView()
   const React = require('react') as { createElement: (...args: unknown[]) => unknown }
   const { renderToStaticMarkup } = require('react-dom/server') as { renderToStaticMarkup: (node: unknown) => string }

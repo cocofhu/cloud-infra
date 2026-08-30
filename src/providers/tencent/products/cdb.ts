@@ -592,8 +592,9 @@ export function createCdbModule(
     actions: ACTIONS,
     async list(ctx) {
       const wanted = String(ctx.region || '').trim()
-      const all = !wanted || wanted === 'all' || wanted === '全部地域'
-      const regions = all ? CDB_REGIONS.map((row) => row.id) : [wanted]
+      // 「全部地域」已下线:无指定地域时默认首个可用地域(广州),不再遍历全部地域,
+      // 避免在未开通账号下产生大量 InvalidRegion 警告。
+      const regions = wanted && wanted !== 'all' ? [wanted] : [CDB_REGIONS[0].id]
       const warnings: string[] = []
       const collected: ResourceCard[] = []
       await Promise.all(regions.map(async (region) => {

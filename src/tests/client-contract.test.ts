@@ -455,7 +455,11 @@ test('cvm and lighthouse consoles share one dual-tab instance card', () => {
   assert.match(client, /华南地区（广州）/)
   assert.match(client, /function RegionSelect/)
   assert.match(client, /function KindTabs/)
-  assert.match(client, /全部地域/)
+  // 「全部地域」已下线:RegionSelect 不再提供 all 哨兵,CVM/轻量/CDB 下拉里不出现
+  assert.doesNotMatch(client, /id: "all", label: "全部地域"/)
+  assert.doesNotMatch(client, /label: "全部地域"/)
+  // CVM/轻量选中未开通地域时前端拦截并给友好提示
+  assert.match(client, /未开通\/不可用，请重新选择地域/)
   assert.match(client, /云服务器/)
   assert.match(client, /轻量应用服务器/)
   assert.match(client, /搜索 ID \/ 名称 \/ IP/)
@@ -484,7 +488,8 @@ test('cvm and lighthouse consoles share one dual-tab instance card', () => {
   assert.match(tool, /h\(KindTabs/)
   assert.match(tool, /h\(Pager/)
   assert.match(tool, /region: useRegion/)
-  assert.match(tool, /trimmed \? "all"/)
+  // 「全部地域」已下线:搜索时不再切到 "all",始终使用当前选中地域
+  assert.doesNotMatch(tool, /trimmed \? "all"/)
   assert.match(tool, /kind === "auto"/)
   assert.match(tool, /kind !== "auto"/)
   assert.match(tool, /tabToKind/)
@@ -651,7 +656,9 @@ test('g3 COS console two pages use region combo and file list, not an expand tre
   assert.match(client, /DEFAULT_COS_REGION_ID = "ap-guangzhou"/)
   assert.match(client, /function defaultCosRegion/)
   assert.match(client, /useState\(\(\) => defaultCosRegion/)
-  assert.match(client, /comboNeedle/)
+  // CosRegionCombo 统一走共享 RegionPicker(不再经过旧 RegionCombo/comboNeedle)
+  assert.doesNotMatch(client, /comboNeedle/)
+  assert.match(client, /function RegionPicker\(/)
   assert.match(client, /创建存储桶/)
   assert.match(client, /请输入存储桶名称/)
   assert.match(client, /"名称"/)
@@ -974,18 +981,24 @@ test('monitor charts: MonitorPanel/MonitorChart shared by CDB and instance detai
   assert.match(client, /map\[m\.key\]/)
 })
 
-test('region pickers unify on RegionCombo with grouping and 全部地域 support', () => {
+test('region pickers unify on RegionPicker; 全部地域哨兵已下线', () => {
   const client = read('src/client.js')
-  assert.match(client, /function RegionCombo\(/)
-  assert.match(client, /function RegionComboById\(/)
+  // 旧 RegionCombo/RegionComboById/REGION_ALL_ID 已随「全部地域」一同移除
+  assert.doesNotMatch(client, /function RegionCombo\(/)
+  assert.doesNotMatch(client, /function RegionComboById\(/)
+  assert.doesNotMatch(client, /REGION_ALL_ID/)
+  assert.doesNotMatch(client, /allowAll/)
   assert.match(client, /function matchRegionItems\(/)
-  assert.match(client, /REGION_ALL_ID = "__all__"/)
-  assert.match(client, /ci-combo-group/)
+  assert.match(client, /function RegionPicker\(/)
   assert.match(client, /function RegionSelect/)
   assert.match(client, /function ClsRegionSelect/)
   assert.match(client, /function CosRegionCombo/)
   assert.match(client, /clsRegionGroups/)
-  assert.match(client, /全部地域/)
+  // 任何地域下拉里都不再出现「全部地域」
+  assert.doesNotMatch(client, /label: "全部地域"/)
+  assert.doesNotMatch(client, /"全部地域"/)
+  // 注释允许保留说明文字,这里断言的是可执行代码中不生成全部地域选项
+  assert.equal((client.match(/RegionPicker/g) || []).length >= 6, true)
 })
 
 test('G2.6 RegionPicker 共享组件存在并被 6+ 个产品卡片接入', () => {
@@ -995,9 +1008,13 @@ test('G2.6 RegionPicker 共享组件存在并被 6+ 个产品卡片接入', () =
   assert.match(client, /createPortal/)
   assert.match(client, /ci-regionpop/)
   assert.match(client, /ci-regionpick-btn/)
-  // 胶囊模式 + 地球 icon + 选中指示 ▾
-  assert.match(client, /🌍/)
+  // 胶囊模式 + 选中指示 ▾;🌍 图标已移除(g1.2)
+  assert.doesNotMatch(client, /ci-regionpick-globe/)
   assert.match(client, /▾/)
+  // 弹层必须不透明(g1.1):Portal 后 token 自解析 + 背景双写兜底
+  assert.match(client, /\.ci-root,\.ci-regionpop\{--ci-fg:/)
+  assert.match(client, /background-color:var\(--dsw-alias-bg-layer-1\)/)
+  assert.match(client, /background-color:var\(--ci-bg\)/)
   // 模糊搜索:input / placeholder 中专有字符串
   assert.match(client, /搜索地域:中文 \/ 拼音 \/ 缩写 \/ id/)
   // A11y:listbox/option/combobox 语义
@@ -1062,25 +1079,24 @@ test('G2.3 Tabs/SubTabs 统一蓝色下划线样式并应用到所有 ci-tab 用
   assert.match(client, /className:\s*"ci-tab"/)
 })
 
-test('RegionComboById typing only filters and never clears selection; all-region maps back to label', () => {
+test('RegionSelect defaults to Guangzhou via RegionPicker and blocks unavailable regions', () => {
   const client = read('src/client.js')
-  // 内部自持文本状态:输入仅更新文本(setInner),不再在打字时清空父级 region
-  const byId = client.match(/function RegionComboById[\s\S]*?\n    \}/)![0]
-  assert.match(byId, /useState/)
-  assert.match(byId, /setInner/)
-  assert.match(byId, /useEffect\(\(\) => \{ setInner\(null\); \}, \[value\]\)/)
-  assert.doesNotMatch(byId, /onChange && onChange\(""\)/)
-  assert.doesNotMatch(byId, /onChange\(""\)/)
-  // 选中『全部地域』时 label 正确回显(不显示字面 all);RegionSelect 已统一切到共享 RegionPicker,"all" 作为特殊 id 保留。
+  // RegionSelect 已统一切到共享 RegionPicker,默认走 defaultRegionName(广州优先,不可用回退第一个)
   const regionSel = client.match(/function RegionSelect[\s\S]*?\n    \}/)![0]
   assert.match(regionSel, /RegionPicker/)
-  assert.match(regionSel, /全部地域/)
-  // 失焦/Esc 回显与 pick 一致的格式(chosenText 回显策略)
-  const combo = client.match(/function RegionCombo\([\s\S]*?\n    \}/)![0]
-  assert.match(combo, /formatChosen/)
-  assert.match(combo, /chosenText/)
-  // 未传 inputId 时不输出固定默认 id,避免同屏重复
-  assert.match(combo, /id: inputId \|\| undefined/)
+  assert.match(regionSel, /defaultRegionName/)
+  // 不再提供「全部地域」选项
+  assert.doesNotMatch(regionSel, /all/)
+  // defaultRegionName 广州优先 + 回退列表第一项
+  const defRegion = client.match(/function defaultRegionName[\s\S]*?\n    \}/)![0]
+  assert.match(defRegion, /广州/)
+  assert.match(defRegion, /ap-guangzhou/)
+  assert.match(defRegion, /list\[0\]/)
+  // 未开通地域前端拦截:不发请求,提示「未开通/不可用,请重新选择地域」
+  assert.match(client, /未开通\/不可用，请重新选择地域/)
+  // CDB 下拉不再注入「全部地域」特殊项
+  const cdbPick = client.match(/inputId: "ci-cdb-region"[\s\S]{0,350}?additionalStyle/)![0]
+  assert.doesNotMatch(cdbPick, /全部地域/)
   // CLS 圆角已纳入统一 --ci-radius-lg(G1.2/g1.4),不再是独立硬编码
   assert.doesNotMatch(client, /\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:[0-9]+px/)
   assert.match(client, /\.ci-cls \.ci-region,\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:var\(--ci-radius-lg\)/)
