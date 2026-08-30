@@ -580,6 +580,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-regionpop{position:fixed;z-index:var(--ci-z-popover);background-color:var(--dsw-alias-bg-layer-1);background-color:var(--ci-bg);border:1px solid var(--ci-border-2);border-radius:var(--ci-radius-lg);box-shadow:var(--ci-shadow-2);box-sizing:border-box;padding:var(--ci-space-2);min-width:260px;max-height:344px;display:flex;flex-direction:column;color:var(--ci-fg)}
 .ci-regionpop-input{flex:none;height:30px;border:1px solid var(--ci-border-2);border-radius:var(--ci-radius-md);background:var(--ci-bg-2);color:var(--ci-fg);padding:0 10px;font:inherit;font-size:var(--ci-font-sm);box-sizing:border-box;width:100%;margin-bottom:var(--ci-space-2)}
 .ci-regionpop-input:focus{outline:none;border-color:var(--ci-brand);box-shadow:0 0 0 3px var(--ci-brand-ring)}
+/* 隐藏浏览器原生搜索装饰(放大镜/✕),与 .ci-search 一致,避免暗色主题下突兀的原生小图标 */
+.ci-regionpop-input::-webkit-search-cancel-button,.ci-regionpop-input::-webkit-search-decoration,.ci-regionpop-input::-webkit-search-results-button,.ci-regionpop-input::-webkit-search-results-decoration{appearance:none;-webkit-appearance:none;display:none}
 .ci-regionpop-list{flex:1;min-height:0;overflow-y:auto}
 .ci-regionpop-empty{padding:24px 12px;text-align:center;color:var(--ci-fg-4);font-size:var(--ci-font-xs)}
 .ci-regionpop-group{padding:4px 10px;font-size:11px;font-weight:600;color:var(--ci-fg-3);margin-top:6px} .ci-regionpop-group:first-child{margin-top:0}
