@@ -165,6 +165,44 @@ test('fetchMonitorSeries: unavailable 指标不发起请求且归类 METRIC_NOT_
     requested.push(String(payload.MetricName || ''))
     return { DataPoints: [{ Timestamps: [1], Values: [1] }] }
   }) as unknown as TencentProductCall
+  // 用临时构造的 unavailable 指标验证通用分支(CVM/LIGHTHOUSE 内置指标集已不再使用 unavailable)
+  const metrics = [
+    { key: 'cpu', metricName: 'CpuUsage', label: 'CPU', unit: '%', color: '#000' },
+    { key: 'futurePlaceholder', metricName: 'FutureMetric', label: '占位', unit: '-', color: '#000', unavailable: '官方暂未提供该指标' },
+  ]
+  const result = await fetchMonitorSeries(monitor, {
+    namespace: 'QCE/CVM',
+    metrics,
+    instanceId: 'ins-abc',
+    region: 'ap-guangzhou',
+    creds,
+    opts,
+    nowMs: 0,
+  })
+  // unavailable 指标不发起 GetMonitorData
+  assert.deepEqual(requested, ['CpuUsage'])
+  const notFound = result.metricErrors.filter((row) => row.errorType === 'METRIC_NOT_FOUND')
+  assert.equal(notFound.length, 1)
+  assert.equal(notFound[0].key, 'futurePlaceholder')
+  assert.equal(notFound[0].message, '官方暂未提供该指标')
+  // series 长度与指标集一致,失败项为空序列但仍在列表中(不拖垮其它图)
+  assert.equal(result.series.length, metrics.length)
+  assert.equal(result.series.find((row) => row.key === 'futurePlaceholder')?.timestamps.length, 0)
+  assert.ok(result.series.find((row) => row.key === 'cpu')?.timestamps.length)
+  // 兼容契约:errors(string[]) 与 metricErrors 一一对应
+  assert.equal(result.errors.length, result.metricErrors.length)
+})
+
+test('内置指标集不含主机级磁盘 IOPS 条目(CVM 与 LIGHTHOUSE)', async () => {
+  for (const metrics of [HOST_METRICS, LIGHTHOUSE_METRICS]) {
+    assert.ok(!metrics.some((row) => row.key === 'diskRead' || row.key === 'diskWrite'))
+    assert.ok(!metrics.some((row) => /Iops/i.test(row.metricName)))
+  }
+  const requested: string[] = []
+  const monitor = (async (_action: string, payload: { MetricName?: string }) => {
+    requested.push(String(payload.MetricName || ''))
+    return { DataPoints: [{ Timestamps: [1], Values: [1] }] }
+  }) as unknown as TencentProductCall
   const result = await fetchMonitorSeries(monitor, {
     namespace: 'QCE/CVM',
     metrics: HOST_METRICS,
@@ -174,19 +212,10 @@ test('fetchMonitorSeries: unavailable 指标不发起请求且归类 METRIC_NOT_
     opts,
     nowMs: 0,
   })
-  // diskRead/diskWrite 标记 unavailable,不得出现在请求里
-  assert.ok(!requested.includes('DiskReadIops'))
-  assert.ok(!requested.includes('DiskWriteIops'))
-  assert.equal(requested.length, HOST_METRICS.length - 2)
-  const notFound = result.metricErrors.filter((row) => row.errorType === 'METRIC_NOT_FOUND')
-  assert.equal(notFound.length, 2)
-  assert.deepEqual(notFound.map((row) => row.key).sort(), ['diskRead', 'diskWrite'])
-  // series 长度与指标集一致,失败项为空序列但仍在列表中(不拖垮其它图)
-  assert.equal(result.series.length, HOST_METRICS.length)
-  assert.equal(result.series.find((row) => row.key === 'diskRead')?.timestamps.length, 0)
-  assert.ok(result.series.find((row) => row.key === 'cpu')?.timestamps.length)
-  // 兼容契约:errors(string[]) 与 metricErrors 一一对应
-  assert.equal(result.errors.length, result.metricErrors.length)
+  // 全部指标均发起真实请求,无磁盘 IOPS
+  assert.equal(requested.length, HOST_METRICS.length)
+  assert.ok(!requested.some((name) => /Iops/i.test(name)))
+  assert.equal(result.metricErrors.length, 0)
 })
 
 test('fetchMonitorSeries: agent 依赖指标空点归 AGENT_MISSING,API 错归 API_ERROR(混合场景)', async () => {
@@ -221,11 +250,9 @@ test('fetchMonitorSeries: agent 依赖指标空点归 AGENT_MISSING,API 错归 A
   assert.deepEqual(result.series.find((row) => row.key === 'cpu')?.values, [2])
 })
 
-test('LIGHTHOUSE disk IOPS 两项同样标记 unavailable(与 CVM 对齐)', () => {
-  const read = LIGHTHOUSE_METRICS.find((row) => row.key === 'diskRead')
-  const write = LIGHTHOUSE_METRICS.find((row) => row.key === 'diskWrite')
-  assert.ok(read?.unavailable, 'LIGHTHOUSE 磁盘读 IOPS 应标记 unavailable')
-  assert.ok(write?.unavailable, 'LIGHTHOUSE 磁盘写 IOPS 应标记 unavailable')
+test('LIGHTHOUSE 与 CVM 指标集均未使用 unavailable 占位(内置集无 IOPS)', () => {
+  assert.ok(!LIGHTHOUSE_METRICS.some((row) => row.unavailable))
+  assert.ok(!HOST_METRICS.some((row) => row.unavailable))
   // 内存/磁盘依赖实例内监控组件
   assert.ok(LIGHTHOUSE_METRICS.find((row) => row.key === 'memory')?.requiresAgent)
   assert.ok(LIGHTHOUSE_METRICS.find((row) => row.key === 'disk')?.requiresAgent)

@@ -159,11 +159,9 @@ export function classifyMetricError(input: {
 
 /**
  * CVM(QCE/CVM)主机级指标集。
- * 已按官方「云服务器监控指标」文档(https://cloud.tencent.com/document/product/248/6843)核对:
- * InstanceId 维度下不存在主机级磁盘 IOPS 指标——相近的 VmDiskReadIops 为 vmUuid 维度、
- * DiskReadTraffic/DiskWriteTraffic 为设备级 vm_uuid 维度,均无法按实例直接查询。
- * 因此 diskRead/diskWrite 标记 unavailable,不发起 GetMonitorData,
- * 前端按指标级说明展示「官方未提供主机级磁盘 IOPS」。
+ * 官方「云服务器监控指标」文档(https://cloud.tencent.com/document/product/248/6843):
+ * InstanceId 维度下不存在主机级磁盘 IOPS 指标(相近的 VmDiskReadIops 为 vmUuid 维度、
+ * DiskReadTraffic/DiskWriteTraffic 为设备级 vm_uuid 维度),故指标集不含磁盘 IOPS 条目。
  * MemUsage/CvmDiskUsage 依赖实例内监控组件(官方文档明示),标记 requiresAgent。
  */
 export const HOST_METRICS: HostMetricDef[] = [
@@ -172,8 +170,6 @@ export const HOST_METRICS: HostMetricDef[] = [
   { key: 'disk', metricName: 'CvmDiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c', requiresAgent: true },
   { key: 'lanIn', metricName: 'LanIntraffic', label: '内网入带宽', unit: 'Mbps', color: '#2fbf71' },
   { key: 'lanOut', metricName: 'LanOuttraffic', label: '内网出带宽', unit: 'Mbps', color: '#1f9d8f' },
-  { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e', unavailable: '官方未提供主机级磁盘读 IOPS 指标' },
-  { key: 'diskWrite', metricName: 'DiskWriteIops', label: '磁盘写 IOPS', unit: '次/s', color: '#d48806', unavailable: '官方未提供主机级磁盘写 IOPS 指标' },
   { key: 'pkgIn', metricName: 'LanInpkg', label: '内网入包量', unit: '个/s', color: '#6b7cff' },
   { key: 'pkgOut', metricName: 'LanOutpkg', label: '内网出包量', unit: '个/s', color: '#9a6bff' },
 ]
@@ -184,9 +180,7 @@ export const HOST_METRICS: HostMetricDef[] = [
  *  - CPU 使用率:CPUUsage(CVM 为 CpuUsage)
  *  - 内存使用率:MemoryUsage(CVM 为 MemUsage;需实例安装监控组件,未装时返回空序列)
  *  - 磁盘使用率:DiskUsage(CVM 为 CvmDiskUsage;Lighthouse 侧带 disk 维度,单 InstanceId 查询时云监控返回首块磁盘序列)
- * 此前随 CVM 一并引入的 DiskReadIops/DiskWriteIops 经线上恒定 2 项失败确认在
- * QCE/LIGHTHOUSE 下同样不存在(QCE/CVM 官方文档已确认无主机级 IOPS;此处同步移除),
- * 标记 unavailable 不再请求,前端展示对应说明。
+ * 与 CVM 一致:官方在 InstanceId 维度同样未提供主机级磁盘 IOPS,指标集不含 IOPS 条目。
  */
 export const LIGHTHOUSE_METRICS: HostMetricDef[] = [
   { key: 'cpu', metricName: 'CPUUsage', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
@@ -194,8 +188,6 @@ export const LIGHTHOUSE_METRICS: HostMetricDef[] = [
   { key: 'disk', metricName: 'DiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c', requiresAgent: true },
   { key: 'lanIn', metricName: 'LanIntraffic', label: '内网入带宽', unit: 'Mbps', color: '#2fbf71' },
   { key: 'lanOut', metricName: 'LanOuttraffic', label: '内网出带宽', unit: 'Mbps', color: '#1f9d8f' },
-  { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e', unavailable: '官方未提供主机级磁盘读 IOPS 指标' },
-  { key: 'diskWrite', metricName: 'DiskWriteIops', label: '磁盘写 IOPS', unit: '次/s', color: '#d48806', unavailable: '官方未提供主机级磁盘写 IOPS 指标' },
   { key: 'pkgIn', metricName: 'LanInpkg', label: '内网入包量', unit: '个/s', color: '#6b7cff' },
   { key: 'pkgOut', metricName: 'LanOutpkg', label: '内网出包量', unit: '个/s', color: '#9a6bff' },
 ]
