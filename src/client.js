@@ -7,7 +7,8 @@ window.__ModuleLoader__.load({
 
     const CSS = `
 /* ============ 设计 token 层 --ci-*:全部映射到 --dsw-alias-*,不做明暗判断(G1.1/G1.2) ============ */
-.ci-root{--ci-fg:var(--dsw-alias-label-primary);--ci-fg-2:var(--dsw-alias-label-secondary);--ci-fg-3:var(--dsw-alias-label-tertiary);--ci-fg-4:var(--dsw-alias-label-caption);--ci-bg:var(--dsw-alias-bg-layer-1);--ci-bg-2:var(--dsw-alias-bg-layer-2);--ci-bg-3:var(--dsw-alias-bg-layer-3);--ci-border:var(--dsw-alias-border-l1);--ci-border-2:var(--dsw-alias-border-l2);--ci-brand:var(--dsw-alias-brand-primary);--ci-brand-fill:var(--dsw-alias-button-primary-fill);--ci-brand-fg:var(--dsw-alias-label-primary-foreground);--ci-brand-soft:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);--ci-brand-soft-14:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);--ci-brand-ring:color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent);--ci-success:var(--dsw-alias-state-success-primary);--ci-success-bg:var(--dsw-alias-state-success-tertiary);--ci-warn:var(--dsw-alias-state-warn-label);--ci-warn-bg:var(--dsw-alias-state-warn-tertiary);--ci-error:var(--dsw-alias-state-error-primary);--ci-info:var(--dsw-alias-brand-primary);--ci-info-bg:color-mix(in srgb,var(--dsw-alias-brand-primary) 10%,transparent);--ci-radius-sm:4px;--ci-radius-md:6px;--ci-radius-lg:8px;--ci-radius-xl:12px;--ci-radius-2xl:14px;--ci-radius-pill:999px;--ci-space-1:4px;--ci-space-2:8px;--ci-space-3:12px;--ci-space-4:16px;--ci-space-5:20px;--ci-space-6:24px;--ci-space-7:32px;--ci-space-8:40px;--ci-font-xs:12px;--ci-font-sm:13px;--ci-font-md:14px;--ci-font-lg:16px;--ci-font-xl:18px;--ci-shadow-1:var(--dsw-alias-shadow);--ci-shadow-2:0 8px 24px rgba(0,0,0,.16);--ci-z-modal:40;--ci-z-popover:60}
+/* Portal 到 <body> 的浮层(.ci-regionpop)不在 .ci-root 内,需在选择器上并列,own token 映射才能生效 */
+.ci-root,.ci-regionpop{--ci-fg:var(--dsw-alias-label-primary);--ci-fg-2:var(--dsw-alias-label-secondary);--ci-fg-3:var(--dsw-alias-label-tertiary);--ci-fg-4:var(--dsw-alias-label-caption);--ci-bg:var(--dsw-alias-bg-layer-1);--ci-bg-2:var(--dsw-alias-bg-layer-2);--ci-bg-3:var(--dsw-alias-bg-layer-3);--ci-border:var(--dsw-alias-border-l1);--ci-border-2:var(--dsw-alias-border-l2);--ci-brand:var(--dsw-alias-brand-primary);--ci-brand-fill:var(--dsw-alias-button-primary-fill);--ci-brand-fg:var(--dsw-alias-label-primary-foreground);--ci-brand-soft:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);--ci-brand-soft-14:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);--ci-brand-ring:color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent);--ci-success:var(--dsw-alias-state-success-primary);--ci-success-bg:var(--dsw-alias-state-success-tertiary);--ci-warn:var(--dsw-alias-state-warn-label);--ci-warn-bg:var(--dsw-alias-state-warn-tertiary);--ci-error:var(--dsw-alias-state-error-primary);--ci-info:var(--dsw-alias-brand-primary);--ci-info-bg:color-mix(in srgb,var(--dsw-alias-brand-primary) 10%,transparent);--ci-radius-sm:4px;--ci-radius-md:6px;--ci-radius-lg:8px;--ci-radius-xl:12px;--ci-radius-2xl:14px;--ci-radius-pill:999px;--ci-space-1:4px;--ci-space-2:8px;--ci-space-3:12px;--ci-space-4:16px;--ci-space-5:20px;--ci-space-6:24px;--ci-space-7:32px;--ci-space-8:40px;--ci-font-xs:12px;--ci-font-sm:13px;--ci-font-md:14px;--ci-font-lg:16px;--ci-font-xl:18px;--ci-shadow-1:var(--dsw-alias-shadow);--ci-shadow-2:0 8px 24px rgba(0,0,0,.16);--ci-z-modal:40;--ci-z-popover:60}
 .ci-root,.ci-tool{font-family:inherit;color:var(--dsw-alias-label-primary);width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:2px 0 6px}
 .ci-panel{border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-xl);background:var(--dsw-alias-bg-layer-1);overflow:hidden;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
 .ci-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;min-width:0;flex-wrap:nowrap;overflow-x:auto}
@@ -566,12 +567,12 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-regionpick-btn:hover:not(:disabled){border-color:var(--ci-brand);color:var(--ci-brand)}
 .ci-regionpick-btn:disabled{opacity:.45;cursor:not-allowed}
 .ci-regionpick-btn:focus-visible{outline:2px solid var(--ci-brand);outline-offset:2px}
-.ci-regionpick-globe{font-size:13px;line-height:1}
 .ci-regionpick-caret{font-size:10px;color:var(--ci-fg-3);line-height:1;margin-left:2px}
 .ci-regionpick-btn.open{border-color:var(--ci-brand);color:var(--ci-brand)}
 
-/* RegionPicker 浮层(Portal 到 body) */
-.ci-regionpop{position:fixed;z-index:var(--ci-z-popover);background:var(--ci-bg);border:1px solid var(--ci-border-2);border-radius:var(--ci-radius-lg);box-shadow:var(--ci-shadow-2);box-sizing:border-box;padding:var(--ci-space-2);min-width:260px;max-height:344px;display:flex;flex-direction:column}
+/* RegionPicker 浮层(Portal 到 body):脱离 .ci-root 后 token 已由 .ci-regionpop 选择器并列补齐;
+   背景双写 —— 先走宿主 --dsw-alias-*(亮/暗主题跟随宿主),再用 --ci-bg 兜底,保证任何宿主下不透明 */
+.ci-regionpop{position:fixed;z-index:var(--ci-z-popover);background-color:var(--dsw-alias-bg-layer-1);background-color:var(--ci-bg);border:1px solid var(--ci-border-2);border-radius:var(--ci-radius-lg);box-shadow:var(--ci-shadow-2);box-sizing:border-box;padding:var(--ci-space-2);min-width:260px;max-height:344px;display:flex;flex-direction:column;color:var(--ci-fg)}
 .ci-regionpop-input{flex:none;height:30px;border:1px solid var(--ci-border-2);border-radius:var(--ci-radius-md);background:var(--ci-bg-2);color:var(--ci-fg);padding:0 10px;font:inherit;font-size:var(--ci-font-sm);box-sizing:border-box;width:100%;margin-bottom:var(--ci-space-2)}
 .ci-regionpop-input:focus{outline:none;border-color:var(--ci-brand);box-shadow:0 0 0 3px var(--ci-brand-ring)}
 .ci-regionpop-list{flex:1;min-height:0;overflow-y:auto}
@@ -1552,7 +1553,6 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           id: inputId, style: additionalStyle,
           onClick: () => { if (disabled) return; setOpen(!open); if (!open) setHi(Math.max(0, flatHits.findIndex((r) => valueObj && r.id === valueObj.id))); },
         },
-          h("span", { "aria-hidden": "true", className: "ci-regionpick-globe" }, "🌍"),
           h("span", { className: "ci-regionpick-text" }, displayLabel),
           h("span", { "aria-hidden": "true", className: "ci-regionpick-caret" }, "▾"),
         ),
@@ -1627,144 +1627,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       return list.find((name) => /广州/.test(name) || name === "ap-guangzhou") || list[0] || "华南地区（广州）";
     }
 
-    const REGION_ALL_ID = "__all__";
-
-    // 统一地域组合框:聚焦展开完整列表、输入按名称/ID 即时过滤、↑↓ 高亮、Enter 选中、
-    // Esc 关闭、失焦延时收起、支持分组标题与『全部地域』首项,供全部 5 处地域选择点复用。
-    function RegionCombo({ items, groups, value, display, onDisplay, placeholder, allowAll, disabled, style, inputId, chosenText, onChange }) {
-      const [open, setOpen] = useState(false);
-      const [highlight, setHighlight] = useState(0);
-      // 脏数据兜底:{id,label} 字段为对象时取内部字符串,绝不把对象交给 React 渲染。
-      const safeItem = (item) => item ? { ...item, id: safeText(item.id), label: safeField(item.label) } : item;
-      const safeValue = safeItem(value);
-      const displayText = safeText(display);
-      const visibleGroups = useMemo(() => {
-        const all = allowAll ? [{ id: REGION_ALL_ID, label: "全部地域", aliases: ["all"] }] : [];
-        const source = Array.isArray(groups) && groups.length
-          ? groups.map((group) => ({ title: safeText(group.title), items: (Array.isArray(group.items) ? group.items : []).filter(Boolean).map(safeItem) }))
-          : [{ title: "", items: (Array.isArray(items) ? items : []).filter(Boolean).map(safeItem) }];
-        // 输入恰为已选项展示文本时视为未输入,展示全量(沿用旧 comboNeedle 语义)
-        let comboNeedle = String(displayText || "");
-        if (safeValue && safeValue.id !== REGION_ALL_ID) {
-          const chosen = source.flatMap((group) => group.items).find((item) => item.id === safeValue.id);
-          if (chosen && (comboNeedle === `${chosen.label}（${chosen.id}）` || comboNeedle === chosen.label)) comboNeedle = "";
-        }
-        const hitGroups = source.map((group) => ({
-          title: group.title,
-          items: matchRegionItems(group.items, comboNeedle),
-        })).filter((group) => group.items.length);
-        if (allowAll && matchRegionItems(all, comboNeedle).length) hitGroups.unshift({ title: "", items: all });
-        return hitGroups;
-      }, [items, groups, displayText, safeValue && safeValue.id, allowAll]);
-      const flat = useMemo(() => visibleGroups.flatMap((group) => group.items), [visibleGroups]);
-      const placeholderText = placeholder || (allowAll ? "全部地域" : "输入地域名称或 ID 补全");
-      // 选中项回显格式:默认 label（id)(COS 视觉),ById 薄封装传 label-only,保证失焦/Esc 与 pick 后一致
-      const formatChosen = (item) => {
-        if (!item) return "";
-        if (typeof chosenText === "function") return chosenText(item);
-        return item.id === REGION_ALL_ID ? item.label : `${item.label}（${item.id}）`;
-      };
-      const pick = (item) => {
-        if (!item) return;
-        const next = item.id === REGION_ALL_ID ? { id: item.id, label: item.label } : item;
-        onDisplay(formatChosen(item));
-        setOpen(false);
-        onChange && onChange(next);
-      };
-      const close = () => {
-        setOpen(false);
-        onDisplay(safeValue ? formatChosen(safeValue) : String(displayText || ""));
-      };
-      return h("div", { className: "ci-combo", style },
-        h("input", {
-          type: "text",
-          placeholder: placeholderText,
-          autoComplete: "off",
-          disabled,
-          "aria-label": "地域",
-          value: displayText,
-          id: inputId || undefined,
-          key: inputId ? `${inputId}:root` : undefined,
-          onChange: (e) => { onDisplay(e.target.value); setHighlight(0); if (!open) setOpen(true); },
-          onFocus: (e) => {
-            if (disabled) return;
-            const idx = safeValue ? flat.findIndex((item) => item.id === safeValue.id) : 0;
-            setHighlight(Math.max(0, idx));
-            setOpen(true);
-            if (e.target && e.target.select) e.target.select();
-          },
-          onBlur: () => setTimeout(close, 150),
-          onKeyDown: (e) => {
-            if (e.key === "ArrowDown") {
-              e.preventDefault();
-              if (!open) setOpen(true);
-              setHighlight(Math.min(flat.length - 1, highlight + 1));
-            } else if (e.key === "ArrowUp") {
-              e.preventDefault();
-              setHighlight(Math.max(0, highlight - 1));
-            } else if (e.key === "Enter") {
-              e.preventDefault();
-              const hit = flat[highlight] || flat[0];
-              if (hit) pick(hit);
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              setOpen(false);
-              onDisplay(safeValue ? formatChosen(safeValue) : "");
-            }
-          },
-        }),
-        open && flat.length ? h("ul", { className: "ci-combo-list", role: "listbox" },
-          visibleGroups.map((group) => [
-            group.title ? h("li", { key: "g:" + group.title, className: "ci-combo-group" }, group.title) : null,
-            group.items.map((item) => {
-              const idx = flat.indexOf(item);
-              return h("li", {
-                key: item.id,
-                className: idx === highlight ? "on" : "",
-                onMouseDown: (e) => { e.preventDefault(); pick(item); },
-              }, item.label, item.id === REGION_ALL_ID ? null : h("span", { className: "ci-combo-id" }, item.id));
-            }),
-          ]),
-        ) : null,
-      );
-    }
-
-    // 旧地域 select 的薄封装:仅靠 id 解析选项;内部自持文本状态,输入仅更新文本与过滤、不清空选中,
-    // 仅在选中新项/清空时经 onChange 回调,供服务器/TCR/CLS/CDB 等 Caller 复用。
-    function RegionComboById({ options, groups, value, text, onText, placeholder, allowAll, disabled, style, onChange }) {
-      const valueId = safeText(value);
-      const list = (Array.isArray(groups) && groups.length
-        ? groups.flatMap((group) => (Array.isArray(group.items) ? group.items : []).filter(Boolean))
-        : (Array.isArray(options) ? options : []).filter(Boolean))
-        .map((item) => item && typeof item === "object" ? { ...item, id: safeText(item.id), label: safeField(item.label) } : item);
-      const hit = list.find((item) => item.id === valueId) || null;
-      const isAll = allowAll && valueId === REGION_ALL_ID;
-      const allItem = isAll ? { id: REGION_ALL_ID, label: "全部地域" } : null;
-      // null 表示跟随外部 value;输入时接管,选中/外部 value 变化时复位
-      const [inner, setInner] = useState(null);
-      const derived = hit ? hit.label : (allItem ? allItem.label : (valueId ? String(valueId) : ""));
-      const shown = text !== undefined ? safeText(text) : (inner !== null ? inner : derived);
-      const setShown = (next) => {
-        if (onText) onText(next);
-        else setInner(next);
-      };
-      useEffect(() => { setInner(null); }, [value]);
-      return h(RegionCombo, {
-        items: list,
-        groups: Array.isArray(groups) && groups.length
-          ? groups.map((group) => ({ ...group, title: safeText(group.title), items: (Array.isArray(group.items) ? group.items : []).filter(Boolean).map((item) => item && typeof item === "object" ? { ...item, id: safeText(item.id), label: safeField(item.label) } : item) }))
-          : groups,
-        value: hit || allItem,
-        display: shown,
-        onDisplay: setShown,
-        placeholder,
-        allowAll,
-        disabled,
-        style,
-        chosenText: (item) => (item && safeField(item.label)) || "",
-        onChange: (item) => { setShown(item.label); onChange && onChange(item.id); },
-      });
-    }
+    // 「全部地域」已随需求下线(腾讯控制台亦不提供该汇总项),旧 RegionCombo/RegionComboById 与全部地域哨兵一并移除;
+    // 所有地域选择统一走共享 RegionPicker。
 
     // 常见 city 短名 → 控制台全称;数据源已返回全称时按原样匹配,否则把「广州」此类短名归一。
     const REGION_CITY_TO_DISPLAY = [
@@ -1802,10 +1666,9 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       return raw;
     }
 
-    // 服务器 CVM/轻量地域选择:统一改用 RegionCombo,并按控制台全称归一去重。
+    // 服务器 CVM/轻量地域选择:统一走共享 RegionPicker,按控制台全称归一去重;不再提供「全部地域」汇总项。
     function RegionSelect({ regions, value, onChange }) {
-      // 上游 regions 可能是对象数组({id,label})或对象本身,先取可读字符串再归一;
-      // 统一改为共享 RegionPicker(G2.6)
+      // 上游 regions 可能是对象数组({id,label})或对象本身,先取可读字符串再归一
       const raw = (Array.isArray(regions) ? regions : []).filter(Boolean).map((item) => safeField(item && typeof item === "object" ? (item.label ?? item.id) : item)).filter(Boolean);
       const seen = new Set();
       const names = [];
@@ -1816,12 +1679,11 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           names.push(canonical);
         }
       }
-      const items = ["all", ...names].map((name) => ({ id: name, label: name === "all" ? "全部地域" : name }));
+      const items = names.map((name) => ({ id: name, label: name }));
       const current = canonicalRegionName(safeField(value && typeof value === "object" ? (value.label ?? value.id) : value)) || defaultRegionName(names);
-      const currentId = current === "all" ? "all" : current;
       return h(RegionPicker, {
         regions: items,
-        value: currentId,
+        value: current,
         placeholder: "选择地域",
         onChange: (next) => onChange && onChange(next),
       });
@@ -7377,7 +7239,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       const [orderErr, setOrderErr] = useState("");
       const [orderResult, setOrderResult] = useState(null);
       const [domainConfirm, setDomainConfirm] = useState(null);
-      const [region, setRegion] = useState("");
+      // CDB 首次加载默认选中「华南地区(广州)」(ap-guangzhou),未开通/异常时由错误提示兜底
+      const [region, setRegion] = useState("ap-guangzhou");
       const [selected, setSelected] = useState({});
       const [moreId, setMoreId] = useState("");
       const [notice, setNotice] = useState("");
@@ -7480,7 +7343,19 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         const useKind = tabToKind(useTab);
         const useRegion = kind === "cdb"
           ? (regionOverride !== undefined ? regionOverride : region)
-          : (regionOverride !== undefined ? regionOverride : (trimmed ? "all" : (listRegion || "华南地区（广州）")));
+          : (regionOverride !== undefined ? regionOverride : (listRegion || "华南地区（广州）"));
+        // CVM/轻量:前端用账号本地地域列表校验,未开通/不可用时给出友好提示并拦截请求
+        if ((instanceView || kind === "cvm" || kind === "lighthouse" || kind === "auto") && kind !== "cdb") {
+          const options = (Array.isArray(regionOptions) ? regionOptions : []).filter(Boolean);
+          const wanted = safeText(useRegion);
+          if (options.length && wanted && !options.some((name) => name === wanted || canonicalRegionName(name) === canonicalRegionName(wanted))) {
+            setListBusy(false);
+            setRows([]);
+            setTotal(0);
+            setListErr(`地域「${wanted}」未开通/不可用，请重新选择地域`);
+            return;
+          }
+        }
         setListBusy(true);
         setListErr("");
         try {
@@ -8388,9 +8263,9 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           ),
           h("div", { className: "ci-tools" },
             h(RegionPicker, {
-              regions: [{ id: "", label: "全部地域" }, ...CDB_REGIONS.map((row) => ({ id: row.id, label: row.name }))],
-              value: region || "",
-              placeholder: "全部地域",
+              regions: CDB_REGIONS.map((row) => ({ id: row.id, label: row.name })),
+              value: region || "ap-guangzhou",
+              placeholder: "选择地域",
               inputId: "ci-cdb-region",
               additionalStyle: { width: 180 },
               onChange: (next) => {

@@ -24,7 +24,7 @@ h(RegionPicker, {
 
 ## 交互
 
-- 关闭态显示胶囊按钮 `🌍 广州 ▾`,高度 30px,圆角 999px(pill)。
+- 关闭态显示胶囊按钮 `广州 ▾`,高度 30px,圆角 999px(pill)(无前置图标)。
 - 点击展开浮层(Portal 到 `document.body`),自动 focus 搜索框。
 - 顶部输入框 placeholder:`搜索地域:中文 / 拼音 / 缩写 / id`,大小写不敏感。
 - 搜索匹配:id / label / aliases 任一命中,即保留;``aliases`` 包含 `gz / guangzhou / canton / bj / beijing / sh / shanghai / 广州 / 北京 / 香港 / hkg` 等。
@@ -49,10 +49,10 @@ button     →  aria-haspopup="listbox" + aria-expanded
 | COS  | `CosRegionCombo` | `TENCENT_REGIONS`(COS subset) |
 | TKE  | `ClusterConsole` | `TKE_REGIONS` |
 | CLS  | `ClsRegionSelect` | `clsRegionGroups(...)` |
-| CDB  | 实例列表 bar | `CDB_REGIONS`(允许「全部地域」特殊项) |
+| CDB  | 实例列表 bar | `CDB_REGIONS`(不含「全部地域」,默认 ap-guangzhou) |
 | TCR  | `ImageToolView` | `TCR_REGIONS` |
 | DBbrain | 顶部筛选行 | `DBBRAIN_REGIONS` |
-| CVM / Lighthouse / Auto | `RegionSelect` | `TENCENT_REGIONS` 兼容「all」 |
+| CVM / Lighthouse / Auto | `RegionSelect` | `TENCENT_REGIONS`(默认广州,无「全部地域」) |
 
 ## 默认值
 
