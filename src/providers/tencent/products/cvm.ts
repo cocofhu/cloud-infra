@@ -213,9 +213,10 @@ export function createCvmModule(call: TencentProductCall = cvmCall, monitor: Ten
               range: monitorData.range,
               metrics: HOST_METRICS,
               series: monitorData.series,
-              note: monitorData.errors.length === HOST_METRICS.length
+              errors: monitorData.metricErrors,
+              note: monitorData.metricErrors.length === HOST_METRICS.length
                 ? '无法拉取监控数据，请检查 CAM 云监控权限'
-                : monitorData.errors.length ? `部分指标拉取失败（${monitorData.errors.length} 项）` : '',
+                : monitorData.metricErrors.length ? `部分指标拉取失败（${monitorData.metricErrors.length} 项）` : '',
             },
           },
         }

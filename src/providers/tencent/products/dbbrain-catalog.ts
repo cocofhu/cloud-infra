@@ -1,4 +1,5 @@
 import type { DetailTab } from '../../../core/types.js'
+import { DEFAULT_REGION, TENCENT_REGIONS, regionsFor } from '../regions-shared.js'
 
 /** Official DBbrain product lines shown in the chat card type filter. */
 export const DBBRAIN_PRODUCTS: DetailTab[] = [
@@ -13,39 +14,19 @@ export const DBBRAIN_PRODUCTS: DetailTab[] = [
 ]
 
 /**
- * Regions the card can filter by. Unknown instance Region ids still render as-is.
- * Includes finance / overseas ids from the official DBbrain region matrix.
+ * 卡片可共享「按 DBbrain 分组」过滤的地域列表。
+ * 已收敛到共享数据源（不再包含 `{ id: '', label: '全地域' }` 的占位项），默认选中 `ap-guangzhou`。
+ * 未改选的语义由调用层默认成 `DEFAULT_REGION`（`ap-guangzhou`），而不再是空串。
  */
-export const DBBRAIN_REGIONS: DetailTab[] = [
-  { id: '', label: '全地域' },
-  { id: 'ap-guangzhou', label: '广州' },
-  { id: 'ap-qingyuan', label: '清远' },
-  { id: 'ap-shenzhen', label: '深圳' },
-  { id: 'ap-shanghai', label: '上海' },
-  { id: 'ap-nanjing', label: '南京' },
-  { id: 'ap-hangzhou', label: '杭州' },
-  { id: 'ap-qingdao', label: '青岛' },
-  { id: 'ap-beijing', label: '北京' },
-  { id: 'ap-tianjin', label: '天津' },
-  { id: 'ap-chengdu', label: '成都' },
-  { id: 'ap-chongqing', label: '重庆' },
-  { id: 'ap-zhongwei', label: '中卫' },
-  { id: 'ap-hongkong', label: '香港' },
-  { id: 'ap-taipei', label: '台北' },
-  { id: 'ap-shanghai-fsi', label: '上海金融' },
-  { id: 'ap-shenzhen-fsi', label: '深圳金融' },
-  { id: 'ap-beijing-fsi', label: '北京金融' },
-  { id: 'ap-singapore', label: '新加坡' },
-  { id: 'ap-jakarta', label: '雅加达' },
-  { id: 'ap-bangkok', label: '曼谷' },
-  { id: 'ap-seoul', label: '首尔' },
-  { id: 'ap-tokyo', label: '东京' },
-  { id: 'na-siliconvalley', label: '硅谷' },
-  { id: 'na-ashburn', label: '弗吉尼亚' },
-  { id: 'sa-saopaulo', label: '圣保罗' },
-  { id: 'eu-frankfurt', label: '法兰克福' },
-]
+export const DBBRAIN_REGIONS: DetailTab[] = regionsFor('dbbrain')
+  .filter((region) => region.group !== '特殊')
+  .map((region) => ({ id: region.id, label: region.label }))
 
 export function catalogPairs(tabs: DetailTab[]): Array<[string, string]> {
   return tabs.map((tab) => [tab.id, tab.label])
 }
+
+/** DBbrain 卡片的地域默认选中（原「全地域」已移除） */
+export const DBBRAIN_DEFAULT_REGION = DEFAULT_REGION
+
+export { TENCENT_REGIONS }

@@ -97,17 +97,83 @@ export interface HostMetricDef {
   label: string
   unit: string
   color: string
+  /** 官方未在主机级(InstanceId 维度)暴露该指标时不发起请求,前端卡片显示此说明 */
+  unavailable?: string
+  /** 依赖实例内监控组件(barad_agent);为空序列时归因为 AGENT_MISSING */
+  requiresAgent?: boolean
 }
 
-/** CVM(QCE/CVM)主机级指标集 */
+/** 指标级失败根因分类 */
+export type MetricErrorType = 'AGENT_MISSING' | 'METRIC_NOT_FOUND' | 'API_ERROR'
+
+export interface MetricError {
+  key: string
+  metric: string
+  errorType: MetricErrorType
+  /** 已脱敏的可展示原因 */
+  message?: string
+  /** 上游错误码(TencentApiError.code),仅 API_ERROR 时存在 */
+  code?: string
+  /** 前端建议动作 */
+  suggestion?: string
+}
+
+export const METRIC_SUGGESTIONS: Record<MetricErrorType, string> = {
+  METRIC_NOT_FOUND: '云监控未提供该指标',
+  AGENT_MISSING: '请到轻量/CVM 控制台检查并安装或启动监控组件(barad_agent)后重试',
+  API_ERROR: '请检查 CAM 云监控权限或稍后重试',
+}
+
+/**
+ * 指标级根因分类。优先级与需求边界用例一致:
+ *  1) 空点 + 依赖 agent → AGENT_MISSING
+ *  2) 空点(或错误信息表明指标/维度不存在)→ METRIC_NOT_FOUND
+ *  3) 带上游 code → 命中上述 not-found 关键字时归 METRIC_NOT_FOUND,否则 API_ERROR
+ */
+export function classifyMetricError(input: {
+  error?: unknown
+  emptyPoints?: boolean
+  requiresAgent?: boolean
+  unavailable?: string
+}): { errorType: MetricErrorType; message?: string; code?: string } {
+  // 结构性不可用(官方未暴露)与「按官方要求未发请求」
+  if (input.unavailable) return { errorType: 'METRIC_NOT_FOUND', message: input.unavailable }
+  const err = input.error
+  const code = err && typeof err === 'object' && 'code' in err ? String((err as { code?: unknown }).code || '') : ''
+  const message = err ? publicErrorMessage(err) : ''
+  // 判定依据用上游原始信息(脱敏后可能塌缩为「云厂商请求失败」),展示信息用脱敏后的
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  const notFound = /InvalidParameterValue|ResourceNotFound|MetricNotExist|not exist|不存在/i.test(`${code} ${raw}`)
+  if (err) {
+    // 依赖 agent 的指标同时返回空/报错:优先按 agent 缺失归因(空点最常见就是组件未装)
+    if (input.emptyPoints && input.requiresAgent) return { errorType: 'AGENT_MISSING', message, code: code || undefined }
+    if (notFound) return { errorType: 'METRIC_NOT_FOUND', message, code: code || undefined }
+    if (code) return { errorType: 'API_ERROR', message, code }
+    if (input.emptyPoints && input.requiresAgent) return { errorType: 'AGENT_MISSING', message }
+    return { errorType: 'API_ERROR', message }
+  }
+  if (input.emptyPoints && input.requiresAgent) return { errorType: 'AGENT_MISSING' }
+  if (input.emptyPoints) return { errorType: 'METRIC_NOT_FOUND' }
+  return { errorType: 'API_ERROR' }
+}
+
+/**
+ * CVM(QCE/CVM)主机级指标集。
+ * 已按官方「云服务器监控指标」文档(https://cloud.tencent.com/document/product/248/6843)核对:
+ * InstanceId 维度下不存在主机级磁盘 IOPS 指标——相近的 VmDiskReadIops 为 vmUuid 维度、
+ * DiskReadTraffic/DiskWriteTraffic 为设备级 vm_uuid 维度,均无法按实例直接查询。
+ * 因此 diskRead/diskWrite 标记 unavailable,不发起 GetMonitorData,
+ * 前端按指标级说明展示「官方未提供主机级磁盘 IOPS」。
+ * MemUsage/CvmDiskUsage 依赖实例内监控组件(官方文档明示),标记 requiresAgent。
+ */
 export const HOST_METRICS: HostMetricDef[] = [
   { key: 'cpu', metricName: 'CpuUsage', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
-  { key: 'memory', metricName: 'MemUsage', label: '内存使用率', unit: '%', color: '#8a5cf6' },
-  { key: 'disk', metricName: 'CvmDiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c' },
+  { key: 'memory', metricName: 'MemUsage', label: '内存使用率', unit: '%', color: '#8a5cf6', requiresAgent: true },
+  { key: 'disk', metricName: 'CvmDiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c', requiresAgent: true },
   { key: 'lanIn', metricName: 'LanIntraffic', label: '内网入带宽', unit: 'Mbps', color: '#2fbf71' },
   { key: 'lanOut', metricName: 'LanOuttraffic', label: '内网出带宽', unit: 'Mbps', color: '#1f9d8f' },
-  { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e' },
-  { key: 'diskWrite', metricName: 'DiskWriteIops', label: '磁盘写 IOPS', unit: '次/s', color: '#d48806' },
+  { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e', unavailable: '官方未提供主机级磁盘读 IOPS 指标' },
+  { key: 'diskWrite', metricName: 'DiskWriteIops', label: '磁盘写 IOPS', unit: '次/s', color: '#d48806', unavailable: '官方未提供主机级磁盘写 IOPS 指标' },
   { key: 'pkgIn', metricName: 'LanInpkg', label: '内网入包量', unit: '个/s', color: '#6b7cff' },
   { key: 'pkgOut', metricName: 'LanOutpkg', label: '内网出包量', unit: '个/s', color: '#9a6bff' },
 ]
@@ -118,22 +184,25 @@ export const HOST_METRICS: HostMetricDef[] = [
  *  - CPU 使用率:CPUUsage(CVM 为 CpuUsage)
  *  - 内存使用率:MemoryUsage(CVM 为 MemUsage;需实例安装监控组件,未装时返回空序列)
  *  - 磁盘使用率:DiskUsage(CVM 为 CvmDiskUsage;Lighthouse 侧带 disk 维度,单 InstanceId 查询时云监控返回首块磁盘序列)
- * 带宽 / IOPS / 包量指标名与 CVM 相同,已按官方 QCE/LIGHTHOUSE 指标文档核对。
+ * 此前随 CVM 一并引入的 DiskReadIops/DiskWriteIops 经线上恒定 2 项失败确认在
+ * QCE/LIGHTHOUSE 下同样不存在(QCE/CVM 官方文档已确认无主机级 IOPS;此处同步移除),
+ * 标记 unavailable 不再请求,前端展示对应说明。
  */
 export const LIGHTHOUSE_METRICS: HostMetricDef[] = [
   { key: 'cpu', metricName: 'CPUUsage', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
-  { key: 'memory', metricName: 'MemoryUsage', label: '内存使用率', unit: '%', color: '#8a5cf6' },
-  { key: 'disk', metricName: 'DiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c' },
+  { key: 'memory', metricName: 'MemoryUsage', label: '内存使用率', unit: '%', color: '#8a5cf6', requiresAgent: true },
+  { key: 'disk', metricName: 'DiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c', requiresAgent: true },
   { key: 'lanIn', metricName: 'LanIntraffic', label: '内网入带宽', unit: 'Mbps', color: '#2fbf71' },
   { key: 'lanOut', metricName: 'LanOuttraffic', label: '内网出带宽', unit: 'Mbps', color: '#1f9d8f' },
-  { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e' },
-  { key: 'diskWrite', metricName: 'DiskWriteIops', label: '磁盘写 IOPS', unit: '次/s', color: '#d48806' },
+  { key: 'diskRead', metricName: 'DiskReadIops', label: '磁盘读 IOPS', unit: '次/s', color: '#e5646e', unavailable: '官方未提供主机级磁盘读 IOPS 指标' },
+  { key: 'diskWrite', metricName: 'DiskWriteIops', label: '磁盘写 IOPS', unit: '次/s', color: '#d48806', unavailable: '官方未提供主机级磁盘写 IOPS 指标' },
   { key: 'pkgIn', metricName: 'LanInpkg', label: '内网入包量', unit: '个/s', color: '#6b7cff' },
   { key: 'pkgOut', metricName: 'LanOutpkg', label: '内网出包量', unit: '个/s', color: '#9a6bff' },
 ]
 
 /**
  * 并发拉取一组指标；单指标失败只记空序列，不拖垮其他图。
+ * 每项失败按 classifyMetricError 归入 MetricError[];errors(string[])保留兼容旧契约。
  */
 export async function fetchMonitorSeries(
   monitor: MonitorApi,
@@ -147,21 +216,61 @@ export async function fetchMonitorSeries(
     opts: TencentCallContext
     nowMs?: number
   },
-): Promise<{ range: MonitorRange; series: MetricSeries[]; errors: string[] }> {
+): Promise<{ range: MonitorRange; series: MetricSeries[]; errors: string[]; metricErrors: MetricError[] }> {
   const range = normalizeMonitorRange(input.range)
   const results = await Promise.all(input.metrics.map(async (metric) => {
+    if (metric.unavailable) {
+      const err = classifyMetricError({ unavailable: metric.unavailable })
+      return {
+        key: metric.key,
+        metric: metric.metricName,
+        timestamps: [] as number[],
+        values: [] as Array<number | null>,
+        error: { key: metric.key, metric: metric.metricName, ...err, suggestion: METRIC_SUGGESTIONS.METRIC_NOT_FOUND } as MetricError,
+      }
+    }
     try {
       const row = await fetchMetricSeries(monitor, { ...input, metric: metric.metricName, range })
+      // 依赖 agent 的指标返回空序列且无错误码:归因为 AGENT_MISSING,让用户获得可操作的引导
+      if (metric.requiresAgent && !row.timestamps.length) {
+        const cls = classifyMetricError({ emptyPoints: true, requiresAgent: true })
+        return {
+          ...row,
+          key: metric.key,
+          error: {
+            key: metric.key,
+            metric: metric.metricName,
+            ...cls,
+            suggestion: METRIC_SUGGESTIONS[cls.errorType],
+          } as MetricError,
+        }
+      }
       // 同步回填 MetricDef.key,前端 seriesMap 统一以 key 为键(避免 metricName 与 key 错位)
       return { ...row, key: metric.key }
     } catch (err) {
-      return { key: metric.key, metric: metric.metricName, timestamps: [] as number[], values: [] as Array<number | null>, error: publicErrorMessage(err) }
+      const cls = classifyMetricError({ error: err, requiresAgent: metric.requiresAgent })
+      return {
+        key: metric.key,
+        metric: metric.metricName,
+        timestamps: [] as number[],
+        values: [] as Array<number | null>,
+        error: {
+          key: metric.key,
+          metric: metric.metricName,
+          ...cls,
+          suggestion: METRIC_SUGGESTIONS[cls.errorType],
+        } as MetricError,
+      }
     }
   }))
+  const metricErrors = results
+    .map((row) => ('error' in row ? row.error : undefined))
+    .filter((row): row is MetricError => !!row)
   return {
     range,
     series: results.map((row) => ({ key: row.key, metric: row.metric, timestamps: row.timestamps, values: row.values })),
-    errors: results.map((row) => ('error' in row ? String(row.error) : '')).filter(Boolean),
+    errors: metricErrors.map((row) => row.message || row.errorType),
+    metricErrors,
   }
 }
 
