@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>RegionPicker 原生搜索装饰自检(本地 harness)</title>
+<style>
+  /* 模拟宿主 dsh 的设计 token(--dsw-alias-*),亮/暗主题用 data-theme 切换 */
+  :root,[data-theme="light"]{
+    --dsw-alias-label-primary:#1f2329;
+    --dsw-alias-label-secondary:#3c4250;
+    --dsw-alias-label-tertiary:#646a78;
+    --dsw-alias-label-caption:#8a8f9b;
+    --dsw-alias-bg-layer-1:#ffffff;
+    --dsw-alias-bg-layer-2:#f5f6f7;
+    --dsw-alias-bg-layer-3:#eceff2;
+    --dsw-alias-border-l1:#e4e6ea;
+    --dsw-alias-border-l2:#d2d6dc;
+    --dsw-alias-brand-primary:#356ef3;
+    --dsw-alias-button-primary-fill:#356ef3;
+    --dsw-alias-label-primary-foreground:#ffffff;
+    --dsw-alias-state-success-primary:#18a058;
+    --dsw-alias-state-success-tertiary:#e7f6ee;
+    --dsw-alias-state-warn-label:#d48806;
+    --dsw-alias-state-warn-tertiary:#fdf3e1;
+    --dsw-alias-state-error-primary:#d54941;
+    --dsw-alias-shadow:0 2px 8px rgba(0,0,0,.08);
+    --dsw-alias-interactive-bg-hover:rgba(31,35,41,.06);
+    background:#f0f1f3;
+  }
+  [data-theme="dark"]{
+    --dsw-alias-label-primary:#e8e9eb;
+    --dsw-alias-label-secondary:#c3c6cc;
+    --dsw-alias-label-tertiary:#9ba0a9;
+    --dsw-alias-label-caption:#747880;
+    --dsw-alias-bg-layer-1:#24262b;
+    --dsw-alias-bg-layer-2:#33353b;
+    --dsw-alias-bg-layer-3:#3e4047;
+    --dsw-alias-border-l1:#3d3f46;
+    --dsw-alias-border-l2:#494b52;
+    --dsw-alias-brand-primary:#5d8bff;
+    --dsw-alias-button-primary-fill:#356ef3;
+    --dsw-alias-label-primary-foreground:#ffffff;
+    --dsw-alias-state-success-primary:#3ccf85;
+    --dsw-alias-state-success-tertiary:#1d3a2c;
+    --dsw-alias-state-warn-label:#e6a23c;
+    --dsw-alias-state-warn-tertiary:#3d3119;
+    --dsw-alias-state-error-primary:#e06e67;
+    --dsw-alias-shadow:0 2px 8px rgba(0,0,0,.4);
+    --dsw-alias-interactive-bg-hover:rgba(255,255,255,.08);
+    background:#1a1b1f;
+  }
+  body{margin:0;padding:24px;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;}
+  .host-card{max-width:860px;margin:0 auto;}
+</style>
+</head>
+<body data-theme="light">
+<div class="host-card" id="root"></div>
+<script>
+  // 最小 __ModuleLoader__ 实现:client.js 会向这里注册工厂
+  window.__capturedFactory = null;
+  window.__ModuleLoader__ = {
+    load(def) { if (def && typeof def.factory === "function") window.__capturedFactory = def.factory; },
+  };
+</script>
+<script src="./react.production.min.js"></script>
+<script src="./react-dom.production.min.js"></script>
+<script src="./client.js"></script>
+<script>
+  // 驱动:用捕获的工厂实例化插件,渲染 SearchToolView(CVM kind,带演示地域)
+  const requireShim = (name) => {
+    if (name === "react") return window.React;
+    if (name === "react-dom") return window.ReactDOM;
+    throw new Error("unknown module " + name);
+  };
+  const mod = window.__capturedFactory(requireShim);
+  window.__pluginMod = mod;
+
+  window.__mount = function (theme) {
+    document.body.setAttribute("data-theme", theme);
+    const payload = {
+      kind: "cvm",
+      resourceKind: "cvm",
+      regions: ["华南地区（广州）", "华东地区（上海）", "华北地区（北京）", "西南地区（成都）"],
+      items: [{ id: "ins-demo1", name: "demo-cvm-1", state: "运行中", region: "华南地区（广州）", moduleId: "cvm" }],
+      total: 1,
+    };
+    const props = {
+      block: {
+        kind: "tool.call.result",
+        call: { argsRaw: JSON.stringify({ kind: "cvm", query: "" }) },
+        result: payload,
+      },
+    };
+    const rootEl = document.getElementById("root");
+    if (!window.__reactRoot) window.__reactRoot = window.ReactDOM.createRoot(rootEl);
+    window.__reactRoot.render(window.React.createElement(mod.SearchToolView, props));
+    return true;
+  };
+</script>
+</body>
+</html>
