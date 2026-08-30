@@ -106,14 +106,30 @@ window.__ModuleLoader__.load({
 .ci-monitor-range:hover{color:var(--dsw-alias-label-primary)}
 .ci-monitor-range.active{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}
 .ci-monitor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
-.ci-monitor-chart{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:10px 12px 6px;min-width:0;box-sizing:border-box}
-.ci-monitor-chart-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px;min-width:0}
-.ci-monitor-chart-t{font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ci-monitor-chart-v{font-size:13px;font-weight:650;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ci-monitor-chart{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:12px 14px 8px;min-width:0;box-sizing:border-box}
+.ci-monitor-chart-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;min-width:0}
+.ci-monitor-chart-t{font-size:13px;font-weight:500;color:var(--dsw-alias-label-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-monitor-chart-v{font-size:18px;font-weight:650;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums;white-space:nowrap}
 .ci-monitor-chart-v i{font-style:normal;font-size:11px;font-weight:400;color:var(--dsw-alias-label-tertiary);margin-left:2px}
-.ci-monitor-chart-box{width:100%;height:180px;min-width:0}
-.ci-monitor-empty{display:flex;align-items:center;justify-content:center;height:180px;color:var(--dsw-alias-label-caption);font-size:12px;text-align:center;padding:0 12px;box-sizing:border-box}
+.ci-monitor-chart-box{width:100%;height:140px;min-width:0}
+.ci-monitor-empty{display:flex;align-items:center;justify-content:center;height:140px;color:var(--dsw-alias-label-caption);font-size:12px;text-align:center;padding:0 12px;box-sizing:border-box}
 .ci-monitor-note{padding:16px 4px;text-align:center;color:var(--dsw-alias-label-caption);font-size:13px}
+/* 右上角时间范围分段控件（腾讯云控制台风格） */
+.ci-monitor-ranges.ci-seg{display:inline-flex;gap:2px;padding:2px;border:0;border-radius:6px;background:var(--dsw-alias-bg-layer-3)}
+.ci-monitor-ranges.ci-seg .ci-monitor-range{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;line-height:22px;height:24px;padding:0 12px;border-radius:5px;cursor:pointer}
+.ci-monitor-ranges.ci-seg .ci-monitor-range:hover{color:var(--dsw-alias-label-primary)}
+.ci-monitor-ranges.ci-seg .ci-monitor-range.active{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-brand-primary);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+/* 顶部指标卡 */
+.ci-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.ci-stat{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:12px 14px;min-width:0;box-sizing:border-box}
+.ci-stat-t{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-tertiary);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-stat-dot{width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-state-success-primary);flex:none}
+.ci-stat-dot.warn{background:var(--dsw-alias-state-warning-primary,#ff7d00)}
+.ci-stat-dot.bad{background:var(--dsw-alias-state-error-primary,#f53f3f)}
+.ci-stat-v{font-size:22px;font-weight:650;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums;margin:4px 0 0;line-height:1.3}
+.ci-stat-v small{font-size:12px;font-weight:400;color:var(--dsw-alias-label-tertiary);margin-left:2px}
+.ci-stat-s{font-size:12px;color:var(--dsw-alias-label-tertiary);margin-top:2px}
+@media (max-width:640px){.ci-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .ci-monitor-errs{display:flex;flex-direction:column;gap:6px;margin:8px 0 12px}
 .ci-monitor-err{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-1);font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.5}
 .ci-monitor-err b{color:var(--dsw-alias-label-primary);font-weight:600;white-space:nowrap}
@@ -214,11 +230,12 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-f b{display:block;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:550;margin-top:2px}
 .ci-sec-t{font-size:13px;font-weight:650;padding:12px 16px 4px}
 .ci-power{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
-.ci-tabs{display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--dsw-alias-border-l1);padding:0 10px;overflow-x:auto;background:var(--dsw-alias-bg-layer-1)}
-.ci-tab{border:0;background:none;padding:10px 14px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-secondary);border-bottom:2px solid transparent;white-space:nowrap;flex:none}
-.ci-tab:hover{color:var(--dsw-alias-brand-primary)}
-.ci-tab.on{color:var(--dsw-alias-brand-primary);border-bottom-color:var(--dsw-alias-brand-primary);font-weight:650}
-.ci-tab.active{color:var(--dsw-alias-brand-primary);border-bottom-color:var(--dsw-alias-brand-primary);font-weight:650}
+/* 卡片式分段 Tab（腾讯云控制台风格）：白底描边圆角，选中浅蓝填充 + 蓝色描边 */
+.ci-tabs{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--dsw-alias-border-l1);padding:10px 14px;overflow-x:auto;background:var(--dsw-alias-bg-layer-2)}
+.ci-tab{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:6px;padding:6px 14px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-secondary);white-space:nowrap;flex:none}
+.ci-tab:hover{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}
+.ci-tab.on{color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 10%,transparent);border-color:var(--dsw-alias-brand-primary);font-weight:600;box-shadow:inset 0 0 0 1px var(--dsw-alias-brand-primary)}
+.ci-tab.active{color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 10%,transparent);border-color:var(--dsw-alias-brand-primary);font-weight:600;box-shadow:inset 0 0 0 1px var(--dsw-alias-brand-primary)}
 .ci-agree{display:flex;align-items:flex-start;gap:8px;margin:8px 0 0;font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary)}
 .ci-agree a{color:var(--dsw-alias-brand-primary)}
 .ci-switch{display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-brand-primary)}
@@ -595,7 +612,15 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
               connectNulls: true,
               lineStyle: { width: 1.6, color },
               itemStyle: { color },
-              areaStyle: { opacity: 0.08, color },
+              // 渐变面积填充（腾讯云控制台风格）：顶部 0.25 → 底部 0 透明
+              areaStyle: (lib && lib.graphic && lib.graphic.LinearGradient)
+                ? {
+                  color: new lib.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color, opacity: 0.25 },
+                    { offset: 1, color, opacity: 0 },
+                  ]),
+                }
+                : { opacity: 0.12, color },
               data: points,
             }],
           }, { notMerge: true });
@@ -651,6 +676,64 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       return map;
     }
 
+    // —— 指标卡统计（重设计：顶部指标卡，数值复用已有实例与监控序列）——
+    function seriesValues(series) {
+      return (series && Array.isArray(series.values) ? series.values : [])
+        .map(Number)
+        .filter((v) => Number.isFinite(v));
+    }
+    function seriesMean(series) {
+      const vs = seriesValues(series);
+      if (!vs.length) return null;
+      return vs.reduce((a, b) => a + b, 0) / vs.length;
+    }
+    function seriesPeak(series) {
+      const vs = seriesValues(series);
+      if (!vs.length) return null;
+      return Math.max(...vs);
+    }
+    function seriesLatest(series) {
+      const vs = seriesValues(series);
+      return vs.length ? vs[vs.length - 1] : null;
+    }
+    function fmtStat(v, unit) {
+      return v == null ? "-" : fmtMonitorValue(v, unit || "");
+    }
+
+    // 从指标序列推断告警数：超过阈值的点数量（基于指标单位/常见阈值）。
+    function alertCount(metrics, map) {
+      let n = 0;
+      for (const m of Array.isArray(metrics) ? metrics : []) {
+        const vs = seriesValues(map[m.key]);
+        if (!vs.length) continue;
+        const unit = String(m.unit || "");
+        // 仅对百分比类（CPU/内存/磁盘利用率）以 90% 作为告警阈值
+        if (/%/.test(unit) || /usage|util|cpu|mem|disk/i.test(String(m.key || "") + String(m.label || ""))) {
+          n += vs.filter((v) => v >= 90).length;
+        }
+      }
+      return n;
+    }
+
+    function StatCard({ dot, title, value, unit, sub }) {
+      return h("div", { className: "ci-stat" },
+        h("div", { className: "ci-stat-t" }, h("span", { className: "ci-stat-dot" + (dot ? " " + dot : "") }), title),
+        h("div", { className: "ci-stat-v" }, value, unit ? h("small", null, unit) : null),
+        sub != null && sub !== "" ? h("div", { className: "ci-stat-s" }, sub) : null,
+      );
+    }
+
+    // 兼容传入：instances 数组，或带 instances/detail 的 session 对象。
+    function sessionInstances(session, instances) {
+      if (Array.isArray(instances)) return instances;
+      const s = session && typeof session === "object" ? session : null;
+      if (!s) return [];
+      if (Array.isArray(s.instances)) return s.instances;
+      if (s.detail && Array.isArray(s.detail.instances)) return s.detail.instances;
+      if (Array.isArray(s.items)) return s.items;
+      return [];
+    }
+
     // 指标级根因分类的中文标签,与后端 MetricErrorType 对齐
     const METRIC_ERROR_TYPE_LABEL = {
       AGENT_MISSING: "监控组件未安装",
@@ -658,10 +741,11 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
       API_ERROR: "接口错误",
     };
 
-    function MonitorPanel({ metrics, seriesMap, range, onRangeChange, note, errors }) {
+    function MonitorPanel({ metrics, seriesMap, range, onRangeChange, note, session, instances, errors }) {
       const cur = MONITOR_RANGES.some((row) => row.id === range) ? range : "1h";
       const list = Array.isArray(metrics) ? metrics : [];
       const map = seriesMap && typeof seriesMap === "object" ? seriesMap : {};
+      const rows = sessionInstances(session, instances);
       // 指标级失败列表:优先使用后端结构化 errors(含 errorType/suggestion),兼容缺省
       const errList = Array.isArray(errors) ? errors.filter((row) => row && row.key) : [];
       const errByKey = {};
@@ -670,6 +754,24 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         const s = map[m.key];
         return !s || !Array.isArray(s.timestamps) || !s.timestamps.length;
       });
+      // 顶部指标卡统计（数值来自真实实例列表与监控序列）
+      const cpuM = list.find((m) => /cpu|processor/i.test(String(m.key || "") + String(m.label || "") + String(m.metricName || "")));
+      const memM = list.find((m) => /mem|memory/i.test(String(m.key || "") + String(m.label || "") + String(m.metricName || "")));
+      const runningCount = rows.filter((it) => {
+        const s = String((it && (it.status || it.state || it.stateLabel)) || "").toLowerCase();
+        return /run|running|正常|在线/.test(s);
+      }).length;
+      const cpuMean = cpuM ? seriesMean(map[cpuM.key]) : null;
+      const memMean = memM ? seriesMean(map[memM.key]) : null;
+      const cpuPeak = cpuM ? seriesPeak(map[cpuM.key]) : null;
+      const memPeak = memM ? seriesPeak(map[memM.key]) : null;
+      const alerts = alertCount(list, map);
+      const stats = [
+        { dot: "", title: "运行实例", value: String(rows.length), unit: "", sub: runningCount ? `运行中 ${runningCount}` : "" },
+        { dot: cpuMean != null && cpuMean >= 80 ? "warn" : "", title: "CPU 平均利用率", value: fmtStat(cpuMean), unit: cpuMean != null ? "%" : "", sub: cpuPeak != null ? `峰值 ${fmtStat(cpuPeak)}%` : "" },
+        { dot: "", title: "内存平均利用率", value: fmtStat(memMean), unit: memMean != null ? "%" : "", sub: memPeak != null ? `峰值 ${fmtStat(memPeak)}%` : "" },
+        { dot: alerts ? "bad" : "", title: "告警", value: String(alerts), unit: "", sub: alerts ? "超过阈值" : "无异常" },
+      ];
       // 指标级卡内占位文案:官方未提供 / 监控组件缺失 等,替代笼统的「暂无监控数据」
       const perChartNote = (m) => {
         if (m && m.unavailable) return m.unavailable;
@@ -681,9 +783,10 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
         return "";
       };
       return h("div", { className: "ci-monitor" },
+        // 头部：仅标题 + 右上角时间范围分段控件（无描述文案）
         h("div", { className: "ci-monitor-bar" },
           h("span", { className: "ci-monitor-title" }, "实例监控"),
-          h("span", { className: "ci-monitor-ranges" }, MONITOR_RANGES.map((row) =>
+          h("span", { className: "ci-monitor-ranges ci-seg" }, MONITOR_RANGES.map((row) =>
             h("button", {
               key: row.id,
               type: "button",
@@ -693,6 +796,8 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
           )),
         ),
         note ? h("div", { className: "ci-monitor-note" }, note) : null,
+        // 顶部指标卡
+        !note ? h("div", { className: "ci-stats" }, stats.map((s) => h(StatCard, { key: s.title, ...s }))) : null,
         errList.length ? h("div", { className: "ci-monitor-errs" }, errList.map((row) =>
           h("div", { key: String(row.key), className: "ci-monitor-err" },
             h("span", { className: "ci-monitor-err-tag" }, METRIC_ERROR_TYPE_LABEL[row.errorType] || row.errorType || "错误"),
@@ -3283,6 +3388,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             seriesMap,
             range: tabData.range || "1h",
             note: tabData.note || (extra.tabError && !tabData.series ? "无法拉取监控数据，请检查 CAM 云监控权限" : ""),
+            instances: [item],
             errors: Array.isArray(tabData.errors) ? tabData.errors : [],
             onRangeChange: (range) => onReload("实例监控", { range }),
           });
@@ -3916,6 +4022,7 @@ html[data-theme=dark] .ci-ic h3{color:#f7f8fb;-webkit-text-fill-color:#f7f8fb}
             seriesMap,
             range: tabData.range || "1h",
             note: tabData.note || "",
+            instances: [card],
             errors: Array.isArray(tabData.errors) ? tabData.errors : [],
             onRangeChange: (range) => onReload("实例监控", { range }),
           });
