@@ -263,10 +263,17 @@ function collectRegions(
   }
 }
 
+/**
+ * kind=auto 的语义与对话卡一致：服务器（云服务器 | 轻量应用服务器 双 Tab），
+ * 而不是「扫描所有已启用模块」——后者会把 tke/cdb/cos 等一并拉起，
+ * 其中 tke 在无显式地域时抛「缺少地域」，错误又被展示在服务器卡上（地域已选广州仍报错）。
+ */
+const AUTO_KINDS = ['cvm', 'lighthouse']
+
 function selectModules(kind: string, provider: string, config: PluginConfig, source: Registry): ResourceModule[] {
-  const wantedKind = kind === 'auto' || !kind ? '' : kind
+  const wantedKinds = kind === 'auto' ? AUTO_KINDS : kind ? [kind] : []
   return source.listModules().filter((module) => {
-    if (wantedKind && module.kind !== wantedKind) return false
+    if (wantedKinds.length && !wantedKinds.includes(module.kind)) return false
     if (provider && module.provider !== provider) return false
     if (!isProviderEnabled(module.provider, config, source.getProvider(module.provider))) return false
     if (config.modules[module.id] === false) return false

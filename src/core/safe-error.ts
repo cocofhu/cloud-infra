@@ -29,6 +29,8 @@ const SAFE_SNIPPETS = [
 
 const CODE_HINTS: Record<string, string> = {
   AuthFailure: '云厂商鉴权失败，请检查设置中的密钥',
+  // AuthFailure.* 里唯一「密钥没错、只是没授权」的分支:落到 AuthFailure 会误导用户去翻密钥
+  'AuthFailure.UnauthorizedOperation': '当前密钥没有该操作的权限',
   UnauthorizedOperation: '当前密钥没有该操作的权限',
   FailedOperation: '云厂商操作失败',
   'FailedOperation.RegisterDomainFailed': '注册失败，请核对账户余额与域名是否仍可注册',
@@ -97,6 +99,9 @@ export function publicErrorMessage(err: unknown): string {
   const code = errorCode(err)
   if (PASSTHROUGH.has(message)) return message
   if (SECRET_RE.test(message)) return hintForCode(code)
+  // 带厂商错误码即视为上游原文。云 API 已按 zh-CN 返回中文 Message,单看文案无法与本地
+  // 提示区分(「缺少参数」等词也会命中 SAFE_SNIPPETS),因此有码时一律用我们自己的文案。
+  if (code) return hintForCode(code)
   if (looksSafeLocal(message)) return message
   if (/timeout/i.test(message)) return '云厂商请求超时'
   if (/^HTTP \d+/.test(message)) return '云厂商请求失败'
@@ -109,6 +114,6 @@ export function actionErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? '')
   const message = raw.replace(/\s+/g, ' ').trim()
   if (!message) return '云厂商请求失败'
-  if (looksSafeBusinessCopy(message)) return message
+  if (!errorCode(err) && looksSafeBusinessCopy(message)) return message
   return publicErrorMessage(err)
 }

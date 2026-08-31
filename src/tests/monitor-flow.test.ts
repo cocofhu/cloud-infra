@@ -191,10 +191,15 @@ test('contract: CVM 与 LIGHTHOUSE 指标表命名空间正确 (v3 回归)', () 
   assert.equal(HOST_METRICS.find((m) => m.key === 'disk')?.metricName, 'CvmDiskUsage')
   assert.equal(HOST_METRICS.find((m) => m.key === 'cpu')?.metricName, 'CpuUsage')
   assert.equal(HOST_METRICS.find((m) => m.key === 'memory')?.metricName, 'MemUsage')
-  // LIGHTHOUSE:磁盘使用率为 DiskUsage、CPU 为 CPUUsage、内存为 MemoryUsage
+  // LIGHTHOUSE(官方 248/60127):磁盘为 DiskUsage、CPU 为 CpuUsage、内存为 MemUsage
+  // 该命名空间没有 CPUUsage / MemoryUsage,写错会被云监控判为 InvalidParameterValue
   assert.equal(LIGHTHOUSE_METRICS.find((m) => m.key === 'disk')?.metricName, 'DiskUsage')
-  assert.equal(LIGHTHOUSE_METRICS.find((m) => m.key === 'cpu')?.metricName, 'CPUUsage')
-  assert.equal(LIGHTHOUSE_METRICS.find((m) => m.key === 'memory')?.metricName, 'MemoryUsage')
+  assert.equal(LIGHTHOUSE_METRICS.find((m) => m.key === 'cpu')?.metricName, 'CpuUsage')
+  assert.equal(LIGHTHOUSE_METRICS.find((m) => m.key === 'memory')?.metricName, 'MemUsage')
+  assert.ok(
+    !LIGHTHOUSE_METRICS.some((m) => m.metricName === 'MemoryUsage' || m.metricName === 'CPUUsage'),
+    'Lighthouse 指标表不得使用 QCE/LIGHTHOUSE 不存在的 MemoryUsage / CPUUsage',
+  )
   assert.ok(
     LIGHTHOUSE_METRICS.every((m) => !m.metricName.startsWith('Cvm')),
     'Lighthouse 指标表不得出现 Cvm* 前缀指标名',

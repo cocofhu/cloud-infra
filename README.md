@@ -6,12 +6,14 @@ DeepSeek Harness 腾讯云资源插件。在对话中查询腾讯云上的域名
 
 ## 功能
 
+- 每张卡片右上角可 **窗口化 / 全屏** 打开（拖标题栏移动、右下角缩放、双击标题栏切全屏、Esc 收回）。对话卡片只有几百像素宽，宽表和监控图在里面永远要横向滚
 - 对话里查询域名解析，按控制台列表展示状态、套餐、记录数，可翻页
 - 点击域名或「解析」配置解析记录：添加、修改、启停、删除（删除始终确认）
 - 对话里查询 DBbrain：卡片顶栏选数据库类型与地域（默认全地域），点「诊断优化」在同一张卡片里看诊断。页多时按诊断/性能/会话/空间/治理分组，切换时显示加载中
 - 列表请求公共 Region 按官方用广州；实例级诊断用该行实例自己的地域。缺地域会明文拒绝，不会暗默广州
 - 对话里查询证书（`kind=cert`）：复刻「我的证书」表，点击证书 ID / 绑定域名看完整分块详情
 - 顶栏申请免费证书、上传证书；行内部署（勾选匹配实例）、下载、更多（吊销/重颁发/删除）
+- 下载先走 `DownloadCertificate` 直取 zip；密钥只有 `ssl:DescribeDownloadCertificateUrl` 时自动退到临时链接，两个权限有其一就能下
 - 对话里查询 COS：地域补全默认为广州（ap-guangzhou），仍可输入中文名 / ID 改选其它官方地域，再列该地域存储桶；点名称进入当前目录文件列表，用面包屑下钻（对齐控制台列表视图，不是 IDE 展开树）
 - COS 可在对话卡创建/删除空桶、上传≤20MB 文件、创建文件夹、查看详情、下载、重命名、删除与复制 15 分钟临时链接
 - 对话工具卡内查询可注册性、立即加购并走完余额支付（不改设置）
@@ -52,7 +54,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 ## 使用
 
-打开 **设置 → 插件 → 插件配置 → 云资源**，填写腾讯云 SecretId / SecretKey。CAM 需包含对应产品的读权限；改记录、开关机、管库或 Kill 还需写权限。不要在设置里填地域。域名注册还需域名注册读写（查询、下单、我的域名、自动续费与两锁）。COS 需对象存储对应权限。插件不新增设置项，复用同一套 AKSK。设置卡字段与布局保持原样：不增加默认地域或 COS 专用配置。设置页不填写地域或库账号。已有腾讯云凭证即可用证书，不必再改设置。
+打开 **设置 → 插件 → 插件配置 → Cloud Infra**，填写腾讯云 SecretId / SecretKey。CAM 需包含对应产品的读权限；改记录、开关机、管库或 Kill 还需写权限。不要在设置里填地域。域名注册还需域名注册读写（查询、下单、我的域名、自动续费与两锁）。COS 需对象存储对应权限。插件不新增设置项，复用同一套 AKSK。设置卡字段与布局保持原样：不增加默认地域或 COS 专用配置。设置页不填写地域或库账号。已有腾讯云凭证即可用证书，不必再改设置。
 
 - 域名 / DNS：`QcloudDNSPodReadOnlyAccess`（或等价读权限）；改记录再加写权限
 - SSL 证书：SSL 读权限；申请 / 上传 / 部署 / 吊销还需写权限
@@ -106,7 +108,7 @@ dsh plugin --profile web add /absolute/path/to/cloud-infra
 
 > 还有吗
 
-插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cert`、`cos`、`cluster`、`cdb`、`lighthouse`、`cvm`、`registrar`、`my-domain`、`cls`、`dbbrain`、`image`、`auto`。DBbrain：`kind=dbbrain`，点击实例名 / 告警 /「诊断优化」进入异常诊断；有健康报告页的产品线可点健康分进入健康报告，Redis / MongoDB 没有该页则不跳转。Kill 会话仅 MySQL / TDSQL-C 支持按会话 ID 两阶段 `Prepare(Threads)` → `Commit(SqlExecId)`。MariaDB / TDSQL / 自建 MySQL 不展示行上 Kill。MongoDB 在卡片内「创建中断任务」（`Duration` 必填，`Time`/`Host`/`Type` 可选），不按 sessionId 杀，可能同时中断多条会话。生成健康报告不发送邮件（`SendMailFlag=0`）。列表接口公共 Region 固定广州；点进某实例后按该实例 Region 请求。镜像查询使用 `kind=image`，结果以对话卡片出现：请先选地域，再点实例卡片进入仓库与版本管理。查 CLS 时传 `kind=cls`；检索日志时再传 `topicId` 或主题名、`queryString`（CQL）、`range`（`15m` / `1h` / `4h` / `1d` / `today` / `yesterday`，默认 `1h`）。**查证书必须传 `kind=cert`**。用户说「查 COS」时必须调用 `kind=cos` **且可以不带 region**，对话卡默认选中广州（`ap-guangzhou`）并列出该地域存储桶，顶部 `#ci-cos-region` 仍可输入补全改选。清空后回到「请输入并选择地域」。禁止把中文名或自由文本当 region，也禁止用 Ask question 代替卡内补全。未配置腾讯云密钥时卡片置顶提示去 **设置 → 插件 → 云资源**，不会把鉴权失败画成「该地域下没有存储桶」。查 TKE 用 `kind=cluster` 并传入运行时 `region`（如 `ap-guangzhou`）。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。查询、切地域、写操作都不会改 `cloud-infra.json`。
+插件向 Agent 提供 `cloud_infra_query`。`kind` 可取 `domain`（缺省）、`cert`、`cos`、`cluster`、`cdb`、`lighthouse`、`cvm`、`registrar`、`my-domain`、`cls`、`dbbrain`、`image`、`auto`。DBbrain：`kind=dbbrain`，点击实例名 / 告警 /「诊断优化」进入异常诊断；有健康报告页的产品线可点健康分进入健康报告，Redis / MongoDB 没有该页则不跳转。Kill 会话仅 MySQL / TDSQL-C 支持按会话 ID 两阶段 `Prepare(Threads)` → `Commit(SqlExecId)`。MariaDB / TDSQL / 自建 MySQL 不展示行上 Kill。MongoDB 在卡片内「创建中断任务」（`Duration` 必填，`Time`/`Host`/`Type` 可选），不按 sessionId 杀，可能同时中断多条会话。生成健康报告不发送邮件（`SendMailFlag=0`）。列表接口公共 Region 固定广州；点进某实例后按该实例 Region 请求。镜像查询使用 `kind=image`，结果以对话卡片出现：请先选地域，再点实例卡片进入仓库与版本管理。查 CLS 时传 `kind=cls`；检索日志时再传 `topicId` 或主题名、`queryString`（CQL）、`range`（`15m` / `1h` / `4h` / `1d` / `today` / `yesterday`，默认 `1h`）。**查证书必须传 `kind=cert`**。用户说「查 COS」时必须调用 `kind=cos` **且可以不带 region**，对话卡默认选中广州（`ap-guangzhou`）并列出该地域存储桶，顶部 `#ci-cos-region` 仍可输入补全改选。清空后回到「请输入并选择地域」。禁止把中文名或自由文本当 region，也禁止用 Ask question 代替卡内补全。未配置腾讯云密钥时卡片置顶提示去 **设置 → 插件 → Cloud Infra**，不会把鉴权失败画成「该地域下没有存储桶」。查 TKE 用 `kind=cluster` 并传入运行时 `region`（如 `ap-guangzhou`）。查服务器时应使用 `cvm` / `lighthouse` / `auto`，不要只用 `domain`。查询、切地域、写操作都不会改 `cloud-infra.json`。
 
 COS 对话卡对齐控制台两页：顶部地域补全默认广州，仍可用中文名 / GZ / `ap-guangzhou` 改选（含硅谷、法兰克福、金融区等官方枚举）→ 存储桶列表（名称 / 地域 / 创建时间 / 访问权限只读，桶名搜索 300ms 防抖）→ 点名称进入文件列表（当前层短名 + 面包屑下钻）。一层对象过多时用「上一页 / 下一页」按 `nextMarker` 翻页，搜索仅过滤当前页。访问权限、CORS、生命周期等桶设置不在对话卡内改。地域选择与上传/删除等操作只留在对话卡内存，不写插件设置。重命名走官方 `x-cos-copy-source`（`<桶>.cos.<地域>.myqcloud.com/<编码后的 Key>`）；删文件夹使用批量删除，失败会提示已删/剩余数量。
 
@@ -125,9 +127,9 @@ COS 对话卡对齐控制台两页：顶部地域补全默认广州，仍可用�
 
 注册和我的域名都出现在 **对话弹出的工具卡** 上，搜索框在卡顶栏，不是独立页，也不进设置。
 
-1. 对 Agent 说「查一下 example 能不能注册」，弹出 **域名注册** 卡。可在卡顶搜索框改关键字再查（完整域名单行；素名会查 `.com / .cn / .net / .xyz / .top`）。
+1. 对 Agent 说「查一下 example 能不能注册」，弹出 **域名注册** 卡。可在卡顶搜索框改关键字再查：素名查 `.com / .cn / .net / .xyz / .top`；给完整域名时精确匹配排第一，同名的其它热门后缀列在 **其他后缀** 分段下（一次查询只回一行的话，想看 `.cn` 还得自己改后缀再查一遍）。
 2. 可买显示 **立即加购**，不可买显示 **已被注册**，溢价词不可加购。
-3. 加购后打开 **购物车**，可加减多个可买后缀，再点 **立即购买**。
+3. 加购不弹窗（连着加多个不会被打断）：已加购的行原地变成 **移除**，列表下沿常驻结算栏显示件数与合计，**去结算** 打开购物车，可加减后再点 **立即购买**。
 4. **提交订单**：时长默认 1 年（1–10，`.co` 最多 5）、已实名信息模板、自动续费 / 禁止更新锁 / 禁止转移锁（下单时两锁可同时开），勾选官方[域名注册协议](https://cloud.tencent.com/document/product/242/8458)（只链到官网，不复制全文）。
 5. **核对信息** 后再 **账户余额支付**（`PayMode=1`）。不支持微信 / QQ 钱包 / 网银。支付与开关永远二次确认。
 6. 下单后看操作状态（已提交 / 进行中 / 成功 / 失败），可到 **我的域名** 卡片刷新。注册不是瞬时 WHOIS 生效。

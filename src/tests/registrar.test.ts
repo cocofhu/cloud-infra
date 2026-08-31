@@ -14,6 +14,8 @@ import {
   createMyDomainModule,
   createRegistrarModule,
   filterOwned,
+  isDnspodNameServers,
+  isSuggestedTarget,
   locksFromDomainStatus,
   mapCheckDomain,
   mapOwnedDomain,
@@ -58,7 +60,18 @@ test('g1.2 empty card search returns no rows; bare name fans out popular TLDs', 
   assert.deepEqual(checkTargets(''), [])
   assert.deepEqual(checkTargets('   '), [])
   assert.deepEqual(checkTargets('example'), POPULAR_TLDS.map((tld) => `example${tld}`))
-  assert.deepEqual(checkTargets('Example.COM'), ['example.com'])
+  // 查完整域名时精确匹配排第一,后面补同名的其它热门后缀(否则一次查询只回一行,卡片大半是空的)
+  assert.deepEqual(
+    checkTargets('Example.COM'),
+    ['example.com', ...POPULAR_TLDS.filter((tld) => tld !== '.com').map((tld) => `example${tld}`)],
+  )
+  // 二级域拆不出干净名字的就只查精确匹配,补出来的名字没有意义
+  assert.deepEqual(checkTargets('example.com.cn'), ['example.com.cn'])
+  assert.deepEqual(checkTargets('a.b.com'), ['a.b.com'])
+  assert.equal(isSuggestedTarget('example.com', 'example.cn'), true)
+  assert.equal(isSuggestedTarget('example.com', 'example.com'), false)
+  // 关键字是裸名时全部都是「候选」,没有精确匹配可分段
+  assert.equal(isSuggestedTarget('example', 'example.cn'), false)
   assert.equal(normalizeKeyword('https://Example.com/path'), 'example.com')
 
   const { calls, call } = mockCall((action, payload) => {
@@ -233,7 +246,11 @@ test('g1.4 my-domain filters by card keyword and serves 基本信息/域名安�
   assert.equal(detail?.card.extras?.updateLock, true)
   assert.equal(detail?.card.extras?.transferLock, false)
   assert.equal(detail?.card.extras?.autoRenew, true)
+  assert.equal(detail?.card.extras?.dnspodHosted, true)
   assert.equal(nameServerText((fixture('domain-base-info.json').DomainInfo as { NameServer?: string[] }).NameServer), 'f1g1ns1.dnspod.net f1g1ns2.dnspod.net')
+  assert.equal(isDnspodNameServers(['f1g1ns1.dnspod.net.', 'f1g1ns2.dnspod.net']), true)
+  assert.equal(isDnspodNameServers(['ns1.dnsv3.com', 'ns2.dnsv3.com']), true)
+  assert.equal(isDnspodNameServers(['ns1.example.com']), false)
   assert.deepEqual(locksFromDomainStatus(['ok', 'clientUpdateProhibited']), { updateLock: true, transferLock: false })
   assert.deepEqual(locksFromDomainStatus(['ok', 'clientTransferProhibited']), { updateLock: false, transferLock: true })
   assert.deepEqual(locksFromDomainStatus(['ok']), { updateLock: false, transferLock: false })

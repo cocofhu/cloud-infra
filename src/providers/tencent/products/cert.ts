@@ -576,19 +576,7 @@ export function createCertModule(call: SslCall = sslCall, dnsCall: DnsCall = dns
           return { ok: true, data: { certificateId: data.CertificateId || '' } }
         }
         if (!certificateId) return { ok: false, error: '缺少证书 ID' }
-        if (actionId === 'cert.download') {
-          const data = await call<{ Content?: string; ContentType?: string }>('DownloadCertificate', {
-            CertificateId: certificateId,
-          }, creds(ctx), opts(ctx))
-          return {
-            ok: true,
-            data: {
-              filename: `${certificateId}.zip`,
-              contentType: data.ContentType || 'application/zip',
-              content: data.Content || '',
-            },
-          }
-        }
+        if (actionId === 'cert.download') return await downloadCert(call, certificateId, ctx)
         if (actionId === 'cert.hosts') {
           const resourceType = String(payload.resourceType || 'cdn').trim().toLowerCase()
           const product = HOST_PRODUCTS.find((item) => item.id === resourceType)
@@ -709,6 +697,45 @@ export function createCertModule(call: SslCall = sslCall, dnsCall: DnsCall = dns
     },
   }
   return module
+}
+
+export function isUnauthorized(err: unknown): boolean {
+  if (!(err instanceof TencentApiError)) return false
+  return /UnauthorizedOperation|AccessDenied/i.test(String(err.code || ''))
+}
+
+// 下载走两条路:DownloadCertificate 直接给 zip 内容,少一次外链;密钥没有 ssl:DownloadCertificate
+// 时它必然 AuthFailure.UnauthorizedOperation,此时退到 DescribeDownloadCertificateUrl 拿 COS 临时链接。
+// 控制台走的就是后者,两个权限只要有一个下载就能用。
+async function downloadCert(
+  call: SslCall,
+  certificateId: string,
+  ctx: ModuleContext,
+): Promise<{ ok: true; data: Record<string, unknown> }> {
+  try {
+    const data = await call<{ Content?: string; ContentType?: string }>('DownloadCertificate', {
+      CertificateId: certificateId,
+    }, creds(ctx), opts(ctx))
+    if (data.Content) {
+      return {
+        ok: true,
+        data: {
+          filename: `${certificateId}.zip`,
+          contentType: data.ContentType || 'application/zip',
+          content: data.Content,
+        },
+      }
+    }
+  } catch (err) {
+    if (!isUnauthorized(err)) throw err
+  }
+  const link = await call<{ DownloadCertificateUrl?: string; DownloadFilename?: string }>('DescribeDownloadCertificateUrl', {
+    CertificateId: certificateId,
+    ServiceType: 'nginx',
+  }, creds(ctx), opts(ctx))
+  const url = String(link.DownloadCertificateUrl || '')
+  if (!url) throw new Error('云厂商没有返回下载链接')
+  return { ok: true, data: { filename: link.DownloadFilename || `${certificateId}.zip`, url } }
 }
 
 async function loadDetail(call: SslCall, moduleId: string, ctx: ModuleContext): Promise<ResourceDetail> {

@@ -37,6 +37,24 @@ test('publicErrorMessage maps vendor codes and never echoes secrets', () => {
   assert.doesNotMatch(publicErrorMessage(new Error('got AKIDabcdefghijklmnop')), /AKID/)
 })
 
+test('云 API 改为 zh-CN 返回后,带错误码的上游中文原文仍不直接透出', () => {
+  // 上游 Message 现在是中文,「缺少 / 不支持」等词会命中本地提示白名单,必须以错误码优先
+  assert.equal(
+    publicErrorMessage(new TencentApiError('缺少参数 InstanceIds', 'MissingParameter')),
+    '请求参数无效',
+  )
+  assert.equal(
+    publicErrorMessage(new TencentApiError('当前账号不支持该操作，请提交工单', 'UnauthorizedOperation')),
+    '当前密钥没有该操作的权限',
+  )
+  assert.equal(
+    actionErrorMessage(new TencentApiError('没有找到指定的实例', 'ResourceNotFound')),
+    '资源不存在',
+  )
+  // 本地抛出的错误不带 code,仍按原文展示
+  assert.equal(publicErrorMessage(new TencentApiError('缺少地域')), '缺少地域')
+})
+
 test('balance and register failures map to readable copy without secrets', () => {
   assert.equal(
     publicErrorMessage(new TencentApiError('balance not enough AKID12345678', 'ResourceInsufficient')),

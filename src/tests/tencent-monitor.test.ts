@@ -4,11 +4,13 @@ import { TencentApiError, type TencentProductCall } from '../providers/tencent/c
 import {
   HOST_METRICS,
   LIGHTHOUSE_METRICS,
+  MONITOR_PERIODS,
   MONITOR_RANGE_PERIOD,
   classifyMetricError,
   fetchMetricSeries,
   fetchMonitorSeries,
   monitorWindow,
+  normalizeMonitorPeriod,
   normalizeMonitorRange,
 } from '../providers/tencent/products/instance-common.js'
 
@@ -34,10 +36,44 @@ test('monitorWindow aligns endTime to 5min and picks period per range', () => {
   assert.equal(h6.endTime, '2026-08-29 12:05:00')
   assert.equal(h6.startTime, '2026-08-29 06:05:00')
   const h24 = monitorWindow('24h', now)
-  assert.equal(h24.period, 900)
+  // 24h 不能用 900s:云监控只接受 10/60/300/3600/86400,900 会让整档指标全报 period is invalid
+  assert.equal(h24.period, 300)
   assert.equal(h24.startTime, '2026-08-28 12:05:00')
   const fallback = monitorWindow(undefined, now)
   assert.equal(fallback.period, 60)
+})
+
+test('每档采样周期都落在云监控允许的统计粒度内', () => {
+  for (const [range, period] of Object.entries(MONITOR_RANGE_PERIOD)) {
+    assert.ok(MONITOR_PERIODS.includes(period), `${range} 的周期 ${period} 不是合法统计粒度`)
+  }
+  // 非法值收敛到不超过它的最细一档,而不是原样发给上游
+  assert.equal(normalizeMonitorPeriod(900), 300)
+  assert.equal(normalizeMonitorPeriod(1800), 300)
+  assert.equal(normalizeMonitorPeriod(7200), 3600)
+  assert.equal(normalizeMonitorPeriod(5), 10)
+  assert.equal(normalizeMonitorPeriod(0), 60)
+  assert.equal(normalizeMonitorPeriod(undefined), 60)
+  assert.equal(normalizeMonitorPeriod(3600), 3600)
+})
+
+test('fetchMetricSeries 不会把非法周期透传给 GetMonitorData', async () => {
+  const calls: Array<Record<string, unknown>> = []
+  const monitor = (async (_action: string, payload: Record<string, unknown>) => {
+    calls.push(payload)
+    return { DataPoints: [{ Timestamps: [1000], Values: [1] }] }
+  }) as unknown as TencentProductCall
+  await fetchMetricSeries(monitor, {
+    namespace: 'QCE/CVM',
+    metric: 'CpuUsage',
+    instanceId: 'ins-abc',
+    region: 'ap-guangzhou',
+    range: '24h',
+    period: 900,
+    creds: { secretId: 'id', secretKey: 'key' },
+    opts: { timeoutMs: 1000 },
+  })
+  assert.equal(calls[0].Period, 300)
 })
 
 test('fetchMetricSeries sends namespace/metric/window and maps data points', async () => {
@@ -157,6 +193,35 @@ test('classifyMetricError: 三类根因各归属正确', () => {
   assert.equal(limited.code, 'RequestLimitExceeded')
   // 空点但不依赖 agent:归 METRIC_NOT_FOUND
   assert.equal(classifyMetricError({ emptyPoints: true }).errorType, 'METRIC_NOT_FOUND')
+  // 关机实例即使云监控用错误码表达无数据，也不能误判成 agent 缺失
+  assert.equal(
+    classifyMetricError({
+      error: new TencentApiError('metric unavailable', 'InvalidParameterValue'),
+      emptyPoints: true,
+      requiresAgent: true,
+      instanceRunning: false,
+    }).errorType,
+    'INSTANCE_NOT_RUNNING',
+  )
+})
+
+test('fetchMonitorSeries: 关机实例的云监控错误收敛为整体未运行提示', async () => {
+  const monitor = (async () => {
+    throw new TencentApiError('metric unavailable', 'InvalidParameterValue')
+  }) as unknown as TencentProductCall
+  const result = await fetchMonitorSeries(monitor, {
+    namespace: 'QCE/CVM',
+    metrics: HOST_METRICS.slice(0, 3),
+    instanceId: 'ins-stopped',
+    region: 'ap-guangzhou',
+    creds,
+    opts,
+    instanceRunning: false,
+  })
+  assert.equal(result.notRunning, true)
+  assert.deepEqual(result.errors, [])
+  assert.deepEqual(result.metricErrors, [])
+  assert.ok(result.series.every((row) => row.timestamps.length === 0))
 })
 
 test('fetchMonitorSeries: unavailable 指标不发起请求且归类 METRIC_NOT_FOUND', async () => {

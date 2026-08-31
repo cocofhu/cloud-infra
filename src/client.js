@@ -7,8 +7,18 @@ window.__ModuleLoader__.load({
 
     const CSS = `
 /* ============ 设计 token 层 --ci-*:全部映射到 --dsw-alias-*,不做明暗判断(G1.1/G1.2) ============ */
-/* Portal 到 <body> 的浮层(.ci-regionpop)不在 .ci-root 内,需在选择器上并列,own token 映射才能生效 */
-.ci-root,.ci-regionpop{--ci-fg:var(--dsw-alias-label-primary);--ci-fg-2:var(--dsw-alias-label-secondary);--ci-fg-3:var(--dsw-alias-label-tertiary);--ci-fg-4:var(--dsw-alias-label-caption);--ci-bg:var(--dsw-alias-bg-layer-1);--ci-bg-2:var(--dsw-alias-bg-layer-2);--ci-bg-3:var(--dsw-alias-bg-layer-3);--ci-border:var(--dsw-alias-border-l1);--ci-border-2:var(--dsw-alias-border-l2);--ci-brand:var(--dsw-alias-brand-primary);--ci-brand-fill:var(--dsw-alias-button-primary-fill);--ci-brand-fg:var(--dsw-alias-label-primary-foreground);--ci-brand-soft:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);--ci-brand-soft-14:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);--ci-brand-ring:color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent);--ci-success:var(--dsw-alias-state-success-primary);--ci-success-bg:var(--dsw-alias-state-success-tertiary);--ci-warn:var(--dsw-alias-state-warn-label);--ci-warn-bg:var(--dsw-alias-state-warn-tertiary);--ci-error:var(--dsw-alias-state-error-primary);--ci-info:var(--dsw-alias-brand-primary);--ci-info-bg:color-mix(in srgb,var(--dsw-alias-brand-primary) 10%,transparent);--ci-radius-sm:4px;--ci-radius-md:6px;--ci-radius-lg:8px;--ci-radius-xl:12px;--ci-radius-2xl:14px;--ci-radius-pill:999px;--ci-space-1:4px;--ci-space-2:8px;--ci-space-3:12px;--ci-space-4:16px;--ci-space-5:20px;--ci-space-6:24px;--ci-space-7:32px;--ci-space-8:40px;--ci-font-xs:12px;--ci-font-sm:13px;--ci-font-md:14px;--ci-font-lg:16px;--ci-font-xl:18px;--ci-shadow-1:var(--dsw-alias-shadow);--ci-shadow-2:0 8px 24px rgba(0,0,0,.16);--ci-z-modal:40;--ci-z-popover:60}
+/* Portal 到 <body> 的浮层(.ci-regionpop / .ci-modal-mask / .ci-more-menu / .ci-colfilter)不在
+   .ci-root 内,需在选择器上并列,own token 映射才能生效(漏了会让 var(--ci-radius-*) 失效、圆角掉成直角)。
+   设置卡 .ci-cfg 同理:它挂在宿主 settings.plugin.item 槽里,外面没有 .ci-root,漏了就是整张直角卡。 */
+/* 阴影与遮罩自持一层 token:宿主主题没有 --dsw-alias-shadow 这个变量(引用它的声明整条无效,
+   弹窗/菜单会完全没有投影);遮罩取 bg-mask-1 而非 bg-mask-3,后者是 48% 纯黑,插件嵌在对话卡片里
+   会把整张卡压成一块黑影。三级阴影统一从浅到深:knob / 菜单 / 浮层与弹窗。 */
+.ci-root,.ci-regionpop,.ci-modal-mask,.ci-more-menu,.ci-colfilter,.ci-menu-portal,.ci-winframe,.ci-cfg{--ci-fg:var(--dsw-alias-label-primary);--ci-fg-2:var(--dsw-alias-label-secondary);--ci-fg-3:var(--dsw-alias-label-tertiary);--ci-fg-4:var(--dsw-alias-label-caption);--ci-bg:var(--dsw-alias-bg-layer-1);--ci-bg-2:var(--dsw-alias-bg-layer-2);--ci-bg-3:var(--dsw-alias-bg-layer-3);--ci-border:var(--dsw-alias-border-l1);--ci-border-2:var(--dsw-alias-border-l2);--ci-brand:var(--dsw-alias-brand-primary);--ci-brand-fill:var(--dsw-alias-button-primary-fill);--ci-brand-fg:var(--dsw-alias-label-primary-foreground);--ci-brand-soft:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);--ci-brand-soft-14:color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent);--ci-brand-ring:color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent);--ci-success:var(--dsw-alias-state-success-primary);--ci-success-bg:var(--dsw-alias-state-success-tertiary);--ci-warn:var(--dsw-alias-state-warn-label);--ci-warn-bg:var(--dsw-alias-state-warn-tertiary);--ci-error:var(--dsw-alias-state-error-primary);--ci-info:var(--dsw-alias-brand-primary);--ci-info-bg:color-mix(in srgb,var(--dsw-alias-brand-primary) 10%,transparent);--ci-radius-sm:4px;--ci-radius-md:6px;--ci-radius-lg:8px;--ci-radius-xl:12px;--ci-radius-2xl:14px;--ci-radius-pill:999px;--ci-space-1:4px;--ci-space-2:8px;--ci-space-3:12px;--ci-space-4:16px;--ci-space-5:20px;--ci-space-6:24px;--ci-space-7:32px;--ci-space-8:40px;--ci-font-xs:12px;--ci-font-sm:13px;--ci-font-md:14px;--ci-font-lg:16px;--ci-font-xl:18px;--ci-shadow-0:0 1px 2px rgba(0,0,0,.12);--ci-shadow-1:0 2px 8px rgba(0,0,0,.08);--ci-shadow-2:0 4px 16px rgba(0,0,0,.1);--ci-mask:var(--dsw-alias-bg-mask-1);--ci-z-window:30;--ci-z-modal:40;--ci-z-popover:60}
+/* 宿主主题把 --dsw-alias-brand-primary 映射成与正文同色(label-primary),控制台风格的文字链、
+   Tab 选中下划线、主按钮会整体退化成黑色 —— 列表里的「部署/下载/更多」和正文分不出来。
+   这里只在插件作用域内做 token→token 重映射:蓝色取宿主 --dsw-alias-button-info-fill
+   (明暗两套由主题给),仍不引入硬编码颜色、不做明暗判断(G1.1/G1.2)。 */
+.ci-root,.ci-regionpop,.ci-modal-mask,.ci-more-menu,.ci-colfilter,.ci-menu-portal,.ci-cfg{--dsw-alias-brand-primary:var(--dsw-alias-button-info-fill);--dsw-alias-button-primary-fill:var(--dsw-alias-button-info-fill);--ci-brand-hover:color-mix(in srgb,var(--dsw-alias-button-info-fill) 80%,var(--dsw-alias-label-primary))}
 .ci-root,.ci-tool{font-family:inherit;color:var(--dsw-alias-label-primary);width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:2px 0 6px}
 .ci-panel{border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-xl);background:var(--dsw-alias-bg-layer-1);overflow:hidden;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
 .ci-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;min-width:0;flex-wrap:nowrap;overflow-x:auto}
@@ -30,17 +40,21 @@ window.__ModuleLoader__.load({
 .ci-row:not(.head):hover,.ci-row:not(.head).open{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-row:not(.head).open{position:relative;z-index:4}
 .ci-cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary)}
-.ci-cell.ci-ops-cell{overflow:visible;min-width:0;background:inherit}
+/* 操作列不许自带底色。background:inherit 是把父级那层底色在子盒里「再画一遍」,
+   而行底色(hover 6% / 已选 12%)都是半透明的 —— 画两遍就在操作列位置留下一块更深的色块,
+   看着像那颗按钮自己带了 hover。行底色由 .ci-row 自己铺,子元素保持透明即可。 */
+.ci-cell.ci-ops-cell{overflow:visible;min-width:0}
 .ci-row.head .ci-cell{color:var(--dsw-alias-label-tertiary)}
 .ci-cell.num{font-variant-numeric:tabular-nums}
 .ci-name{font-weight:550;color:var(--dsw-alias-label-primary);background:none;border:0;padding:0;cursor:pointer;font:inherit;font-size:13px;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ci-name:hover{color:var(--dsw-alias-brand-primary)}
-.ci-ops{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap;background:inherit}
+.ci-ops{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap}
 .ci-ops > *{flex-shrink:0}
 .ci-link{appearance:none;-webkit-appearance:none;background:transparent;border:0;padding:0;margin:0;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-brand-primary)}
-.ci-link:hover{text-decoration:underline}
+.ci-link:hover:not(:disabled){color:var(--ci-brand-hover);text-decoration:underline}
 .ci-link:disabled{opacity:.45;cursor:wait;text-decoration:none}
 .ci-link.danger{color:var(--dsw-alias-state-error-primary)}
+.ci-inline-action{margin-left:10px;font-size:12px;vertical-align:1px}
 .ci-status{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px}
 .ci-dot{display:inline-block;width:6px;height:6px;min-width:6px;min-height:6px;border-radius:50%;flex:none;overflow:hidden;background:var(--dsw-alias-state-success-primary)}
 .ci-dot.enable{background:var(--dsw-alias-state-success-primary)}
@@ -64,6 +78,16 @@ window.__ModuleLoader__.load({
 .ci-st.enable{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
 .ci-st.pause{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
 .ci-st.error{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-label-primary-foreground)}
+.ci-st.plain{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary)}
+.ci-op-hint{color:var(--dsw-alias-label-caption);font-size:12px}
+.ci-subhead{position:sticky;left:0;padding:6px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
+.ci-row.picked{background:var(--ci-brand-soft)}
+/* 已选行 hover 要在自己的品牌色上加深,否则会被中性 hover 底色顶掉,看着像丢了选中态 */
+.ci-row.picked:hover{background:var(--ci-brand-soft-14)}
+.ci-cartbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 14px;border-top:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
+.ci-cartbar-t{font-size:12px;color:var(--dsw-alias-label-secondary)}
+.ci-cartbar-t b{margin-left:8px;font-size:13px;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums}
+.ci-cartbar-ops{display:flex;align-items:center;gap:8px}
 .ci-crumb{display:flex;align-items:center;gap:8px;padding:8px 12px 8px 8px;border-bottom:1px solid var(--dsw-alias-border-l1);min-width:0}
 .ci-back{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;background:transparent;border-radius:var(--ci-radius-lg);cursor:pointer;color:var(--dsw-alias-label-secondary);flex:none}
 .ci-back:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
@@ -102,7 +126,39 @@ window.__ModuleLoader__.load({
 .ci-region-notice .ci-mini{margin:0}
 .ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
 .ci-list-body{min-height:160px}
+.ci-list-body.compact{min-height:0}
+/* 卡片「窗口化 / 全屏」:对话卡片只有几百像素宽,宽表在里面永远要横向滚。
+   这一层把同一棵面板搬到 body 上的浮层里,z-index 必须低于 --ci-z-modal,
+   否则面板内部的确认框/表单弹窗会被窗口盖住。 */
+.ci-winctl{display:flex;align-items:center;justify-content:flex-end;gap:2px;padding:0 2px 4px}
+.ci-winctl-btn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;border:0;border-radius:var(--ci-radius-md);background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit}
+.ci-winctl-btn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.ci-winctl-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
+.ci-winframe{position:fixed;inset:0;z-index:var(--ci-z-window);background:var(--ci-mask);display:flex}
+.ci-win{position:fixed;display:flex;flex-direction:column;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-xl);background:var(--dsw-alias-bg-layer-1);box-shadow:var(--ci-shadow-2);overflow:hidden}
+.ci-win.full{inset:0;border:0;border-radius:0}
+.ci-win-bar{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);user-select:none;flex:none}
+.ci-win:not(.full) .ci-win-bar{cursor:move}
+.ci-win-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:650;color:var(--dsw-alias-label-primary)}
+.ci-win-ops{display:flex;align-items:center;gap:2px;flex:none}
+.ci-win-op{display:inline-flex;align-items:center;justify-content:center;width:28px;height:24px;padding:0;border:0;border-radius:var(--ci-radius-md);background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit}
+.ci-win-op:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.ci-win-op.close:hover{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-label-primary-foreground)}
+.ci-win-op:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}
+.ci-win-body{flex:1;min-height:0;overflow:auto;padding:12px 14px 14px}
+.ci-win-body>.ci-root{width:100%}
+/* 全屏在宽屏上不要把表格拉成一条:内容留个上限并居中 */
+.ci-win.full .ci-win-body>.ci-root{max-width:1440px;margin:0 auto}
+/* 窗口里的面板自己有边框和圆角就够了,不要再叠一层卡片投影 */
+.ci-win-grip{position:absolute;z-index:1}
+.ci-win-grip.e{top:12px;right:0;width:6px;bottom:12px;cursor:ew-resize}
+.ci-win-grip.s{left:12px;right:12px;bottom:0;height:6px;cursor:ns-resize}
+.ci-win-grip.se{right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize}
+/* 面板搬进浮层后,对话卡片里留一块占位:否则卡片塌成 0 高,对话流的「贴底」判定会把滚动条拽到最下面 */
+.ci-win-away{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px;border:1px dashed var(--dsw-alias-border-l2);border-radius:var(--ci-radius-xl);color:var(--dsw-alias-label-tertiary);font-size:13px}
+.ci-list-body.busy{display:flex;flex-direction:column}
 .ci-list-body .ci-load{min-height:160px;box-sizing:border-box}
+.ci-list-body.busy .ci-load{flex:1}
 .ci-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:ci-spin .7s linear infinite;vertical-align:-1px;margin-right:6px}
 @keyframes ci-spin{to{transform:rotate(360deg)}}
 .ci-monitor{border-top:1px solid var(--dsw-alias-border-l1);padding:10px 14px 14px;min-width:0}
@@ -125,7 +181,7 @@ window.__ModuleLoader__.load({
 .ci-monitor-ranges.ci-seg{display:inline-flex;gap:2px;padding:2px;border:0;border-radius:var(--ci-radius-md);background:var(--dsw-alias-bg-layer-3)}
 .ci-monitor-ranges.ci-seg .ci-monitor-range{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;line-height:22px;height:24px;padding:0 12px;border-radius:var(--ci-radius-md);cursor:pointer}
 .ci-monitor-ranges.ci-seg .ci-monitor-range:hover{color:var(--dsw-alias-label-primary)}
-.ci-monitor-ranges.ci-seg .ci-monitor-range.active{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-brand-primary);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.ci-monitor-ranges.ci-seg .ci-monitor-range.active{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-brand-primary);font-weight:600;box-shadow:var(--ci-shadow-0)}
 /* 顶部指标卡 */
 .ci-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px}
 .ci-stat{border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);background:var(--dsw-alias-bg-layer-1);padding:12px 14px;min-width:0;box-sizing:border-box}
@@ -142,12 +198,17 @@ window.__ModuleLoader__.load({
 .ci-monitor-err b{color:var(--dsw-alias-label-primary);font-weight:600;white-space:nowrap}
 .ci-monitor-err-tag{flex:none;font-size:11px;border-radius:var(--ci-radius-md);padding:1px 6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary);white-space:nowrap}
 .ci-monitor-err-hint{flex:1;min-width:0}
-.ci-modal-mask{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--dsw-alias-bg-mask-3);box-sizing:border-box}
+.ci-modal-mask{position:fixed;inset:0;z-index:var(--ci-z-modal);display:flex;align-items:center;justify-content:center;padding:20px;background:var(--ci-mask);box-sizing:border-box}
 .ci-modal-mask.stacked{z-index:41}
-.ci-modal{width:min(400px,100%);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-2xl);padding:16px;box-shadow:var(--dsw-alias-shadow);box-sizing:border-box}
-.ci-modal h3{margin:0 0 8px;font-size:16px}
+.ci-modal{width:min(400px,100%);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-xl);padding:16px;box-shadow:var(--ci-shadow-2);box-sizing:border-box}
+.ci-modal h3{margin:0 0 14px;font-size:16px;line-height:24px}
 .ci-modal p{margin:0 0 12px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.55}
 .ci-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.ci-form-modal{width:min(420px,100%);padding:20px}
+.ci-form-modal .ci-field{margin-bottom:14px}
+.ci-form-modal .ci-field label{font-size:13px;font-weight:500;color:var(--ci-fg-2)}
+.ci-form-modal .ci-field input{display:block;width:100%;height:36px;line-height:36px;box-sizing:border-box;appearance:none}
+.ci-form-modal .ci-modal-actions{margin-top:20px;padding-top:14px;border-top:1px solid var(--ci-border)}
 .ci-cfg-item{list-style:none;margin:0;padding:0;min-width:0}
 .ci-cfg{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:var(--ci-radius-xl);overflow:hidden;box-sizing:border-box;width:100%;min-width:0}
 .ci-cfg-h{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:14px 16px;box-sizing:border-box;min-width:0}
@@ -181,7 +242,6 @@ window.__ModuleLoader__.load({
 .ci-cfg-mod-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
 .ci-cfg-mod-empty{padding:8px 12px;color:var(--dsw-alias-label-caption);font-size:13px}
 .ci-cfg-mod-meta{margin-top:6px;color:var(--dsw-alias-label-caption);font-size:12px;font-weight:400}
-.ci-cfg-mod-hint2{margin-left:6px;color:var(--ci-fg-4);font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .ci-cfg-ft{border-top:1px solid var(--dsw-alias-border-l2);justify-content:flex-end;gap:8px;padding:12px 0 4px;display:flex}
 .ci-cfg-save{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border:1px solid transparent;border-radius:var(--ci-radius-lg);padding:5px 14px;font:inherit;cursor:pointer}
 .ci-cfg-disc{background:var(--dsw-alias-button-elevated-fill);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);border-radius:var(--ci-radius-lg);padding:5px 14px;font:inherit;cursor:pointer}
@@ -196,8 +256,8 @@ window.__ModuleLoader__.load({
 .ci-dl{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;padding:0 14px 14px;font-size:13px}
 .ci-dl span{color:var(--dsw-alias-label-tertiary)}
 .ci-dl b{font-weight:600;color:var(--dsw-alias-label-primary);word-break:break-all}
-.ci-more{position:relative;display:inline-flex;background:inherit}
-.ci-more-menu{position:fixed;z-index:60;min-width:128px;padding:6px 0;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);background-color:Canvas;box-shadow:0 8px 24px rgba(0,0,0,.16);overflow:hidden;isolation:isolate}
+.ci-more{position:relative;display:inline-flex}
+.ci-more-menu{position:fixed;z-index:var(--ci-z-popover);min-width:128px;padding:6px 0;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);background-color:Canvas;box-shadow:var(--ci-shadow-2);overflow:hidden;isolation:isolate}
 .ci-more-menu::before{content:"";position:absolute;inset:0;background:var(--dsw-alias-button-elevated-fill,var(--dsw-alias-bg-layer-1));pointer-events:none;border-radius:inherit}
 .ci-more-item{display:block;width:100%;text-align:left;background:transparent;border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;color:var(--dsw-alias-label-primary);position:relative;z-index:1}
 .ci-more-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
@@ -216,13 +276,17 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-id-sub{color:var(--dsw-alias-label-tertiary);font-size:12px;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .ci-ip{display:block;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
 .ci-scroll{width:100%;overflow:auto;isolation:isolate}
+/* 滚动容器内的空态:sticky 贴左,横向滚表头时提示文案不会被滚出可视区 */
+.ci-scroll>.ci-empty{position:sticky;left:0;width:100%;box-sizing:border-box}
+/* 地域被自动收敛时的说明:是提示不是错误,所以用次要文字色而非 .ci-err 的红 */
+.ci-region-note{margin:8px 14px;font-size:12px;line-height:18px;color:var(--ci-fg-3)}
 .ci-dense{width:100%;min-width:980px;border-collapse:collapse;font-size:13px;table-layout:fixed}
 .ci-dense th,.ci-dense td{text-align:left;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l1);vertical-align:top;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ci-dense th{color:var(--dsw-alias-label-tertiary);font-weight:500;font-size:12px;background:var(--dsw-alias-bg-layer-2)}
 .ci-dense tbody tr:hover td{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-dense tbody tr:hover td{box-shadow:0 1px 0 0 var(--dsw-alias-interactive-bg-hover),0 -1px 0 0 var(--dsw-alias-interactive-bg-hover)}
 .ci-more{position:relative;display:inline-block}
-.ci-menu{position:absolute;right:0;top:22px;z-index:3;min-width:88px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);box-shadow:var(--dsw-alias-shadow);padding:4px 0}
+.ci-menu{position:absolute;right:0;top:22px;z-index:3;min-width:88px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);box-shadow:var(--ci-shadow-1);padding:4px 0}
 .ci-menu button{display:block;width:100%;text-align:left;padding:8px 12px;border:0;background:transparent;cursor:pointer;font:inherit;color:inherit}
 .ci-menu button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
 .ci-menu button:disabled{color:var(--dsw-alias-label-caption);cursor:default}
@@ -240,9 +304,11 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-sec-t{font-size:13px;font-weight:650;padding:12px 16px 4px}
 .ci-power{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
 /* 统一蓝色下划线 Tab(G2.3/F3):选中项 2px 品牌色下划线 + 品牌色文字;非选中 --ci-fg-3;应用到所有产品详情 */
-.ci-tabs{display:flex;align-items:flex-end;gap:4px;border-bottom:1px solid var(--ci-border);padding:0 var(--ci-space-3);overflow-x:auto;background:var(--ci-bg);min-width:0}
+/* 不能用 overflow-x:auto:.ci-tab 用 margin-bottom:-1px 压住容器下边框,负外边距在滚动容器里
+   会溢出 1px,浏览器据此给 Tab 条挂上滚动条。窄卡片时改为换行,任何情况都不出现滚动条。 */
+.ci-tabs{display:flex;align-items:flex-end;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--ci-border);padding:0 var(--ci-space-3);background:var(--ci-bg);min-width:0}
 .ci-tab{border:0;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:12px 14px 10px;cursor:pointer;font:inherit;font-size:var(--ci-font-sm);color:var(--ci-fg-3);white-space:nowrap;flex:none;position:relative;box-sizing:border-box}
-.ci-tab:hover{color:var(--ci-brand)}
+.ci-tab:hover:not(:disabled){color:var(--ci-brand)}
 .ci-tab.on,.ci-tab.active{color:var(--ci-brand);border-bottom-color:var(--ci-brand);font-weight:600;background:none;box-shadow:none}
 .ci-tab:disabled{opacity:.45;cursor:not-allowed}
 .ci-tab:focus-visible{outline:2px solid var(--ci-brand);outline-offset:-2px}
@@ -294,7 +360,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-toggle{width:36px;height:20px;border:0;border-radius:var(--ci-radius-pill);background:var(--dsw-alias-bg-layer-3);cursor:pointer;flex:none;padding:2px}
 .ci-toggle.on{background:var(--dsw-alias-brand-primary)}
 .ci-toggle:disabled{opacity:.4;cursor:not-allowed}
-.ci-toggle i{display:block;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-bg-layer-1);box-shadow:var(--dsw-alias-shadow);transform:translateX(0);transition:transform .16s}
+.ci-toggle i{display:block;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-bg-layer-1);box-shadow:var(--ci-shadow-0);transform:translateX(0);transition:transform .16s}
 .ci-toggle.on i{transform:translateX(16px)}
 .ci-pane-load{min-height:160px;display:flex;align-items:center;justify-content:center;gap:2px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1);font-size:13px}
 .ci-tab:disabled{cursor:wait;opacity:1}
@@ -306,7 +372,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-k{color:var(--dsw-alias-label-tertiary)}
 .ci-sub{display:block;color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:400}
 .ci-drop{position:relative}
-.ci-drop-menu{position:absolute;right:0;top:100%;z-index:5;min-width:168px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);padding:4px 0;box-shadow:var(--dsw-alias-shadow)}
+.ci-drop-menu{position:absolute;right:0;top:100%;z-index:5;min-width:168px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);padding:4px 0;box-shadow:var(--ci-shadow-1)}
 .ci-drop-item{display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 12px;font:inherit;cursor:pointer;color:inherit}
 .ci-drop-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-tools{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;min-width:0}
@@ -323,7 +389,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-subtabs{display:flex;gap:8px;margin:0 0 12px}
 .ci-field textarea{min-height:72px;border-radius:var(--ci-radius-lg);border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:8px 10px;font:inherit;resize:vertical}
 .ci-filters{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 10px;align-items:center}
-.ci-filters select,.ci-filters input,.ci-region{height:32px;border-radius:var(--ci-radius-lg);border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit;font-size:13px}
+.ci-filters select,.ci-filters input{height:32px;border-radius:var(--ci-radius-lg);border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:inherit;padding:0 10px;font:inherit;font-size:13px}
 .ci-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:14px}
 .ci-type-card{border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-xl);padding:14px;background:var(--dsw-alias-bg-layer-2);text-align:left;cursor:pointer;font:inherit;color:inherit}
 .ci-type-card:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary)}
@@ -348,6 +414,16 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-form-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:650;margin:0 0 8px}
 .ci-form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
 .ci-menu.ci-menu-portal{position:fixed;right:auto;top:auto}
+.ci-th{display:inline-flex;align-items:center;gap:4px;max-width:100%}
+.ci-filter-btn{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;border:0;border-radius:4px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;flex-shrink:0}
+.ci-filter-btn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary)}
+.ci-filter-btn.on{color:var(--ci-brand)}
+.ci-filter-btn:disabled{opacity:.45;cursor:not-allowed}
+.ci-colfilter{position:fixed;z-index:var(--ci-z-popover);padding:6px 0 0;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);background:var(--dsw-alias-bg-layer-1);box-shadow:var(--ci-shadow-2)}
+.ci-colfilter-row{display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:13px;color:var(--dsw-alias-label-primary);cursor:pointer}
+.ci-colfilter-row:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-colfilter-row input{margin:0;cursor:pointer}
+.ci-colfilter-foot{display:flex;align-items:center;gap:8px;margin-top:6px;padding:8px 14px;border-top:1px solid var(--dsw-alias-border-l1)}
 .ci-check input[type=checkbox],input.ci-check{width:15px;height:15px;accent-color:var(--dsw-alias-brand-primary)}
 .ci-regionbar{display:flex;align-items:center;gap:8px;flex:none;padding:0;border:0;background:transparent}
 .ci-regionbar label{color:var(--dsw-alias-label-secondary);line-height:32px;flex:none;font-size:13px;font-weight:400}
@@ -366,7 +442,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-crumbs button{background:none;border:0;padding:0;font:inherit;color:var(--dsw-alias-brand-primary);cursor:pointer}
 .ci-crumbs span{color:var(--dsw-alias-label-caption)}
 .ci-file-name{display:inline-flex;align-items:center;gap:6px;min-width:0}
-.ci-more-list{position:absolute;right:0;top:22px;min-width:140px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);padding:4px 0;z-index:4;box-shadow:var(--dsw-alias-shadow)}
+.ci-more-list{position:absolute;right:0;top:22px;min-width:140px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);padding:4px 0;z-index:4;box-shadow:var(--ci-shadow-1)}
 .ci-more-list button{display:block;width:100%;text-align:left;background:none;border:0;padding:6px 12px;font:inherit;cursor:pointer;color:inherit}
 .ci-more-list button:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .ci-more-list button.danger{color:var(--dsw-alias-state-error-primary)}
@@ -375,22 +451,14 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-search-meta{min-width:0}
 .ci-search-sub{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .ci-name-stack{display:flex;flex-direction:column;gap:2px;min-width:0}
-.ci-query{display:grid;grid-template-columns:minmax(0,1fr) 168px;gap:10px;padding:12px;border-bottom:1px solid var(--dsw-alias-border-l1);align-items:stretch}
-.ci-query-side{display:flex;flex-direction:column;gap:6px;min-width:0}
-.ci-query .ci-tiny{margin:0 0 6px}
-.ci-cql{width:100%;min-height:72px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);padding:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;resize:vertical;box-sizing:border-box}
-.ci-cql:focus,.ci-cls .ci-region:focus,.ci-cls-filter .ci-combo input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
-.ci-hist{display:flex;align-items:flex-end;gap:2px;height:56px;padding:8px 12px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l1)}
-.ci-hist i{flex:1;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 42%,transparent);border-radius:2px 2px 0 0;min-height:2px}
+.ci-cql{width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ci-radius-lg);padding:10px 12px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;line-height:1.6;box-sizing:border-box}
+.ci-cql:focus,.ci-cls-control:focus{outline:none;border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}
 .ci-split{display:grid;grid-template-columns:minmax(108px,140px) minmax(0,1fr);min-width:0}
-.ci-log-pane{min-width:0;overflow:auto;max-height:360px}
-.ci-fields{border-right:1px solid var(--dsw-alias-border-l1);padding:8px;background:var(--dsw-alias-bg-layer-2);min-width:0}
-.ci-fields button{display:block;width:100%;text-align:left;border:0;background:none;padding:5px 6px;cursor:pointer;border-radius:var(--ci-radius-md);font:inherit;color:inherit}
+.ci-fields{border-right:1px solid var(--dsw-alias-border-l1);padding:10px;background:var(--dsw-alias-bg-layer-2);min-width:0;max-height:460px;overflow:auto}
+.ci-fields button{display:block;width:100%;text-align:left;border:0;background:none;padding:5px 6px;cursor:pointer;border-radius:var(--ci-radius-md);font:inherit;font-size:12px;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ci-fields button:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-brand-primary)}
-.ci-log{padding:8px 10px;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.ci-log-hd{display:flex;justify-content:space-between;gap:8px;color:var(--dsw-alias-label-tertiary);font-size:12px}
-.ci-cls .ci-kv{display:inline-block;margin:4px 6px 0 0;background:var(--dsw-alias-bg-layer-2);border-radius:var(--ci-radius-md);padding:1px 6px;font-size:12px}
-.ci-raw{font-family:ui-monospace,Menlo,monospace;font-size:12px;margin-top:4px;word-break:break-all}
+.ci-fields-h{display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin:0 0 6px;font-size:12px;color:var(--ci-fg-3)}
+.ci-raw{font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.6;margin:6px 0 0;padding:8px 10px;border-radius:var(--ci-radius-md);background:var(--ci-bg-2);word-break:break-word;white-space:pre-wrap}
 .ci-tiny{font-size:12px;color:var(--dsw-alias-label-tertiary)}
 .ci-table-scroll{overflow-x:auto;overflow-y:hidden;width:100%;max-width:100%;min-width:0;-webkit-overflow-scrolling:touch;isolation:isolate}
 .ci-cls .ci-table{width:100%;min-width:100%;border-collapse:collapse}
@@ -400,29 +468,77 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-cls .ci-name:hover,.ci-cls .ci-link:hover{color:var(--ci-brand)}
 .ci-cls .ci-table th{background:var(--ci-bg-2);color:var(--ci-fg);font-weight:600;border-top:0;border-bottom:1px solid var(--ci-border)}
 .ci-cls .ci-table td{border-top:1px solid var(--ci-border);padding:10px 12px}
-.ci-cls .ci-mini.primary{background:var(--ci-brand);color:var(--dsw-alias-label-primary-foreground);border-radius:var(--ci-radius-sm);height:32px;padding:0 16px;font-size:14px;border:0}
-.ci-cls .ci-mini.primary:hover:not(:disabled){background:var(--ci-brand)}
+.ci-cls .ci-mini.primary{background:var(--ci-brand);color:var(--dsw-alias-label-primary-foreground);border-radius:var(--ci-radius-lg);height:36px;padding:0 16px;font-size:14px;border:0}
+.ci-cls .ci-mini.primary:hover:not(:disabled){background:var(--ci-brand-hover)}
 .ci-cls .ci-back{border-radius:var(--ci-radius-sm);border-color:var(--ci-border);background:var(--dsw-alias-bg-layer-1);height:32px}
-.ci-cls .ci-region,.ci-cls-filter .ci-combo,.ci-cls .ci-search{border-radius:var(--ci-radius-lg);border-color:var(--ci-border);background:var(--dsw-alias-bg-layer-1)}
-.ci-cls .ci-cql{border-radius:var(--ci-radius-sm);border-color:var(--ci-border);background:var(--dsw-alias-bg-layer-1);min-height:64px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
-.ci-cls-mode{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
-.ci-cls-tag{height:22px;padding:0 8px;border:1px solid var(--ci-border);border-radius:var(--ci-radius-sm);font-size:12px;line-height:20px;color:var(--ci-fg);background:var(--dsw-alias-bg-layer-1)}
-.ci-cls-tag.on{border-color:var(--ci-brand);color:var(--ci-brand);background:var(--ci-brand-soft-14)}
-.ci-cls-hint{font-size:12px;color:var(--ci-fg-3)}
-.ci-cls-filter{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ci-fg-3);flex:none}
-.ci-cls-dist{padding:8px 12px 6px;border-bottom:1px solid var(--ci-border);background:var(--ci-bg-2)}
-.ci-cls-dist-h{display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;font-size:12px;color:var(--ci-fg-3)}
-.ci-cls .ci-hist{height:44px;padding:0;background:transparent;border:0}
-.ci-cls .ci-hist i{background:var(--ci-brand);opacity:.55;min-height:2px}
+.ci-cls .ci-search{border-radius:var(--ci-radius-lg);border-color:var(--ci-border);background:var(--dsw-alias-bg-layer-1)}
+.ci-cls-control{width:100%;height:36px;border:1px solid var(--ci-border);border-radius:var(--ci-radius-lg);background:var(--ci-bg);color:var(--ci-fg);padding:0 10px;font:inherit;font-size:13px;box-sizing:border-box}
+.ci-cls-filter{display:flex;align-items:center;gap:8px;flex:none}
+
+/* 检索条:一行放齐「语句 / 时间范围 / 检索分析」,语句框按内容在 36~120px 间伸缩(对齐控制台) */
+.ci-cls-bar{display:flex;align-items:flex-start;gap:8px;padding:12px;border-bottom:1px solid var(--ci-border);background:var(--ci-bg)}
+.ci-cls-bar-in{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.ci-cls .ci-cql{min-height:36px;max-height:120px;padding:7px 10px;border-radius:var(--ci-radius-lg);border-color:var(--ci-border);background:var(--ci-bg);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:20px;resize:vertical;overflow:auto}
+.ci-cls-hint{font-size:12px;line-height:16px;color:var(--ci-fg-4)}
+.ci-cls-range{flex:none;width:128px;min-width:128px}
+.ci-cls-go{flex:none;align-self:flex-start}
+.ci-cls-custom{display:flex;gap:12px;flex-wrap:wrap;padding:0 12px 12px;border-bottom:1px solid var(--ci-border);background:var(--ci-bg)}
+.ci-cls-custom-f{display:flex;flex-direction:column;gap:4px;width:200px}
+
+/* 日志时间分布:echarts 柱状图(色值从 color 读取,见 LogHistogram),失败退回 CSS 柱条 */
+.ci-cls-dist{padding:10px 12px 6px;border-bottom:1px solid var(--ci-border);background:var(--ci-bg)}
+.ci-cls-dist-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 2px;font-size:12px;color:var(--ci-fg-3)}
+.ci-cls-dist-t{font-size:13px;font-weight:600;color:var(--ci-fg)}
+.ci-cls-chart{width:100%;min-width:0;height:104px;color:var(--ci-brand)}
+.ci-cls-chart-empty{display:flex;align-items:center;justify-content:center;height:104px;font-size:12px;color:var(--ci-fg-4)}
+.ci-cls-chart-fallback{display:flex;align-items:flex-end;gap:2px;height:104px}
+.ci-cls-chart-fallback i{flex:1;min-height:2px;border-radius:2px 2px 0 0;background:var(--ci-brand);opacity:.55}
+
 .ci-cls-tabs{display:flex;align-items:flex-end;gap:4px;padding:0 12px;border-bottom:1px solid var(--ci-border);background:var(--dsw-alias-bg-layer-1)}
 .ci-cls-tab{height:36px;padding:0 14px;border:0;background:none;font:inherit;font-size:14px;color:var(--ci-fg-3)}
 .ci-cls-tab.on{color:var(--ci-brand);font-weight:600;box-shadow:inset 0 -2px 0 var(--ci-brand)}
-.ci-cls .ci-split{grid-template-columns:minmax(120px,160px) minmax(0,1fr);min-height:200px}
+.ci-cls-tools{display:flex;align-items:center;gap:6px;margin-left:auto;padding:5px 0}
+.ci-cls-tool{height:26px;padding:0 10px;border:1px solid var(--ci-border);border-radius:var(--ci-radius-md);background:var(--ci-bg);color:var(--ci-fg-2);font:inherit;font-size:12px;cursor:pointer}
+.ci-cls-tool:hover:not(:disabled){border-color:var(--ci-brand);color:var(--ci-brand)}
+.ci-cls-tool.on{border-color:var(--ci-brand);color:var(--ci-brand);background:var(--ci-brand-soft)}
+
+/* 原始日志:时间 + 原文两列表格,折叠一行、展开按字段列出(控制台形态) */
+/* 不换行时原文按 max-content 撑开,长日志靠列表自己的横向滚动条看全(不再一律截成省略号)。
+   表头与每一行必须共享列宽,所以外层做真正的网格、内层用 subgrid 借它的列:
+   若各行各自 max-content,列会逐行错位、表头背景也会在右侧断掉。 */
+.ci-logtable{display:grid;grid-template-columns:20px 172px minmax(max-content,1fr);align-content:start;max-height:460px;overflow:auto;background:var(--ci-bg)}
+.ci-logtable-h,.ci-logrow{grid-column:1/-1;display:grid;grid-template-columns:subgrid;gap:0 12px;align-items:start}
+/* subgrid 不可用时退回原来的固定布局:宁可截断,也不要错位的列 */
+@supports not (grid-template-columns:subgrid){
+.ci-logtable{display:block;grid-template-columns:none}
+.ci-logtable-h,.ci-logrow{grid-template-columns:20px 172px minmax(0,1fr)}
+.ci-logrow-c{overflow:hidden;text-overflow:ellipsis}
+}
+.ci-logtable-h{position:sticky;top:0;z-index:1;padding:8px 12px;background:var(--ci-bg-2);border-bottom:1px solid var(--ci-border);font-size:12px;color:var(--ci-fg-3)}
+.ci-logrow{padding:6px 12px;border-bottom:1px solid var(--ci-border);font-size:12px;line-height:20px}
+.ci-logrow:last-child{border-bottom:0}
+.ci-logrow:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ci-logrow-x{display:flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;background:none;color:var(--ci-fg-3);cursor:pointer}
+.ci-logrow-x:hover{color:var(--ci-brand)}
+.ci-logrow-caret{transform:rotate(-90deg);transition:transform .15s}
+.ci-logrow.open .ci-logrow-caret{transform:rotate(0)}
+.ci-logrow-t{color:var(--ci-fg-2);font-family:ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ci-logrow-c{min-width:0;font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap}
+/* 换行态回到「填满可视宽度、自己折行」,此时不需要横向滚动 */
+.ci-logtable:has(.ci-logrow.wrap){grid-template-columns:20px 172px minmax(0,1fr)}
+.ci-logrow.wrap .ci-logrow-c{overflow:visible;text-overflow:clip;white-space:pre-wrap;word-break:break-word}
+.ci-logrow.open>.ci-logrow-c{display:none}
+.ci-logkv{grid-column:3;display:grid;grid-template-columns:minmax(96px,168px) minmax(0,1fr);gap:2px 12px;margin:0}
+.ci-logkv dt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ci-fg-3)}
+.ci-logkv dd{margin:0;min-width:0;color:var(--ci-fg);font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+.ci-logrow-src{grid-column:3;margin-top:6px;color:var(--ci-fg-4)}
+.ci-logrow .ci-raw{grid-column:3}
+
+.ci-cls .ci-split{grid-template-columns:minmax(120px,168px) minmax(0,1fr);min-height:200px}
 .ci-cls .ci-fields{background:var(--ci-bg-2)}
-.ci-cls .ci-log-hd span:first-child{color:var(--ci-brand);font-variant-numeric:tabular-nums}
 .ci-cls .ci-page-btn.active{background:var(--ci-brand);color:var(--dsw-alias-label-primary-foreground);border-color:var(--ci-brand)}
 .ci-empty-search{border-top:0;padding:48px 16px}
-@media(max-width:640px){.ci-query,.ci-split{grid-template-columns:1fr}.ci-fields{border-right:0;border-bottom:1px solid var(--dsw-alias-border-l1)}}
+@media(max-width:640px){.ci-cls-bar{flex-wrap:wrap}.ci-cls-range,.ci-cls-go{width:100%;flex:1 1 100%}.ci-split{grid-template-columns:1fr}.ci-fields{border-right:0;border-bottom:1px solid var(--dsw-alias-border-l1);max-height:160px}.ci-logtable-h,.ci-logrow{grid-template-columns:20px minmax(0,1fr)}.ci-logrow-t{grid-column:2}.ci-logrow-c,.ci-logkv,.ci-logrow-src,.ci-logrow .ci-raw{grid-column:2}}
 
 
 .ci-image{--ci-title:var(--ci-fg);--ci-text:var(--ci-fg-2);--ci-muted:var(--ci-fg-3);--ci-faint:var(--ci-fg-4);width:100%;max-width:100%;min-width:0;color:var(--ci-text)}
@@ -505,9 +621,9 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-btn-mini{height:26px;padding:0 10px;font-size:var(--ci-font-xs)}
 
 /* Tabs(蓝色下划线版):替代既有 .ci-tabs/.ci-tab 组件,视觉同腾讯云控制台 */
-.ci-tabs-v2{display:flex;align-items:flex-end;gap:4px;padding:0 var(--ci-space-3);border-bottom:1px solid var(--ci-border);overflow-x:auto;min-width:0}
+.ci-tabs-v2{display:flex;align-items:flex-end;flex-wrap:wrap;gap:4px;padding:0 var(--ci-space-3);border-bottom:1px solid var(--ci-border);min-width:0}
 .ci-tab-v2{appearance:none;border:0;background:transparent;padding:12px 16px 10px;font:inherit;font-size:var(--ci-font-md);color:var(--ci-fg-3);cursor:pointer;white-space:nowrap;flex:none;border-bottom:2px solid transparent;margin-bottom:-1px;position:relative;box-sizing:border-box}
-.ci-tab-v2:hover{color:var(--ci-brand)}
+.ci-tab-v2:hover:not(:disabled){color:var(--ci-brand)}
 .ci-tab-v2.on{color:var(--ci-brand);font-weight:600;border-bottom-color:var(--ci-brand)}
 .ci-tab-v2:disabled{opacity:.45;cursor:not-allowed}
 .ci-tab-v2:focus-visible{outline:2px solid var(--ci-brand);outline-offset:-2px}
@@ -567,12 +683,16 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-chip-v2:disabled{opacity:.45;cursor:not-allowed}
 
 /* RegionPicker */
-.ci-regionpick{display:inline-flex;flex:none;min-width:0}
-.ci-regionpick-btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 var(--ci-space-3);border:1px solid var(--ci-border-2);border-radius:var(--ci-radius-pill);background:var(--ci-bg-2);color:var(--ci-fg);font:inherit;font-size:var(--ci-font-sm);cursor:pointer;white-space:nowrap;box-sizing:border-box}
+/* 固定宽度 140px:收起态显示城市名(最长「上海自动驾驶云」7 字 = 91px),留够 caret 与内边距不截断 */
+.ci-regionpick{display:inline-flex;flex:none;width:140px;min-width:140px;max-width:140px}
+.ci-regionpick-btn{display:inline-flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-width:0;height:32px;padding:0 10px;border:1px solid var(--ci-border-2);border-radius:var(--ci-radius-lg);background:var(--ci-bg-2);color:var(--ci-fg);font:inherit;font-size:var(--ci-font-sm);cursor:pointer;white-space:nowrap;box-sizing:border-box}
 .ci-regionpick-btn:hover:not(:disabled){border-color:var(--ci-brand);color:var(--ci-brand)}
 .ci-regionpick-btn:disabled{opacity:.45;cursor:not-allowed}
-.ci-regionpick-btn:focus-visible{outline:2px solid var(--ci-brand);outline-offset:2px}
-.ci-regionpick-caret{font-size:10px;color:var(--ci-fg-3);line-height:1;margin-left:2px}
+.ci-regionpick-btn:focus-visible{outline:none;border-color:var(--ci-brand);box-shadow:0 0 0 3px var(--ci-brand-ring)}
+.ci-regionpick-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-regionpick-caret{flex:none;color:var(--ci-fg-3);margin-left:2px;transition:transform .15s ease}
+.ci-regionpick-btn:hover:not(:disabled) .ci-regionpick-caret,.ci-regionpick-btn.open .ci-regionpick-caret{color:currentColor}
+.ci-regionpick-btn.open .ci-regionpick-caret{transform:rotate(180deg)}
 .ci-regionpick-btn.open{border-color:var(--ci-brand);color:var(--ci-brand)}
 
 /* RegionPicker 浮层(Portal 到 body):脱离 .ci-root 后 token 已由 .ci-regionpop 选择器并列补齐;
@@ -850,6 +970,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       AGENT_MISSING: "监控组件未安装",
       METRIC_NOT_FOUND: "指标不可用",
       API_ERROR: "接口错误",
+      INSTANCE_NOT_RUNNING: "实例未运行",
     };
 
     function MonitorPanel({ metrics, seriesMap, range, onRangeChange, note, session, instances, errors }) {
@@ -891,6 +1012,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         if (err.suggestion) return err.suggestion;
         if (err.errorType === "AGENT_MISSING") return "请检查并安装实例内监控组件";
         if (err.errorType === "METRIC_NOT_FOUND") return "云监控未提供该指标";
+        if (err.errorType === "INSTANCE_NOT_RUNNING") return "实例未运行，暂无监控数据";
         return "";
       };
       return h("div", { className: "ci-monitor" },
@@ -1248,8 +1370,24 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       );
     }
 
-    function ListPane({ busy, children }) {
-      return h("div", { className: "ci-list-body" },
+    // 列表区高度锚定:翻页时表格先被替换成矮一截的加载态、再换回新一页,
+    // 卡片高度这么一收一放会被对话流的「贴底」判定捕获,滚动条直接跳到最下面。
+    // 记住已渲染过的最大高度,加载中(以及 hold=多页列表)时用它兜底,让翻页不改变卡片高度。
+    function ListPane({ busy, hold, compact, children }) {
+      const box = useRef(null);
+      const peak = useRef(0);
+      useEffect(() => {
+        if (busy) return;
+        const el = box.current;
+        const own = el && el.offsetHeight ? el.offsetHeight : 0;
+        if (own > peak.current) peak.current = own;
+      });
+      const floor = (busy || hold) ? peak.current : 0;
+      return h("div", {
+        className: "ci-list-body" + (busy ? " busy" : "") + (compact ? " compact" : ""),
+        ref: box,
+        style: floor ? { minHeight: floor + "px" } : undefined,
+      },
         busy
           ? h("div", { className: "ci-load", "aria-live": "polite" }, h(Spin), "加载列表…")
           : children,
@@ -1409,6 +1547,17 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
     }
 
     /**
+     * 收起态只显示城市名:控制台的地域选择器也是这个口径(全称留给浮层)。
+     * CVM/轻量那条链会把地域归一成「华南地区（广州）」这样的控制台全称(且用全称当 id 传回后端过滤),
+     * 8 个汉字在固定宽度的胶囊里必然被截成「华南地区（...」,所以只在渲染时取括号内的城市。
+     */
+    function shortRegionLabel(label) {
+      const raw = safeField(label).trim();
+      const hit = raw.match(/^[^（(]*[（(]([^）)]+)[）)]\s*$/);
+      return hit && hit[1].trim() ? hit[1].trim() : raw;
+    }
+
+    /**
      * RegionPicker:共享地域选择组件。
      * props:
      *  - value: RegionOption | string | null(可传对象或 id 字符串)
@@ -1425,7 +1574,6 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       placeholder,
       regionAsString = true,
       inputId,
-      additionalStyle,
       product,
     }) {
       // 数据源:默认走共享 regions(由调用方从 regions-shared.ts 传入或 TENCENT_REGIONS);此处不硬编码,避免双源。
@@ -1510,7 +1658,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         if (onChange) onChange(regionAsString ? region.id : region);
       };
 
-      const displayLabel = valueObj ? valueObj.label : (placeholder || "选择地域");
+      const displayLabel = valueObj ? shortRegionLabel(valueObj.label) : (placeholder || "选择地域");
+      const fullLabel = valueObj ? safeField(valueObj.label) || displayLabel : displayLabel;
 
       const popup = open && typeof document !== "undefined" && popupPos ? createPortal(
         h("div", {
@@ -1557,11 +1706,25 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           ref: btnRef, type: "button",
           className: ("ci-regionpick-btn" + (open ? " open" : "")).trim(),
           disabled, "aria-haspopup": "listbox", "aria-expanded": open ? "true" : "false",
-          id: inputId, style: additionalStyle,
+          id: inputId, title: fullLabel,
           onClick: () => { if (disabled) return; setOpen(!open); if (!open) setHi(Math.max(0, flatHits.findIndex((r) => valueObj && r.id === valueObj.id))); },
         },
           h("span", { className: "ci-regionpick-text" }, displayLabel),
-          h("span", { "aria-hidden": "true", className: "ci-regionpick-caret" }, "▾"),
+          // 用 SVG 而不是「▾」字符:字形随字体变化,在 DSH 里渲染成偏上且过细的小三角,和文字基线对不齐
+          h("svg", {
+            className: "ci-regionpick-caret",
+            width: "10",
+            height: "10",
+            viewBox: "0 0 10 10",
+            "aria-hidden": "true",
+          }, h("path", {
+            d: "M2.2 4l2.8 2.8L7.8 4",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: "1.4",
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+          })),
         ),
         popup,
       );
@@ -1634,6 +1797,63 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       return list.find((name) => /广州/.test(name) || name === "ap-guangzhou") || list[0] || "华南地区（广州）";
     }
 
+    const INSTANCE_TAB_LABEL = { cvm: "云服务器", lighthouse: "轻量应用服务器" };
+
+    /** 清单里有这个地域吗?返回清单自己的写法(两条链文案口径不同,要用目标产品的原文回传后端)。 */
+    function regionOptionMatch(options, wanted) {
+      const want = canonicalRegionName(safeField(wanted));
+      if (!want) return "";
+      for (const name of (Array.isArray(options) ? options : [])) {
+        if (canonicalRegionName(name) === want) return name;
+      }
+      return "";
+    }
+
+    /**
+     * 把地域收敛到目标产品支持的一项。
+     *
+     * 云服务器与轻量的可用地域并不是一套:实测同一账号 CVM 44 个、轻量 18 个,
+     * 「清远信安」「上海自动驾驶云」这类专区只有 CVM 有;两边的文案口径也不同
+     * (CVM 给「华南地区（广州）」,轻量给「广州」)。所以切 Tab 时必须重挑一个地域,
+     * 否则请求会撞在后端的空结果或「未开通」上,选择器还会显示上一个产品的清单。
+     *
+     * 优先级:同一地域 → 同城异写(轻量的「广州」↔ CVM 的「华南地区（广州）」)→
+     * 同城专区回落主城(清远信安 → 清远)→ 该 Tab 上次选过的 → 该 Tab 默认(广州优先)。
+     *
+     * reason 用来区分要不要跟用户解释:same / alias 只是换了个写法,城市没变,不必打扰;
+     * city / remembered / default 真换了城市,必须说明。
+     */
+    function resolveRegionForOptions(options, wanted, remembered) {
+      const list = (Array.isArray(options) ? options : []).filter(Boolean);
+      if (!list.length) return { region: safeField(wanted), reason: "" };
+      const same = regionOptionMatch(list, wanted);
+      if (same) return { region: same, reason: "same" };
+      const cityOf = (name) => shortRegionLabel(canonicalRegionName(safeField(name)));
+      const wantCity = cityOf(wanted);
+      if (wantCity) {
+        const exact = list.find((name) => cityOf(name) === wantCity);
+        if (exact) return { region: exact, reason: "alias" };
+        // 专区回落主城:「清远信安」→「清远」;≥2 字才认,避免单字误伤
+        const trimmed = list.find((name) => {
+          const city = cityOf(name);
+          return city.length >= 2 && wantCity.length > city.length && wantCity.startsWith(city);
+        });
+        if (trimmed) return { region: trimmed, reason: "city" };
+      }
+      const kept = regionOptionMatch(list, remembered);
+      if (kept) return { region: kept, reason: "remembered" };
+      return { region: defaultRegionName(list), reason: "default" };
+    }
+
+    /** same/alias 只是换了写法,城市没变,不用打扰用户。 */
+    function regionFixWorthTelling(reason) {
+      return reason === "city" || reason === "remembered" || reason === "default";
+    }
+
+    function regionSwitchNote(tabLabel, from, to) {
+      return `${tabLabel}没有「${shortRegionLabel(from)}」地域，已切换到「${shortRegionLabel(to)}」`;
+    }
+
     // 「全部地域」已随需求下线(腾讯控制台亦不提供该汇总项),旧 RegionCombo/RegionComboById 与全部地域哨兵一并移除;
     // 所有地域选择统一走共享 RegionPicker。
 
@@ -1657,6 +1877,16 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       ["曼谷", "亚太东南（曼谷）"],
       ["深圳", "华南地区（深圳）"],
       ["金融", "华南地区（深圳金融）"],
+      // 轻量应用服务器返回的是城市短名,缺映射时浮层里会混着「华南地区（广州）」和「清远」两种写法,
+      // 跨 Tab 也会因为写法不同而被判成「不支持」。以下全称取自 CVM DescribeRegions 的实际返回。
+      ["清远", "华南地区（清远）"],
+      ["中国香港", "港澳台地区（中国香港）"],
+      ["中国台北", "港澳台地区（中国台北）"],
+      ["大阪", "亚太东北（大阪）"],
+      ["圣保罗", "南美地区（圣保罗）"],
+      ["利雅得", "中东地区（利雅得）"],
+      ["新山", "亚太东南（新山）"],
+      ["中卫", "西北地区（中卫）"],
     ];
     function canonicalRegionName(name) {
       const raw = String(name || "").trim();
@@ -1697,18 +1927,32 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
     }
 
     function KindTabs({ value, onChange }) {
-      return h("div", { className: "ci-tabs" },
+      return h("div", { className: "ci-tabs", role: "tablist" },
         h("button", {
           type: "button",
+          role: "tab",
+          "aria-selected": value === "cvm" ? "true" : "false",
+          title: "云服务器 CVM",
           className: "ci-tab" + (value === "cvm" ? " on" : ""),
           onClick: () => onChange && onChange("cvm"),
         }, "云服务器"),
         h("button", {
           type: "button",
+          role: "tab",
+          "aria-selected": value === "lighthouse" ? "true" : "false",
+          title: "轻量应用服务器 Lighthouse",
           className: "ci-tab" + (value === "lighthouse" ? " on" : ""),
           onClick: () => onChange && onChange("lighthouse"),
         }, "轻量应用服务器"),
       );
+    }
+
+    // 状态筛选口径与后端 mapInstanceState / INSTANCE_STATUS_OPTIONS 一致(过渡态不单列)
+    const INSTANCE_STATUS_OPTIONS = ["运行中", "待回收", "已关机"];
+
+    function statusFilterList(value) {
+      const raw = Array.isArray(value) ? value : String(value || "").split(",");
+      return raw.map((item) => String(item || "").trim()).filter(Boolean);
     }
 
     function instancePower(item) {
@@ -1855,6 +2099,247 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       );
     }
 
+    // ============================================================
+    // 面板窗口化:对话卡片宽度就那么点,宽表在里面永远要横向滚、监控图也挤成一条。
+    // 这里不复制一棵新的 UI,而是把同一棵面板搬到 body 上的浮层里(inline / window / full 三态),
+    // 面板自己完全不知道这件事,所有产品卡共用。
+    // ============================================================
+
+    const WIN_MIN_W = 520;
+    const WIN_MIN_H = 320;
+    let bodyScrollLocks = 0;
+    let bodyOverflowBeforeLock = "";
+
+    function lockBodyScroll() {
+      if (bodyScrollLocks === 0) {
+        bodyOverflowBeforeLock = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+      }
+      bodyScrollLocks += 1;
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        bodyScrollLocks = Math.max(0, bodyScrollLocks - 1);
+        if (bodyScrollLocks === 0) {
+          document.body.style.overflow = bodyOverflowBeforeLock;
+          bodyOverflowBeforeLock = "";
+        }
+      };
+    }
+
+    function viewportBox() {
+      const w = typeof window !== "undefined" && window.innerWidth ? window.innerWidth : 1280;
+      const h = typeof window !== "undefined" && window.innerHeight ? window.innerHeight : 860;
+      return { w, h };
+    }
+
+    function defaultWinRect() {
+      const vp = viewportBox();
+      const w = Math.max(Math.min(WIN_MIN_W, vp.w - 16), Math.min(1180, Math.round(vp.w * 0.86)));
+      const h = Math.max(Math.min(WIN_MIN_H, vp.h - 16), Math.min(880, Math.round(vp.h * 0.84)));
+      return { x: Math.round((vp.w - w) / 2), y: Math.round((vp.h - h) / 2), w, h };
+    }
+
+    /**
+     * 窗口整体留在视口内:拖出去之后抓不回来,比"能拖到屏幕外"难受得多。
+     *
+     * 拖动与缩放的夹法必须分开:拖动时按尺寸夹位置;缩放时按位置夹尺寸 ——
+     * 反过来会变成"往右下拉把手,窗口反而向左上跑",手感是错的。
+     */
+    function clampWinRect(rect, mode) {
+      const vp = viewportBox();
+      const maxW = Math.max(WIN_MIN_W, vp.w - 16);
+      const maxH = Math.max(WIN_MIN_H, vp.h - 16);
+      if (mode === "size") {
+        const x = Math.min(Math.max(Math.round(rect.x), 8), Math.max(8, vp.w - WIN_MIN_W - 8));
+        const y = Math.min(Math.max(Math.round(rect.y), 8), Math.max(8, vp.h - WIN_MIN_H - 8));
+        return {
+          x,
+          y,
+          w: Math.min(Math.max(Math.round(rect.w), WIN_MIN_W), Math.min(maxW, vp.w - x - 8)),
+          h: Math.min(Math.max(Math.round(rect.h), WIN_MIN_H), Math.min(maxH, vp.h - y - 8)),
+        };
+      }
+      const w = Math.min(Math.max(Math.round(rect.w), WIN_MIN_W), maxW);
+      const h = Math.min(Math.max(Math.round(rect.h), WIN_MIN_H), maxH);
+      const x = Math.min(Math.max(Math.round(rect.x), 8), Math.max(8, vp.w - w - 8));
+      const y = Math.min(Math.max(Math.round(rect.y), 8), Math.max(8, vp.h - h - 8));
+      return { x, y, w, h };
+    }
+
+    function WinIcon({ name }) {
+      const common = { width: 14, height: 14, viewBox: "0 0 14 14", fill: "none", "aria-hidden": "true" };
+      const stroke = { stroke: "currentColor", "strokeWidth": 1.3, "strokeLinecap": "round", "strokeLinejoin": "round" };
+      if (name === "window") {
+        return h("svg", common,
+          h("rect", { x: 1.6, y: 3.4, width: 8.4, height: 7, rx: 1.4, ...stroke }),
+          h("path", { d: "M4.6 3.4V2.6a1 1 0 0 1 1-1h6.2a1 1 0 0 1 1 1v6.2a1 1 0 0 1-1 1h-.8", ...stroke }),
+        );
+      }
+      if (name === "full") {
+        return h("svg", common,
+          h("path", { d: "M1.8 5V2.4a.6.6 0 0 1 .6-.6H5M9 1.8h2.6a.6.6 0 0 1 .6.6V5M12.2 9v2.6a.6.6 0 0 1-.6.6H9M5 12.2H2.4a.6.6 0 0 1-.6-.6V9", ...stroke }),
+        );
+      }
+      if (name === "restore") {
+        return h("svg", common,
+          h("rect", { x: 2.2, y: 2.2, width: 9.6, height: 9.6, rx: 1.4, ...stroke }),
+          h("path", { d: "M5.4 8.6V5.4h3.2", ...stroke }),
+        );
+      }
+      return h("svg", common, h("path", { d: "M3.2 3.2l7.6 7.6M10.8 3.2l-7.6 7.6", ...stroke }));
+    }
+
+    /**
+     * 把一棵面板包成可窗口化 / 全屏的外壳。
+     *
+     * - inline:原样嵌在对话卡片里,右上角一条极轻的图标条(窗口化 / 全屏)。
+     * - window:portal 到 body,标题栏可拖,右/下/右下角可缩放,双击标题栏切全屏。
+     * - full:铺满视口。
+     *
+     * z-index 压在 --ci-z-modal 之下:面板内部的确认框、表单弹窗、地域浮层都还得盖在窗口之上。
+     * ESC 用非捕获监听,让内层弹窗先消费；即使弹窗只 preventDefault、不 stopPropagation，
+     * 窗口层也会检查 defaultPrevented 和现存浮层，避免一次关两层。
+     */
+    function PanelFrame({ title, className, children }) {
+      const [mode, setMode] = useState("inline");
+      const [rect, setRect] = useState(defaultWinRect);
+      const drag = useRef(null);
+
+      useEffect(() => {
+        if (mode === "inline") return;
+        const onKey = (e) => {
+          if (e.key !== "Escape") return;
+          if (e.defaultPrevented || document.querySelector(".ci-modal-mask,.ci-regionpop,.ci-more-menu,.ci-colfilter")) return;
+          e.preventDefault();
+          setMode("inline");
+        };
+        const onResize = () => setRect((cur) => clampWinRect(cur, "move"));
+        document.addEventListener("keydown", onKey);
+        window.addEventListener("resize", onResize);
+        // 浮层打开期间锁住宿主页面滚动:鼠标在遮罩上滚会把身后的对话流带跑
+        // 多张卡可同时窗口化，必须引用计数；任意一张先关闭都不能提前解锁宿主页面。
+        const unlockBodyScroll = lockBodyScroll();
+        return () => {
+          document.removeEventListener("keydown", onKey);
+          window.removeEventListener("resize", onResize);
+          unlockBodyScroll();
+        };
+      }, [mode]);
+
+      // 拖拽与缩放都挂在 document 上:指针移出窗口边界后仍要跟手
+      const startGesture = (kind, edge) => (e) => {
+        if (mode !== "window" || e.button !== 0) return;
+        e.preventDefault();
+        drag.current = { kind, edge, mx: e.clientX, my: e.clientY, ...rect };
+        const onMove = (ev) => {
+          const from = drag.current;
+          if (!from) return;
+          const dx = ev.clientX - from.mx;
+          const dy = ev.clientY - from.my;
+          setRect(kind === "move"
+            ? clampWinRect({ x: from.x + dx, y: from.y + dy, w: from.w, h: from.h }, "move")
+            : clampWinRect({
+              x: from.x,
+              y: from.y,
+              w: edge === "s" ? from.w : from.w + dx,
+              h: edge === "e" ? from.h : from.h + dy,
+            }, "size"));
+        };
+        const onUp = () => {
+          drag.current = null;
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      };
+
+      const openWindow = () => { setRect(clampWinRect(rect, "move")); setMode("window"); };
+      const panel = h("div", { className: ("ci-root " + (className || "")).trim() }, children);
+
+      if (mode === "inline") {
+        return h("div", { className: ("ci-root " + (className || "")).trim() },
+          h("div", { className: "ci-winctl" },
+            h("button", {
+              type: "button",
+              className: "ci-winctl-btn",
+              title: "在窗口中打开",
+              "aria-label": "在窗口中打开",
+              onClick: openWindow,
+            }, h(WinIcon, { name: "window" })),
+            h("button", {
+              type: "button",
+              className: "ci-winctl-btn",
+              title: "全屏打开",
+              "aria-label": "全屏打开",
+              onClick: () => setMode("full"),
+            }, h(WinIcon, { name: "full" })),
+          ),
+          children,
+        );
+      }
+
+      const full = mode === "full";
+      const node = h("div", { className: "ci-winframe", role: "presentation" },
+        h("div", {
+          className: "ci-win" + (full ? " full" : ""),
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-label": title || "云资源",
+          style: full ? undefined : { left: rect.x + "px", top: rect.y + "px", width: rect.w + "px", height: rect.h + "px" },
+        },
+          h("div", {
+            className: "ci-win-bar",
+            onMouseDown: startGesture("move"),
+            onDoubleClick: () => setMode(full ? "window" : "full"),
+          },
+            h("span", { className: "ci-win-t" }, title || "云资源"),
+            h("div", { className: "ci-win-ops" },
+              full
+                ? h("button", {
+                  type: "button",
+                  className: "ci-win-op",
+                  title: "还原为窗口",
+                  "aria-label": "还原为窗口",
+                  onClick: () => setMode("window"),
+                }, h(WinIcon, { name: "restore" }))
+                : h("button", {
+                  type: "button",
+                  className: "ci-win-op",
+                  title: "全屏",
+                  "aria-label": "全屏",
+                  onClick: () => setMode("full"),
+                }, h(WinIcon, { name: "full" })),
+              h("button", {
+                type: "button",
+                className: "ci-win-op close",
+                title: "收回对话卡片（Esc）",
+                "aria-label": "收回对话卡片",
+                onClick: () => setMode("inline"),
+              }, h(WinIcon, { name: "close" })),
+            ),
+          ),
+          h("div", { className: "ci-win-body" }, panel),
+          full ? null : [
+            h("div", { key: "e", className: "ci-win-grip e", onMouseDown: startGesture("size", "e") }),
+            h("div", { key: "s", className: "ci-win-grip s", onMouseDown: startGesture("size", "s") }),
+            h("div", { key: "se", className: "ci-win-grip se", onMouseDown: startGesture("size", "se") }),
+          ],
+        ),
+      );
+      // 浮层挂 body,但对话卡片里要留一个占位:面板整棵树搬走后卡片会塌成 0 高,
+      // 对话流的"贴底"判定会把滚动条拽到最下面。
+      return h("div", { className: ("ci-root " + (className || "")).trim() },
+        h("div", { className: "ci-win-away" },
+          h("span", null, full ? "已全屏打开" : "已在窗口中打开"),
+          h("button", { type: "button", className: "ci-mini", onClick: () => setMode("inline") }, "收回这里"),
+        ),
+        createPortal(node, document.body),
+      );
+    }
+
     function useOverlayKeys(open, busy, onClose, capture) {
       const box = useRef(null);
       useEffect(() => {
@@ -1957,7 +2442,21 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       return String(certMeta(item)[label] || "");
     }
 
-    function triggerDownload(filename, content, contentType) {
+    function triggerDownload(filename, content, contentType, href) {
+      // 后端可能只拿到临时下载链接(密钥缺 ssl:DownloadCertificate 时的兜底):跨域链接上 download 属性无效,
+      // 靠对象存储自己的 Content-Disposition 落盘,所以新开一个标签页交给浏览器。
+      if (!content && href) {
+        const link = String(href);
+        if (!/^https:\/\//i.test(link)) throw new Error("下载链接无效");
+        const a = document.createElement("a");
+        a.href = link;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        return;
+      }
       const raw = String(content || "");
       if (!raw) throw new Error("没有可下载的内容");
       if (/-----BEGIN /i.test(raw)) throw new Error("下载内容含 PEM，不支持明文下发，请使用 zip 包下载");
@@ -1986,7 +2485,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       );
     }
 
-    function MoreMenu({ item, open, onToggle, onClose, onAction }) {
+    function CertMoreMenu({ item, open, onToggle, onClose, onAction }) {
       const meta = certMeta(item);
       const status = Number(meta.status);
       const items = [];
@@ -2071,7 +2570,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       return h("div", { className: "ci-ops" },
         meta.deployable ? h("button", { type: "button", className: "ci-link", disabled: busy, onClick: () => onDeploy(item) }, "部署") : null,
         meta.downloadable ? h("button", { type: "button", className: "ci-link", disabled: busy, onClick: () => onDownload(item) }, busy ? "下载中" : "下载") : null,
-        h(MoreMenu, {
+        h(CertMoreMenu, {
           item,
           open: moreId === item.id,
           onToggle: () => setMoreId(moreId === item.id ? "" : item.id),
@@ -2084,7 +2583,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
     function CertTable({ items, pendingId, moreId, setMoreId, onOpen, emptyHint, onDeploy, onDownload, onMore }) {
       const rows = Array.isArray(items) ? items.filter(Boolean) : [];
       if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "没有证书");
-      const template = "minmax(110px,1.1fr) minmax(140px,1.3fr) minmax(72px,0.8fr) minmax(110px,1fr) minmax(88px,0.9fr) minmax(130px,1fr) 128px";
+      // 操作列给 max-content:固定 128px 时「部署 下载 更多」正好顶满,切到「下载中」就会溢出遮住有效期列
+      const template = "minmax(110px,1.1fr) minmax(140px,1.3fr) minmax(72px,0.8fr) minmax(110px,1fr) minmax(88px,0.9fr) minmax(130px,1fr) minmax(128px,max-content)";
       const head = ["证书 ID", "绑定域名", "备注", "类型/品牌", "状态", "有效期", "操作"];
       return h("div", { className: "ci-list ci-cert-list" },
         h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
@@ -3268,8 +3768,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           onClose: () => setMissDismissed(true),
         }) : null,
         !session && !selected && !listErr ? h("div", { key: "need-region", className: "ci-empty" }, "请输入并选择地域，再查看该地域下的存储桶。") : null,
-        !session && selected && listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : null,
-        !session && selected && !listBusy && !(listErr && !rows.length) ? h(CosBucketTable, {
+        !session && selected ? h(ListPane, { key: "body", busy: listBusy, hold: pageCount > 1 }, !(listErr && !rows.length) ? h(CosBucketTable, {
           key: "buckets",
           items: rows,
           pendingId,
@@ -3279,7 +3778,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
             { moduleId: item.moduleId, id: item.id, bucket: item.title, payload: { bucket: item.title } },
             `确定删除空存储桶 ${item.title}？非空桶会失败。`,
           ),
-        }) : null,
+        }) : null) : null,
         !session && selected && !(listErr && !rows.length) ? h(Pager, {
           key: "pager",
           total: counted,
@@ -3557,7 +4056,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         role: "presentation",
         onClick: (e) => { if (!busy && e.target === e.currentTarget) onCancel(); },
       },
-        h("div", { className: "ci-modal", role: "dialog", "aria-modal": "true", ref: box },
+        h("div", { className: "ci-modal ci-form-modal", role: "dialog", "aria-modal": "true", ref: box },
           h("h3", null, title),
           fields.map((field) => h("div", { className: "ci-field", key: field.key },
             h("label", null, field.label),
@@ -3644,13 +4143,13 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
               h("div", { key: safeText(row.label) + "k", className: "ci-k" }, safeField(row.label)),
               h("div", { key: row.label + "v" },
                 row.value,
-                row.label === "实例名称" ? h("button", { type: "button", className: "ci-link", style: { marginLeft: 8 }, onClick: () => setForm({
+                row.label === "实例名称" ? h("button", { type: "button", className: "ci-link ci-inline-action", onClick: () => setForm({
                   title: "修改实例名称",
                   fields: [{ key: "instanceName", label: "实例名称" }],
                   initial: { instanceName: cdbMeta(item).instanceName || item.description || "" },
                   action: { id: "instance.rename", label: "修改实例名称", confirm: "default" },
                 }) }, "修改") : null,
-                row.label === "内网地址" ? h("button", { type: "button", className: "ci-link", style: { marginLeft: 8 }, onClick: () => setForm({
+                row.label === "内网地址" ? h("button", { type: "button", className: "ci-link ci-inline-action", onClick: () => setForm({
                   title: "修改端口",
                   fields: [{ key: "port", label: "端口", placeholder: "3306" }],
                   initial: { port: cdbMeta(item).port || "3306" },
@@ -3658,8 +4157,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
                 }) }, "修改端口") : null,
                 row.label === "外网地址" ? h("button", {
                   type: "button",
-                  className: "ci-link",
-                  style: { marginLeft: 8 },
+                  className: "ci-link ci-inline-action",
                   onClick: () => request(
                     { id: extra.wanOpen ? "instance.closeWan" : "instance.openWan", label: extra.wanOpen ? "关闭外网连接地址" : "开启外网连接地址", confirm: "default" },
                     {},
@@ -4118,7 +4616,112 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       ];
     }
 
-    function MoreMenu({ item, disabled, onAction }) {
+    function FilterIcon() {
+      return h("svg", { width: "12", height: "12", viewBox: "0 0 12 12", "aria-hidden": "true" },
+        h("path", {
+          d: "M1.5 2.5h9L7 6.6v3.2L5 8.6V6.6z",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "1.2",
+          strokeLinejoin: "round",
+        }),
+      );
+    }
+
+    // 控制台「状态」列筛选:表头漏斗图标 + 多选浮层((全选)/确定/重置)。
+    // 浮层必须 portal 到 body 并用 fixed 定位——列表的 th 与 .ci-scroll 都是 overflow 裁剪容器,
+    // 用绝对定位会被裁掉半个下拉。
+    function ColumnFilter({ label, options, value, onChange, disabled }) {
+      const list = Array.isArray(options) ? options : [];
+      const applied = Array.isArray(value) ? value.filter(Boolean) : [];
+      const [open, setOpen] = useState(false);
+      const [draft, setDraft] = useState(applied);
+      const btn = useRef(null);
+      const popRef = useRef(null);
+      const [pos, setPos] = useState(null);
+      useEffect(() => {
+        if (!open) {
+          setPos(null);
+          return;
+        }
+        setDraft(applied);
+        const place = () => {
+          const el = btn.current;
+          if (!el || typeof el.getBoundingClientRect !== "function") return;
+          const r = el.getBoundingClientRect();
+          const width = 176;
+          const vw = typeof window !== "undefined" ? window.innerWidth : r.right;
+          const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+          const height = (list.length + 1) * 32 + 56;
+          const left = Math.max(8, Math.min(r.left, vw - width - 8));
+          const top = r.bottom + 4 + height > vh - 8 ? Math.max(8, r.top - height - 4) : r.bottom + 4;
+          setPos({ top, left, width });
+        };
+        place();
+        const onDoc = (e) => {
+          if (btn.current && btn.current.contains(e.target)) return;
+          if (popRef.current && popRef.current.contains(e.target)) return;
+          setOpen(false);
+        };
+        const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+        document.addEventListener("mousedown", onDoc);
+        document.addEventListener("keydown", onKey);
+        window.addEventListener("resize", place);
+        window.addEventListener("scroll", place, true);
+        return () => {
+          document.removeEventListener("mousedown", onDoc);
+          document.removeEventListener("keydown", onKey);
+          window.removeEventListener("resize", place);
+          window.removeEventListener("scroll", place, true);
+        };
+      }, [open]);
+      const allOn = list.length > 0 && draft.length === list.length;
+      const toggle = (name) => setDraft((cur) => cur.includes(name) ? cur.filter((row) => row !== name) : [...cur, name]);
+      const commit = (next) => {
+        setOpen(false);
+        // 全选与不选等价于「不筛选」,统一收敛成空数组,请求里不带无意义的全量条件
+        onChange && onChange(next.length === list.length ? [] : next);
+      };
+      const pop = open && pos && typeof document !== "undefined" ? createPortal(h("div", {
+        className: "ci-colfilter",
+        ref: popRef,
+        role: "dialog",
+        "aria-label": `${label || ""}筛选`,
+        style: { top: pos.top + "px", left: pos.left + "px", minWidth: pos.width + "px" },
+      },
+        h("label", { className: "ci-colfilter-row" },
+          h("input", {
+            type: "checkbox",
+            checked: allOn,
+            onChange: () => setDraft(allOn ? [] : list.slice()),
+          }),
+          h("span", null, "(全选)"),
+        ),
+        list.map((name) => h("label", { key: name, className: "ci-colfilter-row" },
+          h("input", { type: "checkbox", checked: draft.includes(name), onChange: () => toggle(name) }),
+          h("span", null, name),
+        )),
+        h("div", { className: "ci-colfilter-foot" },
+          h("button", { type: "button", className: "ci-btn ci-btn-mini ci-btn-primary", onClick: () => commit(draft) }, "确定"),
+          h("button", { type: "button", className: "ci-btn ci-btn-mini ci-btn-ghost", onClick: () => { setDraft([]); commit([]); } }, "重置"),
+        ),
+      ), document.body) : null;
+      return h("span", { className: "ci-th" },
+        h("span", null, label),
+        h("button", {
+          type: "button",
+          className: "ci-filter-btn" + (applied.length ? " on" : ""),
+          ref: btn,
+          disabled,
+          "aria-label": `筛选${label || ""}`,
+          "aria-expanded": open ? "true" : "false",
+          onClick: (e) => { e.stopPropagation(); setOpen(!open); },
+        }, h(FilterIcon)),
+        pop,
+      );
+    }
+
+    function InstanceMoreMenu({ item, disabled, onAction }) {
       const [open, setOpen] = useState(false);
       const box = useRef(null);
       const power = instancePower(item);
@@ -4161,14 +4764,30 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       ];
     }
 
-    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, q, busy }) {
+    // 表头常驻:状态筛完为空时也要能在原位撤销筛选,所以空态提示放在表格下方而不是替换整张表
+    function InstanceHead({ labels, status, onStatus, busy }) {
+      return h("thead", null, h("tr", null, labels.map((label) => h("th", { key: label },
+        label === "状态"
+          ? h(ColumnFilter, { label, options: INSTANCE_STATUS_OPTIONS, value: status, onChange: onStatus, disabled: busy })
+          : label,
+      ))));
+    }
+
+    function instanceEmptyHint(emptyHint, q, status) {
+      if (statusFilterList(status).length) return `没有「${statusFilterList(status).join("、")}」状态的实例`;
+      return emptyHint || ((q || "").trim() ? `没有匹配「${String(q).trim()}」的实例` : "没有匹配的实例");
+    }
+
+    function CvmConsole({ items, pendingId, onOpen, onAction, emptyHint, q, busy, hold, status, onStatus }) {
       const rows = Array.isArray(items) ? items : [];
-      return h(ListPane, { busy },
-        rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
-          h("thead", null, h("tr", null,
-            ["ID/名称", "状态", "可用区", "实例类型", "操作系统", "实例配置", "主IPv4地址", "实例计费模式", "操作"]
-              .map((label) => h("th", { key: label }, label)),
-          )),
+      return h(ListPane, { busy, hold },
+        h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
+          h(InstanceHead, {
+            labels: ["ID/名称", "状态", "可用区", "实例类型", "操作系统", "实例配置", "主IPv4地址", "实例计费模式", "操作"],
+            status,
+            onStatus,
+            busy,
+          }),
           h("tbody", null, rows.map((item) => h("tr", { key: item.id },
             h("td", null, h("div", { className: "ci-id" },
               h("button", {
@@ -4186,19 +4805,25 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
             h("td", null, cellValue(item, "实例配置") || "-"),
             h("td", null, h(MainIpv4, { item })),
             h("td", null, cellValue(item, "实例计费模式") || "-"),
-            h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
+            h("td", null, h(InstanceMoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : h("div", { className: "ci-empty" }, emptyHint || ((q || "").trim() ? `没有匹配「${String(q).trim()}」的实例` : "没有匹配的实例")),
+        ),
+          // 空态必须待在滚动容器里:否则容器只包住表头,横向滚动条就压在表头下沿(而不是整块表格底部)
+          rows.length ? null : h("div", { className: "ci-empty" }, instanceEmptyHint(emptyHint, q, status)),
+        ),
       );
     }
 
-    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, q, busy }) {
+    function LhConsole({ items, pendingId, onOpen, onAction, emptyHint, q, busy, hold, status, onStatus }) {
       const rows = Array.isArray(items) ? items : [];
-      return h(ListPane, { busy },
-        rows.length ? h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
-          h("thead", null, h("tr", null,
-            ["ID/名称", "状态", "可用区", "套餐", "公网 IP", "到期时间", "操作"].map((label) => h("th", { key: label }, label)),
-          )),
+      return h(ListPane, { busy, hold },
+        h("div", { className: "ci-scroll" }, h("table", { className: "ci-dense" },
+          h(InstanceHead, {
+            labels: ["ID/名称", "状态", "可用区", "套餐", "公网 IP", "到期时间", "操作"],
+            status,
+            onStatus,
+            busy,
+          }),
           h("tbody", null, rows.map((item) => h("tr", { key: item.id },
             h("td", null, h("div", { className: "ci-id" },
               h("button", {
@@ -4214,9 +4839,11 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
             h("td", null, cellValue(item, "套餐") || "-"),
             h("td", null, item.publicIp || cellValue(item, "公网 IP") || "-"),
             h("td", null, cellValue(item, "到期时间") || "-"),
-            h("td", null, h(MoreMenu, { item, disabled: pendingId === item.id, onAction })),
+            h("td", null, h(InstanceMoreMenu, { item, disabled: pendingId === item.id, onAction })),
           ))),
-        )) : h("div", { className: "ci-empty" }, emptyHint || ((q || "").trim() ? `没有匹配「${String(q).trim()}」的实例` : "没有匹配的实例")),
+        ),
+          rows.length ? null : h("div", { className: "ci-empty" }, instanceEmptyHint(emptyHint, q, status)),
+        ),
       );
     }
 
@@ -4344,6 +4971,22 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       return fallback;
     }
 
+    /** 窗口标题栏用的产品名:比卡片顶栏的标题更完整,窗口脱离了对话上下文,得自己说清是什么。 */
+    function frameTitleOf(kind) {
+      const map = {
+        cvm: "云服务器",
+        lighthouse: "轻量应用服务器",
+        auto: "云服务器 / 轻量应用服务器",
+        cdb: "云数据库 MySQL",
+        dbbrain: "数据库智能管家",
+        cert: "SSL 证书 · 我的证书",
+        registrar: "域名注册",
+        "my-domain": "我的域名",
+        domain: "域名解析",
+      };
+      return map[kind] || "云资源";
+    }
+
     function barTitleOf(kind) {
       if (kind === "cert") return "我的证书";
       if (kind === "registrar") return "域名注册";
@@ -4355,7 +4998,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 
     function searchPlaceholderOf(kind) {
       if (kind === "cert") return "搜索证书 ID / 备注 / 域名";
-      if (kind === "registrar") return "请输入域名或后缀";
+      if (kind === "registrar") return "域名或名称，如 example.com";
       if (kind === "my-domain" || kind === "domain") return "请输入域名关键字";
       if (kind === "dbbrain") return "实例 ID / 名称";
       return "搜索";
@@ -4371,10 +5014,49 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       return extraOf(item, "actionHint", "") || item.openLabel || cellValue(item, "状态") || "已被注册";
     }
 
-    function RegistrarTable({ items, pendingId, cartTitles, onAdd, emptyHint }) {
+    /** 输入不是域名时,与其回一句「没有匹配的资源」,不如直接说清该怎么输。 */
+    function registrarEmptyHint(q) {
+      const raw = String(q || "").trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].replace(/\.$/, "");
+      if (!raw) return "输入域名或名称后回车查询，例如 example 或 example.com";
+      if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(raw)) return `「${raw}」不是合法域名：只能用字母、数字和连字符`;
+      return `没查到「${raw}」的注册信息，换个名字再试`;
+    }
+
+    function RegistrarTable({ items, pendingId, cartTitles, onAdd, onRemove, emptyHint }) {
       const rows = Array.isArray(items) ? items.filter(Boolean) : [];
       if (!rows.length) return h("div", { className: "ci-empty" }, emptyHint || "请输入域名后查询");
-      const template = "minmax(120px,1.7fr) 84px minmax(72px,0.8fr) 110px";
+      const template = "minmax(150px,1.7fr) 88px minmax(76px,0.8fr) minmax(76px,max-content)";
+      // 已加购的行要能就地退出,不能只留一个灰掉的「已加购」当死路;
+      // 后端补出来的同名其它后缀单独分一段,免得看着像用户没搜过的东西混进了结果里
+      const renderRow = (item) => {
+        const addable = canAddCart(item);
+        const inCart = (cartTitles || []).includes(item.title);
+        return h("div", {
+          key: item.id,
+          className: "ci-row" + (inCart ? " picked" : ""),
+          style: { gridTemplateColumns: template },
+        },
+          h("div", { className: "ci-cell" },
+            h("span", { className: "ci-name", title: safeField(item.title), style: { cursor: "default" } }, safeField(item.title)),
+            inCart ? h("span", { className: "ci-badge", style: { marginLeft: "6px", marginRight: 0 } }, "已加购") : null,
+          ),
+          // 「已被注册」在后端是 error,但对用户只是个事实,不该用报错色;溢价/敏感词才是要留意的黄色
+          h("div", { className: "ci-cell" }, h("span", {
+            className: "ci-st " + (item.status === "enable" ? "enable" : item.status === "pause" ? "pause" : "plain"),
+          }, cellValue(item, "状态") || item.description || "-")),
+          h("div", { className: "ci-cell num" }, cellValue(item, "价格") || "-"),
+          h("div", { className: "ci-cell ci-ops" }, addable
+            ? h("button", {
+              type: "button",
+              className: "ci-link",
+              disabled: pendingId === item.id,
+              onClick: () => (inCart ? onRemove(item.title) : onAdd(item)),
+            }, inCart ? "移除" : "立即加购")
+            : h("span", { className: "ci-op-hint" }, actionHint(item))),
+        );
+      };
+      const exact = rows.filter((item) => extraOf(item, "suggested", false) !== true);
+      const more = rows.filter((item) => extraOf(item, "suggested", false) === true);
       return h("div", { className: "ci-list" },
         h("div", { className: "ci-row head", style: { gridTemplateColumns: template } },
           h("div", { className: "ci-cell" }, "域名"),
@@ -4382,23 +5064,26 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           h("div", { className: "ci-cell" }, "价格"),
           h("div", { className: "ci-cell" }, "操作"),
         ),
-        rows.map((item) => {
-          const addable = canAddCart(item);
-          const inCart = (cartTitles || []).includes(item.title);
-          return h("div", { key: item.id, className: "ci-row", style: { gridTemplateColumns: template } },
-            h("div", { className: "ci-cell" }, h("span", { className: "ci-name", title: safeField(item.title), style: { cursor: "default" } }, safeField(item.title))),
-            h("div", { className: "ci-cell" }, cellValue(item, "状态") || item.description || "-"),
-            h("div", { className: "ci-cell num" }, cellValue(item, "价格") || "-"),
-            h("div", { className: "ci-cell ci-ops" }, addable
-              ? h("button", {
-                type: "button",
-                className: "ci-link",
-                disabled: pendingId === item.id || inCart,
-                onClick: () => onAdd(item),
-              }, inCart ? "已加购" : "立即加购")
-              : h("span", { className: "ci-muted", style: { color: "var(--dsw-alias-label-caption)" } }, actionHint(item))),
-          );
-        }),
+        exact.map(renderRow),
+        more.length ? h("div", { key: "more-h", className: "ci-subhead" }, "其他后缀") : null,
+        more.map(renderRow),
+      );
+    }
+
+    /** 加购之后总得有个去处:结算入口就钉在列表下沿,不用回顶上找那个小链接。 */
+    function CartBar({ cart, busy, onOpen, onClear }) {
+      const rows = Array.isArray(cart) ? cart.filter(Boolean) : [];
+      if (!rows.length) return null;
+      const sum = rows.reduce((total, row) => total + Number(row.price || 0), 0);
+      return h("div", { className: "ci-cartbar" },
+        h("span", { className: "ci-cartbar-t" },
+          `购物车 ${rows.length} 个域名`,
+          h("b", null, sum > 0 ? `¥${sum}/年` : "价格待确认"),
+        ),
+        h("div", { className: "ci-cartbar-ops" },
+          h("button", { type: "button", className: "ci-mini", disabled: busy, onClick: onClear }, "清空"),
+          h("button", { type: "button", className: "ci-mini primary", disabled: busy, onClick: onOpen }, "去结算"),
+        ),
       );
     }
 
@@ -4650,7 +5335,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       return createPortal(node, document.body);
     }
 
-    function OwnedDetailView({ item, detail, loading, error, onBack, onReload }) {
+    function OwnedDetailView({ item, detail, loading, error, onBack, onReload, onOpenDns }) {
       const [tab, setTab] = useState("basic");
       const [confirm, setConfirm] = useState(null);
       const [busy, setBusy] = useState(false);
@@ -4696,6 +5381,12 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           h("div", { key: "tabs", className: "ci-tabs" },
             h("button", { type: "button", className: "ci-tab" + (tab === "basic" ? " active" : ""), onClick: () => setTab("basic") }, "基本信息"),
             h("button", { type: "button", className: "ci-tab" + (tab === "security" ? " active" : ""), onClick: () => setTab("security") }, "域名安全"),
+            extras.dnspodHosted ? h("button", {
+              type: "button",
+              className: "ci-tab",
+              title: "打开 DNSPod 解析记录",
+              onClick: () => onOpenDns && onOpenDns(item),
+            }, "解析记录") : null,
           ),
           tab === "basic" ? h("div", { key: "basic", className: "ci-kv" },
             basicFields.map((row) => [
@@ -5670,7 +6361,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       const extra = hasMore && offset + rows.length >= counted ? 1 : 0;
       const pageCount = Math.max(pages, Math.floor(offset / pageSize) + 1 + extra);
       const page = Math.floor(offset / pageSize) + 1;
-      return h("div", { className: "ci-root ci-tool" },
+      return h(PanelFrame, { title: "容器服务 · 集群", className: "ci-tool" },
         h("div", { className: "ci-panel" },
           screen === "create" && createType ? h(CreateWizard, {
             createType,
@@ -5744,7 +6435,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
               text: notFoundText("集群", missQuery, { id: region }, rows.length),
               onClose: () => setMissDismissed(true),
             }) : null,
-            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(ClusterListTable, {
+            h(ListPane, { key: "body", busy: listBusy, hold: pageCount > 1 }, h(ClusterListTable, {
               key: "table",
               items: rows,
               pendingId,
@@ -5756,7 +6447,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
                 requestAction("cluster.protection", { enable: false, clusterId: col(item, "集群ID") }, "关闭删除保护？", { item });
               },
               onDelete: (item) => { setMenuId(""); setDeleteItem(item); setScreen("delete"); },
-            }),
+            })),
             h(Pager, { key: "pager", total: counted, page, pages: pageCount, busy: listBusy, onPage: (next) => fetchList((next - 1) * pageSize, activeQ, region, filters) }),
           ] : null,
           h(ConfirmDialog, {
@@ -5854,21 +6545,153 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       };
     }
 
-    function histBars(logs) {
-      const rows = Array.isArray(logs) ? logs : [];
-      if (!rows.length) return Array.from({ length: 12 }, () => 8);
-      const times = rows.map((row) => Number(row.timeMs) || 0).filter((n) => n > 0);
-      if (!times.length) return Array.from({ length: 12 }, () => 8);
+    // 控制台的「日志时间分布」是按时间轴分桶的柱状图,桶宽取整到秒/分钟这类整数刻度,
+    // 否则 tooltip 里会出现 14:37:03.482 这种没法读的边界。
+    const CLS_BUCKET_STEPS = [
+      1e3, 2e3, 5e3, 1e4, 15e3, 3e4, 6e4, 12e4, 18e4, 3e5, 6e5, 9e5, 18e5, 36e5, 72e5, 108e5, 216e5, 432e5, 864e5,
+    ];
+    function logHistogram(logs, buckets) {
+      const times = (Array.isArray(logs) ? logs : [])
+        .map((row) => Number(row && row.timeMs) || 0)
+        .filter((n) => n > 0);
+      if (!times.length) return { rows: [], stepMs: 0, total: 0 };
+      const want = Math.max(6, Math.min(60, Number(buckets) || 30));
       const min = Math.min(...times);
       const max = Math.max(...times);
-      const span = Math.max(1, max - min);
-      const buckets = Array.from({ length: 12 }, () => 0);
-      for (const t of times) {
-        const i = Math.min(11, Math.floor(((t - min) / span) * 12));
-        buckets[i] += 1;
+      const raw = Math.max(1, (max - min) / want);
+      const stepMs = CLS_BUCKET_STEPS.find((step) => step >= raw) || CLS_BUCKET_STEPS[CLS_BUCKET_STEPS.length - 1];
+      const start = Math.floor(min / stepMs) * stepMs;
+      const count = Math.max(1, Math.floor((max - start) / stepMs) + 1);
+      const rows = Array.from({ length: count }, (_, i) => ({ ms: start + i * stepMs, count: 0 }));
+      for (const t of times) rows[Math.min(count - 1, Math.floor((t - start) / stepMs))].count += 1;
+      return { rows, stepMs, total: times.length };
+    }
+
+    function fmtBucketTime(ms, stepMs) {
+      const d = new Date(Number(ms));
+      if (!Number.isFinite(d.getTime())) return "";
+      const p = (n) => String(n).padStart(2, "0");
+      const hm = `${p(d.getHours())}:${p(d.getMinutes())}`;
+      if (stepMs >= 864e5) return `${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      if (stepMs >= 36e5) return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${hm}`;
+      if (stepMs >= 6e4) return hm;
+      return `${hm}:${p(d.getSeconds())}`;
+    }
+
+    // 日志时间分布:复用构建期打包的 echarts(与监控图同一实例来源),
+    // 失败时退回纯 CSS 柱条,保证没有图表库也能看出分布。
+    function LogHistogram({ logs, buckets, height }) {
+      const box = useRef(null);
+      const chartRef = useRef(null);
+      const [failed, setFailed] = useState(false);
+      const hist = logHistogram(logs, buckets);
+      const rows = hist.rows;
+      const sig = rows.length ? `${rows.length}|${hist.stepMs}|${rows[0].ms}|${hist.total}` : "";
+      useEffect(() => {
+        let dead = false;
+        if (!box.current || !rows.length) {
+          if (chartRef.current) { try { chartRef.current.dispose(); } catch { /* keep */ } chartRef.current = null; }
+          return;
+        }
+        loadEcharts().then((lib) => {
+          if (dead || !box.current) return;
+          let chart = chartRef.current;
+          if (!chart) {
+            chart = lib.init(box.current);
+            chartRef.current = chart;
+          }
+          // canvas 不认 var(--ci-brand):把元素上已解析的 color 读出来交给 echarts,
+          // 这样柱子颜色跟随宿主明暗主题,不需要在 JS 里硬编码颜色。
+          const brand = getComputedStyle(box.current).getPropertyValue("color").trim() || "rgb(0,82,217)";
+          chart.setOption({
+            animation: false,
+            grid: { left: 4, right: 8, top: 12, bottom: 2, containLabel: true },
+            tooltip: {
+              trigger: "axis",
+              axisPointer: { type: "shadow" },
+              formatter: (params) => {
+                const first = Array.isArray(params) ? params[0] : params;
+                if (!first) return "";
+                const from = Number(first.value[0]);
+                return `${fmtBucketTime(from, hist.stepMs)} ~ ${fmtBucketTime(from + hist.stepMs, hist.stepMs)}<br/>${first.value[1]} 条`;
+              },
+            },
+            xAxis: {
+              type: "time",
+              axisTick: { show: false },
+              axisLine: { lineStyle: { color: "rgba(128,128,128,.35)" } },
+              axisLabel: { fontSize: 10, hideOverlap: true, formatter: (ms) => fmtBucketTime(ms, hist.stepMs) },
+            },
+            yAxis: {
+              type: "value",
+              minInterval: 1,
+              splitLine: { lineStyle: { color: "rgba(128,128,128,.18)" } },
+              axisLabel: { fontSize: 10 },
+            },
+            series: [{
+              type: "bar",
+              barMaxWidth: 24,
+              // 空桶不进 data:barMinHeight 会给 0 条的时间段也画一根 1px 的柱子,看着像有日志
+              itemStyle: { color: brand, borderRadius: [2, 2, 0, 0] },
+              data: rows.filter((row) => row.count > 0).map((row) => [row.ms, row.count]),
+            }],
+          }, { notMerge: true });
+          chart.resize();
+        }).catch(() => { if (!dead) setFailed(true); });
+        const onResize = () => { try { chartRef.current && chartRef.current.resize(); } catch { /* keep */ } };
+        window.addEventListener("resize", onResize);
+        return () => {
+          dead = true;
+          window.removeEventListener("resize", onResize);
+        };
+      }, [sig]);
+      useEffect(() => () => {
+        if (chartRef.current) { try { chartRef.current.dispose(); } catch { /* keep */ } chartRef.current = null; }
+      }, []);
+      if (!rows.length) return h("div", { className: "ci-cls-chart-empty" }, "本页无日志,暂无分布");
+      if (failed) {
+        const peak = Math.max(1, ...rows.map((row) => row.count));
+        return h("div", { className: "ci-cls-chart-fallback", "aria-hidden": "true" },
+          rows.map((row, idx) => h("i", {
+            key: idx,
+            title: `${fmtBucketTime(row.ms, hist.stepMs)} · ${row.count} 条`,
+            style: { height: Math.max(2, Math.round((row.count / peak) * 100)) + "%" },
+          })),
+        );
       }
-      const peak = Math.max(1, ...buckets);
-      return buckets.map((n) => Math.max(8, Math.round((n / peak) * 100)));
+      return h("div", { className: "ci-cls-chart", ref: box, style: height ? { height } : undefined });
+    }
+
+    // 一行日志:折叠态一行原文(控制台的「原始日志」列),展开后按字段列出 + 原文
+    function ClsLogRow({ row, wrap, expandAll }) {
+      const [open, setOpen] = useState(!!expandAll);
+      // 「全部展开/收起」只作为一次批量赋值,之后单条仍可自己开合(不做 props 锁死)
+      useEffect(() => { setOpen(!!expandAll); }, [expandAll]);
+      const shown = open;
+      const fields = Object.entries((row && row.fields) || {});
+      const content = String((row && row.content) || "").trim();
+      const summary = content || fields.map(([k, v]) => `${k}: ${v}`).join("  ");
+      // 结构化日志的 content 往往就是 fields 的 JSON 原文,展开后再贴一遍纯属重复
+      const rawWorthShowing = content && !(content[0] === "{" && fields.length > 0);
+      return h("div", { className: "ci-logrow" + (shown ? " open" : "") + (wrap ? " wrap" : "") },
+        h("button", {
+          type: "button",
+          className: "ci-logrow-x",
+          "aria-expanded": shown ? "true" : "false",
+          "aria-label": shown ? "收起该条日志" : "展开该条日志",
+          onClick: () => setOpen(!open),
+        }, h(ChevronDown, { className: "ci-logrow-caret" })),
+        h("div", { className: "ci-logrow-t", title: row.timeLabel || "" }, row.timeLabel || "-"),
+        h("div", { className: "ci-logrow-c", title: shown ? undefined : summary }, summary || "-"),
+        shown && fields.length ? h("dl", { className: "ci-logkv" }, fields.flatMap(([k, v]) => [
+          h("dt", { key: "k" + k, title: k }, k),
+          h("dd", { key: "v" + k }, String(v)),
+        ])) : null,
+        shown && rawWorthShowing ? h("pre", { className: "ci-raw" }, content) : null,
+        shown && (row.source || row.fileName) ? h("div", { className: "ci-logrow-src" },
+          [row.source ? `来源 ${row.source}` : "", row.fileName ? `文件 ${row.fileName}` : ""].filter(Boolean).join(" · "),
+        ) : null,
+      );
     }
 
     // CLS 地域选择:统一改为 RegionPicker(G2.6/F3.10),保留共享 clsRegionGroups 分组。
@@ -5944,6 +6767,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       const [logContext, setLogContext] = useState(payload?.context || "");
       const [logMore, setLogMore] = useState(!!payload?.hasMore && startSearch);
       const [logBusy, setLogBusy] = useState(false);
+      const [logWrap, setLogWrap] = useState(false);
+      const [logExpand, setLogExpand] = useState(false);
       const [pendingId, setPendingId] = useState("");
       const [regionFetch, setRegionFetch] = useState(null);
       const seq = useRef(0);
@@ -6096,11 +6921,11 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       const pageCount = Math.max(pages, Math.floor(offset / pageSize) + 1 + extra);
       const page = Math.floor(offset / pageSize) + 1;
       const fieldNames = Array.from(new Set(logs.flatMap((row) => Object.keys(row.fields || {}))));
-      const bars = histBars(logs);
       const regionName = clsRegionName(regions, region);
       if (view === "search" && topic) {
         const hasLogs = logs.length > 0;
-        return h("div", { className: "ci-root ci-tool ci-cls" }, h("div", { className: "ci-panel" },
+        const runNow = () => fetchSearch(topic, { queryString: cql, range });
+        return h(PanelFrame, { title: "日志服务 · 检索分析", className: "ci-tool ci-cls" }, h("div", { className: "ci-panel" },
           h("div", { className: "ci-search-bar" },
             h("div", { className: "ci-search-bar-main" },
               h(BackButton, { onClick: () => { setView("list"); setTopic(null); } }),
@@ -6109,101 +6934,128 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
                 h("div", { className: "ci-search-sub", title: topicCaption(topic, region, regions) }, topicCaption(topic, region, regions)),
               ),
             ),
-            h("div", { className: "ci-cls-filter" },
-              h("span", null, "地域"),
-              h(ClsRegionSelect, { value: region, regions, disabled: logBusy, onChange: onRegion }),
-              h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadRegions }),
-            ),
           ),
-          h("div", { className: "ci-query" },
-            h("div", null,
-              h("div", { className: "ci-cls-mode" },
-                h("span", { className: "ci-cls-tag on" }, "语句模式"),
-                h("span", { className: "ci-cls-tag on" }, "CQL"),
-                h("span", { className: "ci-cls-hint" }, "空则查全部"),
-              ),
+          // 控制台的检索条是一行:语句输入占满、时间范围与「检索分析」右侧对齐
+          h("div", { className: "ci-cls-bar" },
+            h("div", { className: "ci-cls-bar-in" },
               h("textarea", {
                 className: "ci-cql",
+                rows: 1,
+                spellCheck: false,
                 value: cql,
-                placeholder: "status:500 OR level:ERROR",
-                onChange: (e) => setCql(e.target.value),
+                placeholder: "输入 CQL 检索语句,例如 status:500 OR level:ERROR",
+                onChange: (e) => {
+                  setCql(e.target.value);
+                  // 单行起步、随语句长度长到 120px 为止:控制台的语句框也是这么伸缩的
+                  const el = e.target;
+                  if (el && el.style) {
+                    el.style.height = "auto";
+                    el.style.height = Math.min(120, Math.max(36, el.scrollHeight + 2)) + "px";
+                  }
+                },
+                onKeyDown: (e) => {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    runNow();
+                  }
+                },
+              }),
+              h("div", { className: "ci-cls-hint" }, "留空检索全部日志 · Ctrl/⌘ + Enter 执行"),
+            ),
+            h("div", { className: "ci-cls-range" }, h("select", {
+              id: "ci-cls-range",
+              className: "ci-cls-control",
+              "aria-label": "日志时间范围",
+              value: range,
+              onChange: (e) => setRange(e.target.value),
+            }, CLS_RANGE_OPTIONS.map(([k, n]) => h("option", { key: k, value: k }, n)))),
+            h("button", {
+              type: "button",
+              className: "ci-mini primary ci-cls-go",
+              disabled: logBusy,
+              onClick: runNow,
+            }, logBusy ? "检索中" : "检索分析"),
+          ),
+          range === "custom" ? h("div", { className: "ci-cls-custom" },
+            h("label", { className: "ci-cls-custom-f" },
+              h("span", { className: "ci-tiny" }, "开始时间"),
+              h("input", {
+                type: "datetime-local",
+                className: "ci-cls-control",
+                value: customFrom,
+                onChange: (e) => setCustomFrom(e.target.value),
               }),
             ),
-            h("div", { className: "ci-query-side" },
-              h("div", { className: "ci-tiny" }, "日志时间"),
-              h("select", {
-                className: "ci-region",
-                style: { maxWidth: "100%", width: "100%" },
-                value: range,
-                onChange: (e) => setRange(e.target.value),
-              }, CLS_RANGE_OPTIONS.map(([k, n]) => h("option", { key: k, value: k }, n))),
-              range === "custom" ? [
-                h("input", {
-                  key: "from",
-                  type: "datetime-local",
-                  className: "ci-region",
-                  style: { maxWidth: "100%", width: "100%" },
-                  value: customFrom,
-                  onChange: (e) => setCustomFrom(e.target.value),
-                }),
-                h("input", {
-                  key: "to",
-                  type: "datetime-local",
-                  className: "ci-region",
-                  style: { maxWidth: "100%", width: "100%" },
-                  value: customTo,
-                  onChange: (e) => setCustomTo(e.target.value),
-                }),
-              ] : null,
-              h("button", {
-                type: "button",
-                className: "ci-mini primary",
-                disabled: logBusy,
-                style: { width: "100%", marginTop: "auto" },
-                onClick: () => fetchSearch(topic, { queryString: cql, range }),
-              }, logBusy ? "检索中" : "检索分析"),
+            h("label", { className: "ci-cls-custom-f" },
+              h("span", { className: "ci-tiny" }, "结束时间"),
+              h("input", {
+                type: "datetime-local",
+                className: "ci-cls-control",
+                value: customTo,
+                onChange: (e) => setCustomTo(e.target.value),
+              }),
             ),
-          ),
+          ) : null,
           !listErr ? h("div", { className: "ci-cls-dist" },
             h("div", { className: "ci-cls-dist-h" },
-              h("span", null, "日志分布"),
-              h("span", null, hasLogs ? `${logs.length} 条` : "本页无数据"),
+              h("span", { className: "ci-cls-dist-t" }, "日志时间分布"),
+              h("span", null, hasLogs ? `共 ${logs.length} 条` : "本页无数据"),
             ),
-            h("div", { className: "ci-hist", "aria-hidden": "true" },
-              bars.map((hgt, idx) => h("i", { key: idx, style: { height: (hasLogs ? hgt : 8) + "%" } })),
-            ),
+            h(LogHistogram, { logs, height: 104 }),
           ) : null,
           listErr ? h("div", { className: "ci-err" }, listErr) : null,
           h("div", { className: "ci-cls-tabs" },
             h("span", { className: "ci-cls-tab on" }, "原始日志"),
+            hasLogs ? h("div", { className: "ci-cls-tools" },
+              h("button", {
+                type: "button",
+                className: "ci-cls-tool" + (logWrap ? " on" : ""),
+                "aria-pressed": logWrap ? "true" : "false",
+                title: "长日志换行显示",
+                onClick: () => setLogWrap(!logWrap),
+              }, "换行"),
+              h("button", {
+                type: "button",
+                className: "ci-cls-tool" + (logExpand ? " on" : ""),
+                "aria-pressed": logExpand ? "true" : "false",
+                onClick: () => setLogExpand(!logExpand),
+              }, logExpand ? "全部收起" : "全部展开"),
+            ) : null,
           ),
           logBusy && !hasLogs ? h("div", { className: "ci-load" }, h(Spin), "检索日志…")
             : listErr && !hasLogs ? null
             : !hasLogs ? h("div", { className: "ci-empty ci-empty-search" }, "该时间窗没有匹配日志")
             : h("div", { className: "ci-split" },
             h("div", { className: "ci-fields" },
-              h("div", { className: "ci-tiny" }, "字段"),
-              ["__SOURCE__"].concat(fieldNames).map((name) => h("button", {
+              h("div", { className: "ci-fields-h" },
+                h("span", null, "字段"),
+                h("span", null, String(fieldNames.length)),
+              ),
+              fieldNames.length ? fieldNames.map((name) => h("button", {
                 type: "button",
                 key: name,
+                title: `把 ${name} 加入检索语句`,
                 onClick: () => {
-                  if (name[0] === "_") return;
-                  setCql(name + ":");
+                  setCql((cur) => cur.trim() ? `${cur.trim()} AND ${name}:` : `${name}:`);
                 },
-              }, name)),
+              }, name)) : h("div", { className: "ci-tiny" }, "本页日志没有结构化字段"),
             ),
-            h("div", { className: "ci-log-pane" }, logs.map((row, idx) => h("div", { className: "ci-log", key: (row.timeMs || 0) + "-" + idx },
-              h("div", { className: "ci-log-hd" },
-                h("span", null, row.timeLabel || ""),
-                h("span", null, row.source || ""),
+            h("div", { className: "ci-logtable" },
+              h("div", { className: "ci-logtable-h" },
+                h("span", { "aria-hidden": "true" }, ""),
+                h("span", null, "时间"),
+                h("span", null, "原始日志"),
               ),
-              Object.entries(row.fields || {}).map(([k, v]) => h("span", { className: "ci-kv", key: k }, k + ": " + v)),
-              h("div", { className: "ci-raw" }, row.content || ""),
-            ))),
+              logs.map((row, idx) => h(ClsLogRow, {
+                key: (row.timeMs || 0) + "-" + idx,
+                row,
+                wrap: logWrap,
+                expandAll: logExpand,
+              })),
+            ),
           ),
           h("div", { className: "ci-foot-note" },
             h("span", null, `原始日志倒排 · ${logs.length} 条`),
-            h("span", null, "仅当前对话 · 设置未写"),
           ),
           logMore ? h("div", { className: "ci-footbar" }, h("button", {
             type: "button",
@@ -6213,7 +7065,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           }, logBusy ? "拉取中" : "继续拉取")) : null,
         ));
       }
-      return h("div", { className: "ci-root ci-tool ci-cls" }, h("div", { className: "ci-panel" },
+      return h(PanelFrame, { title: "日志服务 · 日志主题", className: "ci-tool ci-cls" }, h("div", { className: "ci-panel" },
         h("div", { className: "ci-bar" },
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, "日志主题"),
@@ -6221,7 +7073,6 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           ),
           h("div", { className: "ci-bar-left", style: { flex: "none", alignItems: "center" } },
             h("div", { className: "ci-cls-filter" },
-              h("span", null, "地域"),
               h(ClsRegionSelect, { value: region, regions, disabled: listBusy, onChange: onRegion }),
               h(RegionFetchNotice, { fetch: regionFetch, onRetry: loadRegions }),
             ),
@@ -6251,12 +7102,12 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           ),
         ),
         listErr ? h("div", { className: "ci-err" }, listErr) : null,
-        listBusy ? h("div", { className: "ci-load" }, h(Spin), "加载列表…") : h(ClsTopicTable, {
+        h(ListPane, { busy: listBusy, hold: pageCount > 1 }, h(ClsTopicTable, {
           items: rows,
           pendingId,
           onOpen: openSearch,
           emptyHint: (activeQ || draftQ) ? `当前地域没有匹配的日志主题` : "当前地域没有匹配的日志主题",
-        }),
+        })),
         h(Pager, {
           total: counted,
           page,
@@ -6264,10 +7115,6 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           busy: listBusy,
           onPage: (next) => fetchList((next - 1) * pageSize, String(activeQ || "").trim()),
         }),
-        h("div", { className: "ci-foot-note" },
-          h("span", null, "对话卡片 · 不写设置"),
-          h("span", null, "点「检索分析」仍在这张卡片里打开"),
-        ),
       ));
     }
 
@@ -6723,23 +7570,19 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         ];
       };
 
-      return h("div", { className: "ci-root ci-tool" },
+      return h(PanelFrame, { title: "容器镜像", className: "ci-tool" },
         h("div", { className: "ci-panel ci-image" },
           h("div", { className: "ci-image-head" },
             h("h1", { className: "ci-image-title" }, "容器镜像"),
             h("p", { className: "ci-image-sub" }, "当前范围内的实例、仓库与版本"),
             h("div", { className: "ci-filters" },
-              h("label", { className: "ci-chip-sel" },
-                h("span", null, "地域"),
-                h(RegionPicker, {
-                  regions: regions.some((item) => item.id === region) ? regions : [{ id: region, label: region }, ...regions],
-                  value: region,
-                  placeholder: "选择地域",
-                  inputId: "ci-image-region",
-                  additionalStyle: { width: 180 },
-                  onChange: (next) => changeRegion(next),
-                }),
-              ),
+              h(RegionPicker, {
+                regions: regions.some((item) => item.id === region) ? regions : [{ id: region, label: region }, ...regions],
+                value: region,
+                placeholder: "选择地域",
+                inputId: "ci-image-region",
+                onChange: (next) => changeRegion(next),
+              }),
               h("label", { className: "ci-chip-sel" },
                 h("span", null, "实例"),
                 h("select", {
@@ -7239,6 +8082,13 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           .map((item) => safeField(item && typeof item === "object" ? (item.label ?? item.id) : item))
           .filter(Boolean));
       const [kindTab, setKindTab] = useState(kind === "lighthouse" ? "lighthouse" : "cvm");
+      // 地域清单与选中值都要按 Tab 分开记:两条链的可用地域集合不同(见 resolveRegionForOptions),
+      // 共用一份会让切 Tab 后的选择器显示上一个产品的清单。用 ref 是因为切 Tab 后紧接着就发请求,
+      // 同一轮里读不到刚 set 的 state。
+      const regionCache = useRef({ cvm: [], lighthouse: [] });
+      const regionMemo = useRef({ cvm: "", lighthouse: "" });
+      const [regionFix, setRegionFix] = useState(null);
+      const [instStatus, setInstStatus] = useState([]);
       const [cart, setCart] = useState([]);
       const [flow, setFlow] = useState("");
       const [orderDraft, setOrderDraft] = useState(null);
@@ -7296,9 +8146,11 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         ? `${Number(payload?.offset) || 0}|${fromTool.map((i) => safeText(i && i.id)).join(",")}|${payload?.total}|${payload?.hasMore}|${initialQuery}`
         : "";
       const instanceView = kind === "cvm" || kind === "lighthouse" || kind === "auto";
+      // 实例卡常驻双 Tab,所以点了哪个 Tab 就查哪个产品;卡片自己的 kind 只用来决定初始 Tab。
+      // 以前这里对 kind==="cvm"/"lighthouse" 的卡片直接返回 kind,另一个 Tab 会拿着本产品的 kind 去查,
+      // 结果永远是空列表(渲染时又按 row.kind 过滤,一条都留不下)。
       const tabToKind = (tab) => {
-        if (kind === "cvm" || kind === "lighthouse") return kind;
-        if (kind === "auto") return tab === "lighthouse" ? "lighthouse" : "cvm";
+        if (instanceView) return tab === "lighthouse" ? "lighthouse" : "cvm";
         return kind;
       };
       useEffect(() => {
@@ -7319,9 +8171,12 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           .map((item) => safeField(item && typeof item === "object" ? (item.label ?? item.id) : item))
           .filter(Boolean);
         setRegionOptions(names);
-        setListRegion((cur) => names.includes(cur) ? cur : defaultRegionName(names));
+        regionCache.current[tabToKind(tab)] = names;
+        setRegionFix(null);
+        setListRegion((cur) => resolveRegionForOptions(names, cur, "").region || defaultRegionName(names));
         if (kind === "lighthouse") setKindTab("lighthouse");
         else if (kind === "cvm" || kind === "auto") setKindTab("cvm");
+        setInstStatus([]);
         setListErr("");
       }, [toolSig]);
       // 资源直达：payload 带 directItemId 且 rows 里能找到对应条目时，自动调用该视图现成的「打开详情」（只触发一次）。
@@ -7347,20 +8202,27 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         const n = ++seq.current;
         const trimmed = String(q || "").trim();
         const useTab = tab || kindTab;
+        const useStatus = filterOverride && filterOverride.status !== undefined
+          ? statusFilterList(filterOverride.status)
+          : statusFilterList(instStatus);
         const useKind = tabToKind(useTab);
-        const useRegion = kind === "cdb"
+        let useRegion = kind === "cdb"
           ? (regionOverride !== undefined ? regionOverride : region)
           : (regionOverride !== undefined ? regionOverride : (listRegion || "华南地区（广州）"));
-        // CVM/轻量:前端用账号本地地域列表校验,未开通/不可用时给出友好提示并拦截请求
+        // CVM/轻量:目标产品不支持当前地域时就地收敛(切 Tab 是主要来源),不再让请求撞在「未开通」上
         if ((instanceView || kind === "cvm" || kind === "lighthouse" || kind === "auto") && kind !== "cdb") {
-          const options = (Array.isArray(regionOptions) ? regionOptions : []).filter(Boolean);
+          const options = (regionCache.current[useKind] || []).filter(Boolean);
           const wanted = safeText(useRegion);
-          if (options.length && wanted && !options.some((name) => name === wanted || canonicalRegionName(name) === canonicalRegionName(wanted))) {
-            setListBusy(false);
-            setRows([]);
-            setTotal(0);
-            setListErr(`地域「${wanted}」未开通/不可用，请重新选择地域`);
-            return;
+          if (options.length && wanted) {
+            const fixed = resolveRegionForOptions(options, wanted, regionMemo.current[useKind]);
+            // 按字符串比而不是按 reason:后端是拿字符串跟自己的地域名对齐的,
+            // 同一地域的两种写法(轻量「广州」/ CVM「华南地区（广州）」)必须换成目标产品的原文再发。
+            if (fixed.region && fixed.region !== wanted) {
+              if (regionFixWorthTelling(fixed.reason)) setRegionFix({ kind: useKind, from: wanted, to: fixed.region });
+              setListRegion(fixed.region);
+              regionMemo.current[useKind] = fixed.region;
+              useRegion = fixed.region;
+            }
           }
         }
         setListBusy(true);
@@ -7378,7 +8240,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
             filters: isDbbrain ? {
               product: (filterOverride && safeText(filterOverride.product)) || dbProduct,
               region: (filterOverride && filterOverride.region != null) ? safeText(filterOverride.region) : dbRegion,
-            } : undefined,
+            } : (instanceView && useStatus.length ? { status: useStatus.join(",") } : undefined),
           });
           let result = await run(useKind);
           if (n !== seq.current) return;
@@ -7403,7 +8265,19 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           setActiveQ(trimmed);
           if (Array.isArray(result.regions)) {
             // 服务端可能返回 {id,label} 对象数组,统一取可读字符串
-            setRegionOptions(result.regions.map((item) => safeField(item && typeof item === "object" ? (item.label ?? item.id) : item)).filter(Boolean));
+            const names = result.regions.map((item) => safeField(item && typeof item === "object" ? (item.label ?? item.id) : item)).filter(Boolean);
+            setRegionOptions(names);
+            regionCache.current[useKind] = names;
+            // 首次进这个 Tab 时缓存还是空的,校验只能等清单回来:此时若地域不被支持就收敛后重拉一次。
+            // 收敛后的地域一定在清单里,所以不会二次触发。
+            const fixed = names.length ? resolveRegionForOptions(names, useRegion, regionMemo.current[useKind]) : { region: "", reason: "" };
+            if (fixed.region && fixed.region !== safeText(useRegion)) {
+              if (regionFixWorthTelling(fixed.reason)) setRegionFix({ kind: useKind, from: safeText(useRegion), to: fixed.region });
+              setListRegion(fixed.region);
+              regionMemo.current[useKind] = fixed.region;
+              fetchList(0, trimmed, fixed.region, useTab);
+              return;
+            }
           }
         } catch (e) {
           if (n !== seq.current) return;
@@ -7435,6 +8309,12 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       const pageCount = Math.max(pages, Math.floor(offset / pageSize) + 1 + extra);
       const page = Math.floor(offset / pageSize) + 1;
       const goPage = (next) => fetchList((next - 1) * pageSize, String(activeQ || "").trim());
+      // 筛选变更回到第 1 页:留在原页码可能落在新结果的页数之外,直接变成空表
+      const onInstStatus = (next) => {
+        const list = statusFilterList(next);
+        setInstStatus(list);
+        fetchList(0, String(activeQ || "").trim(), undefined, undefined, { status: list });
+      };
       const openItem = async (item, tab) => {
         setPendingId(item.id);
         setMoreId("");
@@ -7482,6 +8362,14 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           if (n === detailSeq.current) setPendingId("");
         }
       };
+      const openDnsRecords = (owned) => openItem({
+        id: `tencent.domain:${safeField(owned.title)}`,
+        moduleId: "tencent.domain",
+        provider: "tencent",
+        kind: "domain",
+        title: safeField(owned.title),
+        description: "DNSPod 解析记录",
+      });
       const openLogin = (item, database) => {
         setMoreId("");
         setSession({ item, mode: "dmc", database });
@@ -7599,7 +8487,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         });
         if ((action.id || action) === "cert.download") {
           const data = result.data || {};
-          triggerDownload(data.filename, data.content, data.contentType);
+          triggerDownload(data.filename, data.content, data.contentType, data.url);
         }
         return result;
       };
@@ -7671,7 +8559,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         }));
       }
       if (kind === "cos") {
-        return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
+        return h(CiBoundary, null, h(PanelFrame, { title: "对象存储", className: "ci-tool" },
           h("div", { className: "ci-panel" },
             h(CosConsoleView, {
               payload,
@@ -7684,6 +8572,12 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       }
       const errors = payload?.errors || [];
       const payloadErr = errors.map((e) => e && e.message).filter(Boolean).join("；");
+      // 服务器卡只展示 cvm/轻量自己的失败:kind=auto 时同一次工具调用可能带回别的模块的错误
+      // (历史上 tke 的「缺少地域」就这样出现在已选广州的服务器卡上),与本卡无关不应展示。
+      const instanceErrors = errors.filter((e) => {
+        const from = String((e && e.moduleId) || "");
+        return from === "core" || /(^|[.:])(cvm|lighthouse)\b/.test(from);
+      });
       const keepCard = kind === "registrar" || kind === "my-domain";
       if (!isCert && !fromTool?.length && !rows.length && !activeQ && !draftQ && !keepCard && !isDbbrain) {
         const msg = payloadErr;
@@ -7702,8 +8596,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
             moduleId: item.moduleId,
           }];
         });
+        // 不再自动弹购物车:连着加几个域名时每次都被弹窗打断,结算入口改成列表下沿常驻
         setOrderErr("");
-        setFlow("cart");
       };
       const removeCart = (title) => setCart((cur) => cur.filter((row) => row.title !== title));
       const registrarId = cart[0]?.moduleId || (rows[0] && rows[0].moduleId) || "tencent.registrar";
@@ -7904,6 +8798,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
               error: session.error,
               onBack: () => setSession(null),
               onReload: reload,
+              onOpenDns: openDnsRecords,
             })
             : h(DetailView, {
               item: session.item,
@@ -7971,12 +8866,12 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
               ),
             ),
             listErr || payloadErr ? h("div", { key: "lerr", className: "ci-err" }, listErr || payloadErr) : null,
-            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(DbbrainTable, {
+            h(ListPane, { key: "body", busy: listBusy, hold: pageCount > 1 }, h(DbbrainTable, {
               key: "table",
               items: rows,
               pendingId,
               onOpen: openItem,
-            }),
+            })),
             h(Pager, {
               key: "pager",
               total: counted,
@@ -8038,7 +8933,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
             ) : null,
             listErr || payloadErr ? h("div", { key: "lerr", className: "ci-err" }, listErr || payloadErr) : null,
             isCert ? missNode : null,
-            listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : (
+            h(ListPane, { key: "body", busy: listBusy, hold: pageCount > 1 }, (
               isCert
                 ? h(CertTable, {
                   key: "table",
@@ -8061,7 +8956,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
                   showProvider,
                   emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的资源` : "没有资源",
                 })
-            ),
+            )),
             h(Pager, {
               key: "pager",
               total: counted,
@@ -8274,7 +9169,6 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
               value: region || "ap-guangzhou",
               placeholder: "选择地域",
               inputId: "ci-cdb-region",
-              additionalStyle: { width: 180 },
               onChange: (next) => {
                 setRegion(next);
                 fetchList(0, String(activeQ || draftQ || "").trim(), next);
@@ -8295,7 +9189,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         ),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
         missNode,
-        listBusy ? h("div", { key: "load", className: "ci-load" }, h(Spin), "加载列表…") : h(CdbTable, {
+        h(ListPane, { key: "body", busy: listBusy, hold: pageCount > 1 }, h(CdbTable, {
           key: "cdb-table",
           items: rows,
           pendingId,
@@ -8306,7 +9200,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           onLogin: openLogin,
           onManage: (item) => openItem(item),
           onMore: (item) => setMoreId((cur) => cur === item.id ? "" : item.id),
-        }),
+        })),
         h(Pager, {
           key: "pager",
           total: counted,
@@ -8333,13 +9227,23 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           onConfirm: () => listConfirm && runListAction(listConfirm.item, listConfirm.action, listConfirm.payload),
         }),
       ] : null;
+      // 说明文案由状态推导而非单独维护:用户改地域或切到别的 Tab 后条件自然不成立,不需要额外清理
+      const regionNote = regionFix
+        && regionFix.kind === tabToKind(kindTab)
+        && canonicalRegionName(regionFix.to) === canonicalRegionName(listRegion)
+        ? regionSwitchNote(INSTANCE_TAB_LABEL[regionFix.kind] || "该产品", regionFix.from, regionFix.to)
+        : "";
       const instanceList = !session && (showCvm || showLh) ? [
         h(KindTabs, {
           key: "ktabs",
           value: kindTab,
           onChange: (next) => {
             if (next === kindTab) return;
+            // 记下要离开的这个 Tab 选的是哪个地域,回来时优先复用;同时把选择器立刻换成目标产品的清单
+            regionMemo.current[tabToKind(kindTab)] = safeText(listRegion);
             setKindTab(next);
+            const cached = (regionCache.current[tabToKind(next)] || []).filter(Boolean);
+            if (cached.length) setRegionOptions(cached);
             fetchList(0, String(activeQ || "").trim(), undefined, next);
           },
         }),
@@ -8350,6 +9254,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
               value: listRegion || defaultRegionName(regionOptions),
               onChange: (next) => {
                 setListRegion(next);
+                regionMemo.current[tabToKind(kindTab)] = safeText(next);
+                setRegionFix(null);
                 fetchList(0, String(activeQ || "").trim(), next);
               },
             }),
@@ -8361,9 +9267,10 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
             placeholder: "搜索 ID / 名称 / IP",
           }),
         ),
+        regionNote ? h("div", { key: "rnote", className: "ci-region-note" }, regionNote) : null,
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
         missNode,
-        errors.length ? h("div", { key: "perr", className: "ci-err" }, errors.map((e) => e.message).join("；")) : null,
+        instanceErrors.length ? h("div", { key: "perr", className: "ci-err" }, instanceErrors.map((e) => e.message).join("；")) : null,
         kindTab === "cvm" ? h(CvmConsole, {
           key: "cvm",
           items: kind === "cvm" ? rows : cvmRows,
@@ -8373,6 +9280,9 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
           q: activeQ || draftQ,
           busy: listBusy,
+          hold: pageCount > 1,
+          status: instStatus,
+          onStatus: onInstStatus,
         }) : h(LhConsole, {
           key: "lh",
           items: kind === "lighthouse" ? rows : lhRows,
@@ -8382,15 +9292,18 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           emptyHint: (activeQ || draftQ) ? `没有匹配「${activeQ || draftQ}」的实例` : "没有匹配的实例",
           q: activeQ || draftQ,
           busy: listBusy,
+          hold: pageCount > 1,
+          status: instStatus,
+          onStatus: onInstStatus,
         }),
-        !listBusy ? h(Pager, {
+        h(Pager, {
           key: "pager",
           total: counted,
           page,
           pages: pageCount,
           busy: listBusy,
           onPage: goPage,
-        }) : null,
+        }),
         h(ConfirmDialog, {
           key: "power",
           open: !!powerConfirm,
@@ -8409,7 +9322,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           pendingId,
           cartTitles: cart.map((row) => row.title),
           onAdd: addCart,
-          emptyHint,
+          onRemove: removeCart,
+          emptyHint: registrarEmptyHint(activeQ || draftQ),
         })
         : kind === "my-domain"
           ? h(MyDomainTable, {
@@ -8445,11 +9359,6 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           h("div", { className: "ci-bar-left" },
             h("span", { className: "ci-bar-title" }, barTitleOf(kind)),
             h("span", { className: "ci-bar-count" }, `${counted} 条`),
-            kind === "registrar" ? h("button", {
-              type: "button",
-              className: "ci-link",
-              onClick: () => { setOrderErr(""); setFlow("cart"); },
-            }, `购物车${cart.length ? `(${cart.length})` : ""}`) : null,
           ),
           h(SearchField, {
             value: safeText(draftQ),
@@ -8460,17 +9369,26 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         ),
         listErr ? h("div", { key: "lerr", className: "ci-err" }, listErr) : null,
         orderErr && !flow ? h("div", { key: "oerr", className: "ci-err" }, orderErr) : null,
-        h(ListPane, { key: "body", busy: listBusy }, domainTable),
-        !listBusy ? h(Pager, {
-          key: "pager",
-          total: counted,
-          page,
-          pages: pageCount,
-          busy: listBusy,
-          onPage: goPage,
-        }) : null,
+        // 可注册查询一次最多几行、不翻页:留着 160px 的高度地板和「共 N 条」页脚只是空占版面
+        h(ListPane, { key: "body", busy: listBusy, hold: pageCount > 1, compact: kind === "registrar" }, domainTable),
+        kind === "registrar"
+          ? h(CartBar, {
+            key: "cart",
+            cart,
+            busy: orderBusy,
+            onOpen: () => { setOrderErr(""); setFlow("cart"); },
+            onClear: () => setCart([]),
+          })
+          : h(Pager, {
+            key: "pager",
+            total: counted,
+            page,
+            pages: pageCount,
+            busy: listBusy,
+            onPage: goPage,
+          }),
       ] : null;
-      return h(CiBoundary, null, h("div", { className: "ci-root ci-tool" },
+      return h(CiBoundary, null, h(PanelFrame, { title: frameTitleOf(kind), className: "ci-tool" },
         h("div", { className: "ci-panel" },
           detailNode || dbbrainList || cdbList || instanceList || certList || domainList,
         ),
@@ -8603,16 +9521,14 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           h("details", { className: "ci-cfg" },
             h("summary", { className: "ci-cfg-h" },
               h("span", { className: "ci-cfg-t" },
-                h("span", { className: "ci-cfg-n" }, "云资源"),
+                h("span", { className: "ci-cfg-n" }, "Cloud Infra"),
                 h("span", { className: "ci-cfg-d" }, err || "加载配置…"),
               ),
             ),
           ),
         );
       }
-      const modules = (meta.modules || []).filter((m) => m.implemented !== false)
-        // 补充 G3.12 副文本:统一通过 module.kind 暴露给 UI,展示 (kind=xxx) 标签(如 TKE 集群 kind=cluster)
-        .map((m) => ({ ...m, kindHint: m.kind ? `(kind=${m.kind})` : "" }));
+      const modules = (meta.modules || []).filter((m) => m.implemented !== false);
       const visibleModules = modules.filter((m) => matchModule(m, modQ));
       const enabledModCount = modules.filter((m) => draft.modules[m.id] !== false).length;
       const filtering = !!String(modQ || "").trim();
@@ -8624,8 +9540,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
         },
           h("summary", { className: "ci-cfg-h" },
             h("span", { className: "ci-cfg-t" },
-              h("span", { className: "ci-cfg-n" }, "云资源"),
-              h("span", { className: "ci-cfg-d" }, "配置各云厂商 AccessKey，查询域名与解析记录、DBbrain、容器镜像、云服务器、云数据库、对象存储与 TKE 集群。地域在资源列表中选择，不写入设置。地域只在对话卡片里选，不进设置。TKE 列表默认广州。"),
+              h("span", { className: "ci-cfg-n" }, "Cloud Infra"),
+              h("span", { className: "ci-cfg-d" }, "填写云厂商 AccessKey。地域在对话卡片里选，不写入设置。"),
             ),
             dirty ? h("span", { className: "ci-badge" }, "未保存") : null,
             h(ChevronDown, { className: "ci-cfg-ch" + (open ? " ci-cfg-ch-open" : "") }),
@@ -8673,7 +9589,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
             }),
             modules.length ? h("div", { className: "ci-cfg-f" },
               h("label", { htmlFor: "ci-mod-q" }, "产品模块"),
-              h("p", { className: "ci-cfg-mod-hint" }, "勾选后参与对话查询。条目增多时在框内滚动，不撑高整张设置卡。"),
+              h("p", { className: "ci-cfg-mod-hint" }, "勾选后参与对话查询。"),
               h("input", {
                 id: "ci-mod-q",
                 className: "ci-cfg-mod-q",
@@ -8695,7 +9611,6 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
                     }),
                     h("span", { className: "ci-cfg-mod-title", title: module.title || module.id },
                       module.title || module.id,
-                      module.kindHint ? h("span", { className: "ci-cfg-mod-hint2" }, ` ${module.kindHint}`) : null,
                     ),
                   ))
                   : h("div", { className: "ci-cfg-mod-empty" }, "没有匹配的模块"),

@@ -382,12 +382,15 @@ test('client CLS card stays inside ci-panel and does not save config (g2.3 g1.4)
   const client = readFileSync(join(root, 'src/client.js'), 'utf8')
   assert.match(client, /日志主题/)
   assert.match(client, /检索分析/)
-  assert.match(client, /语句模式/)
-  assert.match(client, /CQL/)
-  assert.match(client, /空则查全部/)
+  assert.match(client, /输入 CQL 检索语句/)
+  assert.match(client, /留空检索全部日志/)
+  assert.match(client, /Ctrl\/⌘ \+ Enter 执行/)
   assert.match(client, /日志时间/)
   assert.match(client, /原始日志倒排/)
-  assert.match(client, /不写设置/)
+  // 「不写设置 / 仅当前对话 / 点检索分析仍在这张卡片里打开」这类实现说明不再占版面
+  assert.doesNotMatch(client, /对话卡片 · 不写设置/)
+  assert.doesNotMatch(client, /仍在这张卡片里打开/)
+  assert.doesNotMatch(client, /仅当前对话 · 设置未写/)
   assert.match(client, /主题名 \/ ID \/ 日志集/)
   // G2.6:CLS 地域选择统一改为共享 RegionPicker 胶囊,而不是原生 select+optgroup;
   // 分组由 RegionPicker 内部分组标题渲染(.ci-regionpop-group),不再依赖 <optgroup>。
@@ -407,14 +410,27 @@ test('client CLS card stays inside ci-panel and does not save config (g2.3 g1.4)
   assert.match(client, /\.ci-table\{[^}]*table-layout:fixed/)
   assert.match(client, /className: "ci-search-bar"/)
   assert.match(client, /ci-empty-search/)
+  // 地域只在主题列表选择；进入具体主题后地域已确定，检索分析页不再重复显示选择器
+  // 检索分析那一支:从 view==="search" 起,到主题列表那个 return(缩进 6 空格)为止
+  const searchView = client.match(/if \(view === "search" && topic\)[\s\S]*?\n      return h\(PanelFrame/)![0]
+  assert.match(searchView, /title: "日志服务 · 检索分析"/)
+  assert.doesNotMatch(searchView, /ClsRegionSelect/)
+  assert.match(searchView, /ci-cls-bar-in/)
+  assert.match(searchView, /e\.ctrlKey \|\| e\.metaKey/)
+  assert.match(searchView, /setCql\(\(cur\) => cur\.trim\(\) \?/)
+  // 原始日志改为控制台式表格:时间 + 原文两列、逐条可展开
+  assert.match(searchView, /className: "ci-logtable"/)
+  assert.match(searchView, /h\(ClsLogRow, \{/)
+  assert.match(searchView, /wrap: logWrap/)
+  assert.match(searchView, /expandAll: logExpand/)
   assert.match(client, /function keepClsTopic/)
   assert.match(client, /function topicCaption/)
   // CLS 视觉已并入统一 --ci-* token 层(G1),不再保留 cls 私有 hex
   assert.match(client, /--ci-brand:var\(--dsw-alias-brand-primary\)/)
   assert.doesNotMatch(client, /#0052d9/)
-  assert.match(client, /日志分布/)
+  assert.match(client, /日志时间分布/)
   assert.match(client, /ci-cls-tab on/)
-  assert.match(client, /ci-root ci-tool ci-cls/)
+  assert.match(client, /className: "ci-tool ci-cls"/)
   const hostSrc = readFileSync(join(root, 'src/host.ts'), 'utf8')
   assert.match(hostSrc, /title: String\(body.title/)
   const start = client.indexOf('function ClsCard')
@@ -427,6 +443,65 @@ test('client CLS card stays inside ci-panel and does not save config (g2.3 g1.4)
   assert.match(client, /域名解析/)
   assert.match(client, /请输入域名关键字/)
   assert.match(client, /function DetailView/)
+})
+
+test('CLS 检索分析对齐控制台三段式:检索条 / echarts 时间分布 / 可展开原始日志表', () => {
+  const client = readFileSync(join(root, 'src/client.js'), 'utf8')
+  // 1) 检索条压成一行:语句框自适应 + 128px 时间范围 + 检索按钮;旧的 180px 侧栏与「CQL 检索」标签已删
+  assert.match(client, /\.ci-cls-bar\{display:flex[^}]*padding:12px/)
+  assert.match(client, /\.ci-cls-bar-in\{[^}]*flex:1/)
+  assert.match(client, /\.ci-cls-range\{[^}]*width:128px/)
+  assert.match(client, /\.ci-cls \.ci-cql\{min-height:36px;max-height:120px/)
+  assert.doesNotMatch(client, /ci-cls-tag/)
+  assert.doesNotMatch(client, /\.ci-query\{/)
+  assert.doesNotMatch(client, /ci-query-main|ci-query-side/)
+  // 自定义时间不再挤在侧栏里,单独一行且带标签
+  assert.match(client, /className: "ci-cls-custom"/)
+  assert.match(client, /"开始时间"/)
+  assert.match(client, /"结束时间"/)
+
+  // 2) 时间分布换成 echarts 柱状图(与监控图共用构建期打包的实例),桶宽对齐整数刻度,失败退回 CSS 柱条
+  assert.match(client, /const CLS_BUCKET_STEPS = /)
+  assert.match(client, /function logHistogram/)
+  assert.match(client, /function LogHistogram/)
+  assert.match(client, /function LogHistogram[\s\S]{0,3000}loadEcharts\(\)[\s\S]{0,3000}type: "bar"/)
+  assert.match(client, /getPropertyValue\("color"\)/)
+  assert.match(client, /ci-cls-chart-fallback/)
+  assert.doesNotMatch(client, /function histBars/)
+  assert.doesNotMatch(client, /\.ci-hist\{/)
+
+  // 3) 原始日志改成两列表格:sticky 表头、折叠单行、展开出字段表与原文
+  // 长原文允许列表自己横向滚动(不再一律省略号);表头与各行用 subgrid 共享列宽,否则列会逐行错位
+  assert.match(client, /\.ci-logtable\{display:grid;grid-template-columns:20px 172px minmax\(max-content,1fr\)[^}]*overflow:auto/)
+  assert.match(client, /\.ci-logtable-h,\.ci-logrow\{grid-column:1\/-1;display:grid;grid-template-columns:subgrid/)
+  assert.match(client, /\.ci-logrow-c\{min-width:0;font-family:[^}]*white-space:nowrap\}/)
+  // 换行态回到「填满可视宽度、自己折行」,此时不该再有横向滚动
+  assert.match(client, /\.ci-logtable:has\(\.ci-logrow\.wrap\)\{grid-template-columns:20px 172px minmax\(0,1fr\)\}/)
+  // subgrid 不可用时退回固定布局:宁可截断也不要错位(省略号只出现在这个兜底块里)
+  const clsFallback = client.match(/@supports not \(grid-template-columns:subgrid\)\{[\s\S]*?\n\}/)![0]
+  assert.match(clsFallback, /\.ci-logtable\{display:block/)
+  assert.match(clsFallback, /grid-template-columns:20px 172px minmax\(0,1fr\)/)
+  assert.match(clsFallback, /text-overflow:ellipsis/)
+  assert.match(client, /\.ci-logtable-h\{position:sticky/)
+  assert.match(client, /\.ci-logrow\.open>\.ci-logrow-c\{display:none\}/)
+  assert.match(client, /\.ci-logkv\{grid-column:3/)
+  assert.match(client, /function ClsLogRow/)
+  assert.match(client, /"aria-expanded": shown \? "true" : "false"/)
+  // 结构化日志的 content 就是字段 JSON,展开后不再贴一遍原文
+  assert.match(client, /const rawWorthShowing = content && !\(content\[0\] === "\{" && fields\.length > 0\)/)
+  // 空桶不画柱子(barMinHeight 会给 0 条的时间段也画一根,像是有日志)
+  assert.match(client, /data: rows\.filter\(\(row\) => row\.count > 0\)/)
+  assert.doesNotMatch(client, /barMinHeight:/)
+  assert.doesNotMatch(client, /\.ci-log-pane\{|\.ci-log-fields\{|\.ci-log-hd\{/)
+
+  // 4) 表头右侧是控制台那两个开关:换行 / 全部展开
+  assert.match(client, /className: "ci-cls-tool" \+ \(logWrap \? " on" : ""\)/)
+  assert.match(client, /logExpand \? "全部收起" : "全部展开"/)
+
+  // 5) 字段面板:去掉 __SOURCE__ 伪字段,长字段名 ellipsis + title,点击拼进 CQL
+  assert.doesNotMatch(client, /__SOURCE__/)
+  assert.match(client, /\.ci-fields button\{[^}]*text-overflow:ellipsis/)
+  assert.match(client, /把 \$\{name\} 加入检索语句/)
 })
 
 test('tencent.cls is registered and settings can toggle it (g2.4)', () => {

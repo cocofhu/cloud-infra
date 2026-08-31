@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CLS 检索分析 harness(对齐控制台形态的视觉自检)</title>
+<style>
+  /* 与 verify-regionpop-icons/index.html 同一套宿主 token 模拟:亮/暗由 data-theme 切换。
+     注意 --dsw-alias-shadow 故意不定义,复刻宿主主题的真实情况。 */
+  :root,[data-theme="light"]{
+    --dsw-alias-label-primary:#1f2329;
+    --dsw-alias-label-secondary:#3c4250;
+    --dsw-alias-label-tertiary:#646a78;
+    --dsw-alias-label-caption:#8a8f9b;
+    --dsw-alias-bg-layer-1:#ffffff;
+    --dsw-alias-bg-layer-2:#f5f6f7;
+    --dsw-alias-bg-layer-3:#eceff2;
+    --dsw-alias-border-l1:#e4e6ea;
+    --dsw-alias-border-l2:#d2d6dc;
+    --dsw-alias-brand-primary:#1f2329;
+    --dsw-alias-button-primary-fill:#1f2329;
+    --dsw-alias-button-info-fill:#0052d9;
+    --dsw-alias-label-primary-foreground:#ffffff;
+    --dsw-alias-state-success-primary:#18a058;
+    --dsw-alias-state-success-tertiary:#e7f6ee;
+    --dsw-alias-state-warn-label:#d48806;
+    --dsw-alias-state-warn-tertiary:#fdf3e1;
+    --dsw-alias-state-error-primary:#d54941;
+    --dsw-alias-bg-mask-1:#0000003d;
+    --dsw-alias-interactive-bg-hover:rgba(31,35,41,.06);
+    background:#f0f1f3;
+  }
+  [data-theme="dark"]{
+    --dsw-alias-label-primary:#e8e9eb;
+    --dsw-alias-label-secondary:#c3c6cc;
+    --dsw-alias-label-tertiary:#9ba0a9;
+    --dsw-alias-label-caption:#747880;
+    --dsw-alias-bg-layer-1:#24262b;
+    --dsw-alias-bg-layer-2:#33353b;
+    --dsw-alias-bg-layer-3:#3e4047;
+    --dsw-alias-border-l1:#3d3f46;
+    --dsw-alias-border-l2:#494b52;
+    --dsw-alias-brand-primary:#e8e9eb;
+    --dsw-alias-button-primary-fill:#e8e9eb;
+    --dsw-alias-button-info-fill:#5d8bff;
+    --dsw-alias-label-primary-foreground:#ffffff;
+    --dsw-alias-state-success-primary:#3ccf85;
+    --dsw-alias-state-success-tertiary:#1d3a2c;
+    --dsw-alias-state-warn-label:#e6a23c;
+    --dsw-alias-state-warn-tertiary:#3d3119;
+    --dsw-alias-state-error-primary:#e06e67;
+    --dsw-alias-bg-mask-1:#00000080;
+    --dsw-alias-interactive-bg-hover:rgba(255,255,255,.08);
+    background:#1a1b1f;
+  }
+  body{margin:0;padding:16px;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;}
+  .host-card{max-width:980px;margin:0 auto;}
+</style>
+</head>
+<body data-theme="light">
+<div class="host-card" id="root"></div>
+<script>
+  window.__capturedFactory = null;
+  window.__ModuleLoader__ = {
+    load(def) { if (def && typeof def.factory === "function") window.__capturedFactory = def.factory; },
+  };
+</script>
+<script src="./react.production.min.js"></script>
+<script src="./react-dom.production.min.js"></script>
+<script src="./client.js"></script>
+<script>
+  const requireShim = (name) => {
+    if (name === "react") return window.React;
+    if (name === "react-dom") return window.ReactDOM;
+    throw new Error("unknown module " + name);
+  };
+  const mod = window.__capturedFactory(requireShim);
+
+  const p2 = (n) => String(n).padStart(2, "0");
+  function fakeLogs(count) {
+    // 分布刻意不均匀:确认直方图能看出形状,而不是 12 根等高柱子
+    const base = new Date(2026, 7, 31, 14, 5, 0).getTime();
+    const out = [];
+    for (let i = 0; i < count; i += 1) {
+      const jitter = Math.round(Math.sin(i * 1.7) * 90) * 1000;
+      const timeMs = base + i * 92 * 1000 + jitter + (i % 4) * 400;
+      const d = new Date(timeMs);
+      const fields = {
+        ssql_process_duration: String(120 + ((i * 37) % 900)),
+        ssql_query_window_start_time: `2026-08-31 ${p2(d.getHours())}:${p2(d.getMinutes())}:00.000`,
+        ssql_err_detail_msg: i % 5 === 0 ? "connection reset by peer" : "",
+        cls_module: "ssql",
+        ssql_failed_line: String(i % 3),
+        ssql_success_line: String((i * 11) % 40),
+        ssql_process_start_time: `2026-08-31 ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}.016`,
+        ssql_err_type: i % 5 === 0 ? "UpstreamError" : "",
+      };
+      // 偶数条:content 就是 fields 的 JSON 原文(展开后不该再贴一遍);
+      // 奇数条:content 是 nginx 那种纯文本原文(展开后必须能看到)
+      const rawText = `10.0.0.${10 + (i % 6)} - - [31/Aug/2026:${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())} +0800] "GET /api/v1/query?id=${i} HTTP/1.1" ${i % 5 === 0 ? 500 : 200} 1274 "-" "curl/8.4.0"`;
+      out.push({
+        timeMs,
+        timeLabel: `2026-08-31 ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, "0")}`,
+        content: i % 2 === 0 ? JSON.stringify(fields) : rawText,
+        source: "10.0.0." + (10 + (i % 6)),
+        fileName: "/data/log/ssql/app.log",
+        fields,
+      });
+    }
+    return out;
+  }
+
+  window.__mount = function (theme, opts) {
+    document.body.setAttribute("data-theme", theme);
+    const o = opts || {};
+    const payload = {
+      kind: "cls",
+      resourceKind: "cls",
+      view: "search",
+      region: "ap-guangzhou",
+      regions: [{ id: "ap-guangzhou", name: "广州", group: "大陆" }],
+      items: [{
+        id: "tencent.cls:ap-guangzhou:11111111-2222-3333-4444-555555555555",
+        moduleId: "tencent.cls",
+        provider: "tencent",
+        kind: "cls",
+        title: "cls_service_log",
+        openLabel: "检索分析",
+        columns: [
+          { label: "主题ID", value: "11111111-2222-3333-4444-555555555555" },
+          { label: "日志集", value: "cls_service_logging" },
+        ],
+      }],
+      queryString: o.cql != null ? o.cql : "status:500 OR level:ERROR",
+      range: "1h",
+      logs: o.empty ? [] : fakeLogs(o.count || 26),
+      hasMore: true,
+      total: 1,
+      errors: [],
+    };
+    const props = {
+      block: {
+        kind: "tool.call.result",
+        call: { argsRaw: JSON.stringify({ kind: "cls", query: "", region: "ap-guangzhou" }) },
+        result: payload,
+      },
+    };
+    const rootEl = document.getElementById("root");
+    if (!window.__reactRoot) window.__reactRoot = window.ReactDOM.createRoot(rootEl);
+    window.__reactRoot.render(window.React.createElement(mod.SearchToolView, props));
+    return true;
+  };
+</script>
+</body>
+</html>
