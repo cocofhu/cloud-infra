@@ -209,6 +209,61 @@ const darkChart = await env.evaluate(`(() => {
 check("暗色下柱状图仍随主题取色", !!darkChart && /rgb/.test(darkChart.color), JSON.stringify(darkChart));
 const shotDark = await shoot("dark-collapsed");
 
+// ---------- 触底自动续拉(没有「继续拉取」按钮) ----------
+await env.evaluate("window.__searchDelay = 350");
+await mount("light", { count: 26 });
+const feed0 = await env.evaluate("window.__readLogFeed()");
+check(
+  "首屏:没有「继续拉取」按钮,底部不留任何提示行,也不曾多余请求",
+  !!feed0 && feed0.loadMoreBtn === false && feed0.footbar === false
+    && feed0.hasSentinel === false && feed0.scrollable === true && feed0.calls === 0
+    && /26 条/.test(feed0.note),
+  JSON.stringify(feed0),
+);
+
+// 一次触底连派 5 个 scroll:锁没生效就会用同一个 context 打出多个请求
+await env.evaluate("window.__scrollLogsToBottom(5)");
+await wait(120);
+const loading = await env.evaluate("window.__readLogFeed()");
+check(
+  "取的过程中底部占一行「加载更多日志…」",
+  !!loading && loading.hasSentinel === true && /加载更多日志/.test(loading.sentinel) && loading.calls === 1,
+  JSON.stringify(loading),
+);
+
+await wait(900);
+const feed1 = await env.evaluate("window.__readLogFeed()");
+check(
+  "滚到底自动续拉一页,连续 scroll 只发一个请求,取完提示行收掉",
+  !!feed1 && feed1.rows === 46 && feed1.calls === 1 && feed1.contexts[0] === "cur-1"
+    && feed1.hasSentinel === false && /46 条/.test(feed1.note),
+  JSON.stringify(feed1),
+);
+
+await env.evaluate("window.__scrollLogsToBottom(3)");
+await wait(900);
+const feed2 = await env.evaluate("window.__readLogFeed()");
+check(
+  "再触底取到最后一页,不再请求",
+  !!feed2 && feed2.rows === 66 && feed2.calls === 2 && feed2.contexts[1] === "cur-2"
+    && feed2.hasSentinel === false,
+  JSON.stringify(feed2),
+);
+await env.evaluate("window.__scrollLogsToBottom(3)");
+await wait(700);
+const feed3 = await env.evaluate("window.__readLogFeed()");
+check("拉完之后再怎么滚都不再发请求", !!feed3 && feed3.calls === 2 && feed3.rows === 66, JSON.stringify(feed3));
+
+// 首屏不足一屏:滚不动就没有 scroll 事件,必须由 effect 自己补到能滚
+await mount("light", { count: 2 });
+await wait(1400);
+const thin = await env.evaluate("window.__readLogFeed()");
+check(
+  "首屏只有 2 条滚不动时自动补拉,不把用户卡在一屏不到的列表上",
+  !!thin && thin.calls >= 1 && thin.rows > 2 && thin.scrollable === true,
+  JSON.stringify(thin),
+);
+
 // ---------- 空态 ----------
 await mount("light", { empty: true });
 const empty = await env.evaluate(`(() => ({

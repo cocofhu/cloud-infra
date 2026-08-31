@@ -518,6 +518,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
 .ci-logrow{padding:6px 12px;border-bottom:1px solid var(--ci-border);font-size:12px;line-height:20px}
 .ci-logrow:last-child{border-bottom:0}
 .ci-logrow:hover{background:var(--dsw-alias-interactive-bg-hover)}
+/* 触底续拉的哨兵行:横向滚动时也要留在可视区(与 .ci-scroll>.ci-empty 同一个 sticky 技巧) */
+.ci-log-more{grid-column:1/-1;position:sticky;left:0;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;color:var(--ci-fg-3);font-size:12px}
 .ci-logrow-x{display:flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;background:none;color:var(--ci-fg-3);cursor:pointer}
 .ci-logrow-x:hover{color:var(--ci-brand)}
 .ci-logrow-caret{transform:rotate(-90deg);transition:transform .15s}
@@ -6773,6 +6775,8 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       const [regionFetch, setRegionFetch] = useState(null);
       const seq = useRef(0);
       const debounce = useRef(0);
+      const logPane = useRef(null);
+      const moreLock = useRef(false);
       const toolSig = fromTool
         ? `${payload?.view}|${payload?.region}|${Number(payload?.offset) || 0}|${fromTool.map((i) => i.id).join(",")}|${(payload?.logs || []).length}|${payload?.queryString || ""}`
         : "";
@@ -6886,6 +6890,24 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
           if (n === seq.current) setLogBusy(false);
         }
       };
+      // 滚到底自动续拉。logBusy 是 state,同一帧内连续的 scroll 事件读到的都是旧值,
+      // 所以再用 ref 上一把锁,否则一次触底会打出好几个相同 context 的请求。
+      const loadMoreLogs = () => {
+        if (!logMore || logBusy || moreLock.current || !topic) return;
+        moreLock.current = true;
+        fetchSearch(topic, { append: true, queryString: cql, range })
+          .finally(() => { moreLock.current = false; });
+      };
+      const onLogScroll = (e) => {
+        const el = e.currentTarget;
+        if (el && el.scrollHeight - el.scrollTop - el.clientHeight <= 96) loadMoreLogs();
+      };
+      // 首屏不足一屏时滚不动,没有 scroll 事件也就永远不会续拉:自己补到能滚为止
+      useEffect(() => {
+        const el = logPane.current;
+        if (!el || !logMore || logBusy) return;
+        if (el.scrollHeight - el.clientHeight <= 8) loadMoreLogs();
+      }, [logs.length, logMore, logBusy]);
       const runSearch = (q) => {
         const next = String(q || "").trim();
         if (debounce.current) {
@@ -7040,7 +7062,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
                 },
               }, name)) : h("div", { className: "ci-tiny" }, "本页日志没有结构化字段"),
             ),
-            h("div", { className: "ci-logtable" },
+            h("div", { className: "ci-logtable", ref: logPane, onScroll: onLogScroll },
               h("div", { className: "ci-logtable-h" },
                 h("span", { "aria-hidden": "true" }, ""),
                 h("span", null, "时间"),
@@ -7052,17 +7074,13 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
                 wrap: logWrap,
                 expandAll: logExpand,
               })),
+              // 只在真的在取时占一行:空闲时不留提示、取完不留「没有更多」,列表底部就是最后一条日志
+              logMore && logBusy ? h("div", { className: "ci-log-more" }, h(Spin), "加载更多日志…") : null,
             ),
           ),
           h("div", { className: "ci-foot-note" },
             h("span", null, `原始日志倒排 · ${logs.length} 条`),
           ),
-          logMore ? h("div", { className: "ci-footbar" }, h("button", {
-            type: "button",
-            className: "ci-mini",
-            disabled: logBusy,
-            onClick: () => fetchSearch(topic, { append: true, queryString: cql, range }),
-          }, logBusy ? "拉取中" : "继续拉取")) : null,
         ));
       }
       return h(PanelFrame, { title: "日志服务 · 日志主题", className: "ci-tool ci-cls" }, h("div", { className: "ci-panel" },

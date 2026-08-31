@@ -75,12 +75,43 @@
   };
   const mod = window.__capturedFactory(requireShim);
 
+  // 假后端:只接 /cloud-infra。search 按 context 游标发页,用来驱动「滚到底自动续拉」,
+  // 并记录每次请求的 context —— 触底时若锁失效,同一个 context 会被打出好几次。
+  const realFetch = window.fetch.bind(window);
+  window.__searchCalls = [];
+  window.__pageSize = 20;
+  window.__totalPages = 3;
+  window.fetch = async (url, init) => {
+    const href = String(url || "");
+    if (!/\/cloud-infra$/.test(href)) return realFetch(url, init);
+    const req = JSON.parse((init && init.body) || "{}");
+    const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+    if (req.method === "meta") return json({ ok: true, skipConfirm: false });
+    if (req.method !== "search") return json({ ok: true, items: [], total: 0, hasMore: false, errors: [] });
+    window.__searchCalls.push({ context: req.context || "", limit: req.limit });
+    // 留一点延迟:否则「加载中」那一行一帧就闪过去,断言抓不到
+    if (window.__searchDelay) await new Promise((r) => setTimeout(r, window.__searchDelay));
+    const served = req.context ? Number(String(req.context).replace("cur-", "")) || 0 : 0;
+    const next = served + 1;
+    return json({
+      ok: true,
+      logs: fakeLogs(window.__pageSize, served * window.__pageSize),
+      context: next < window.__totalPages ? `cur-${next}` : "",
+      hasMore: next < window.__totalPages,
+      queryString: req.queryString || "",
+      range: req.range || "1h",
+      errors: [],
+    });
+  };
+
   const p2 = (n) => String(n).padStart(2, "0");
-  function fakeLogs(count) {
+  function fakeLogs(count, from) {
     // 分布刻意不均匀:确认直方图能看出形状,而不是 12 根等高柱子
     const base = new Date(2026, 7, 31, 14, 5, 0).getTime();
+    const start = Number(from) || 0;
     const out = [];
-    for (let i = 0; i < count; i += 1) {
+    for (let n = 0; n < count; n += 1) {
+      const i = start + n;
       const jitter = Math.round(Math.sin(i * 1.7) * 90) * 1000;
       const timeMs = base + i * 92 * 1000 + jitter + (i % 4) * 400;
       const d = new Date(timeMs);
@@ -133,10 +164,13 @@
       queryString: o.cql != null ? o.cql : "status:500 OR level:ERROR",
       range: "1h",
       logs: o.empty ? [] : fakeLogs(o.count || 26),
-      hasMore: true,
+      // 首屏已经算第 1 页,续拉从游标 cur-1 接着取
+      context: o.context != null ? o.context : "cur-1",
+      hasMore: o.hasMore != null ? o.hasMore : true,
       total: 1,
       errors: [],
     };
+    window.__searchCalls = [];
     const props = {
       block: {
         kind: "tool.call.result",
@@ -145,8 +179,39 @@
       },
     };
     const rootEl = document.getElementById("root");
-    if (!window.__reactRoot) window.__reactRoot = window.ReactDOM.createRoot(rootEl);
+    // 每次挂载都换一个 root:同一份 payload 的 toolSig 不变,复用 root 会把上一轮
+    // 追加进去的日志和展开/换行状态带过来,续拉的断言就全乱了
+    if (window.__reactRoot) window.__reactRoot.unmount();
+    window.__reactRoot = window.ReactDOM.createRoot(rootEl);
     window.__reactRoot.render(window.React.createElement(mod.SearchToolView, props));
+    return true;
+  };
+
+  // 触底续拉:量行数与请求次数。scrollTop 直接写到底,再派一次 scroll(React 的 onScroll 监听真实事件)
+  window.__readLogFeed = function () {
+    const table = document.querySelector(".ci-logtable");
+    const more = document.querySelector(".ci-log-more");
+    return {
+      rows: document.querySelectorAll(".ci-logrow").length,
+      sentinel: more ? more.textContent : "",
+      hasSentinel: !!more,
+      loadMoreBtn: [...document.querySelectorAll("button")].some((b) => /继续拉取|拉取中/.test(b.textContent)),
+      footbar: !!document.querySelector(".ci-footbar"),
+      scrollable: table ? table.scrollHeight > table.clientHeight + 1 : null,
+      atBottom: table ? table.scrollHeight - table.scrollTop - table.clientHeight : null,
+      calls: window.__searchCalls.length,
+      contexts: window.__searchCalls.map((c) => c.context),
+      note: (document.querySelector(".ci-foot-note span") || {}).textContent || "",
+    };
+  };
+
+  window.__scrollLogsToBottom = function (times) {
+    const table = document.querySelector(".ci-logtable");
+    if (!table) return false;
+    for (let i = 0; i < (times || 1); i += 1) {
+      table.scrollTop = table.scrollHeight;
+      table.dispatchEvent(new Event("scroll", { bubbles: true }));
+    }
     return true;
   };
 </script>

@@ -227,6 +227,11 @@ h(RegionPicker, {
 - 柱子颜色不写死,`LogHistogram` 读 `.ci-cls-chart` 上已解析的 `color`(canvas 不认 `var()`)交给 echarts,明暗自动跟随。
 - 结构化日志展开后只列字段表;`content` 是 fields 的 JSON 原文时不再重复贴一遍原文。
 - `换行` / `全部展开` 两个开关在表头右侧(`.ci-cls-tools`),分别控制 `.ci-logrow.wrap` 与逐条展开态。
+- **续拉靠触底,不放「继续拉取」按钮**:`.ci-logtable` 自己就是滚动容器,离底 96px 内即取下一页。
+  三个坑:①`logBusy` 是 state,同一帧的连续 `scroll` 事件读到的都是旧值,必须再用 `moreLock` ref 上锁,
+  否则一次触底会用同一个 CLS `Context` 打出好几个请求;②首屏不足一屏时滚不动、永远等不到 `scroll` 事件,
+  要用 effect 补到能滚为止;③底部提示行只在**真的在取**时出现(`.ci-log-more`,sticky left 跟着横向滚动),
+  空闲不留提示、取完也不留「没有更多」,列表底部就是最后一条日志。
 - 视觉回归:`node scripts/verify-cls-console/verify.mjs [chrome]`(真实 Chromium + 真实构建产物,断言 + 亮/暗截图)。
 
 ### 2.15 宽表横向滚动 — 滚动条只能长在表格底部

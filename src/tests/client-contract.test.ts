@@ -795,7 +795,11 @@ test('g3 COS console two pages use region combo and file list, not an expand tre
   assert.match(client, /id: "ci-cos-file-prev"/)
   assert.doesNotMatch(client, /className: "ci-page-btns" \},\)/)
   assert.doesNotMatch(client, /id: "ci-cos-load-more"/)
-  assert.doesNotMatch(client, /加载更多/)
+  // 「不许加载更多」这条只约束 COS 文件列表(它必须是上一页/下一页),
+  // 别把整份 client.js 都禁掉 —— CLS 原始日志就是靠触底续拉的
+  const cosView = client.slice(client.indexOf('function CosConsoleView'), client.indexOf('function ClusterConsole'))
+  assert.ok(cosView.length > 1000)
+  assert.doesNotMatch(cosView, /加载更多/)
   assert.doesNotMatch(client, /一层过多可翻页/)
   assert.doesNotMatch(client, /已加载 \$\{/)
   assert.match(client, /仅搜索当前页的文件/)
