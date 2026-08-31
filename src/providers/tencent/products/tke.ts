@@ -12,17 +12,23 @@ import type {
   ResourceModule,
   ResourceStatus,
 } from '../../../core/types.js'
-import { tkeCall } from '../client.js'
+import { cvmCall, tkeCall } from '../client.js'
+import { listZones } from './instance-common.js'
 
 export const TKE_SIDEBAR_PAGES: DetailPage[] = [
-  { id: 'basic', title: '基本信息' },
-  { id: 'nodes', title: '节点管理' },
-  { id: 'pools', title: '节点池' },
-  { id: 'namespaces', title: '命名空间' },
-  { id: 'addons', title: '组件管理' },
-  { id: 'rbac', title: '授权管理' },
-  { id: 'policy', title: '策略管理' },
-  { id: 'ops', title: '运维功能' },
+  { id: 'basic', title: '基本信息', group: '集群' },
+  { id: 'nodes', title: '节点', group: '节点管理' },
+  { id: 'pools', title: '节点池', group: '节点管理' },
+  { id: 'workloads', title: '工作负载', group: '工作负载' },
+  { id: 'services', title: '服务与路由', group: '工作负载' },
+  { id: 'configs', title: '配置', group: '工作负载' },
+  { id: 'storage', title: '存储', group: '工作负载' },
+  { id: 'namespaces', title: '命名空间', group: '工作负载' },
+  { id: 'addons', title: '组件管理', group: '扩展' },
+  { id: 'helm', title: '应用', group: '扩展' },
+  { id: 'rbac', title: '授权管理', group: '安全' },
+  { id: 'policy', title: '策略管理', group: '安全' },
+  { id: 'ops', title: '运维功能', group: '运维' },
 ]
 
 export const TKE_CLUSTER_TYPES = {
@@ -39,6 +45,7 @@ const ACTIONS: ResourceAction[] = [
   { id: 'cluster.create', label: '新建集群', confirm: 'default' },
   { id: 'cluster.delete', label: '删除集群', confirm: 'always' },
   { id: 'cluster.protection', label: '删除保护', confirm: 'default' },
+  { id: 'cluster.rename', label: '修改集群名称 / 描述', confirm: 'default' },
   { id: 'cluster.upgrade.master', label: 'Master 升级', confirm: 'default' },
   { id: 'cluster.upgrade.node', label: 'Node 升级', confirm: 'default' },
   { id: 'cluster.endpoint', label: 'APIServer 访问', confirm: 'default' },
@@ -65,6 +72,10 @@ const ACTIONS: ResourceAction[] = [
   { id: 'policy.toggle', label: '开关策略', confirm: 'always' },
   { id: 'ops.audit', label: '集群审计', confirm: 'default' },
   { id: 'ops.event', label: '事件投递', confirm: 'default' },
+  { id: 'k8s.list', label: '列出 Kubernetes 资源', confirm: 'default' },
+  { id: 'k8s.scale', label: '调整副本', confirm: 'default' },
+  { id: 'k8s.restart', label: '滚动重启', confirm: 'default' },
+  { id: 'k8s.delete', label: '删除资源', confirm: 'always' },
 ]
 
 export interface TkeClusterItem {
@@ -189,21 +200,60 @@ export function mapClusterItem(item: TkeClusterItem, moduleId = 'tencent.tke', r
   }
 }
 
-export function mapNodeCard(item: TkeInstanceItem): DetailCard {
+/** 节点在 TKE 接口之外补齐的维度:k8s 侧的就绪/版本/污点,CVM 侧的机型与计费。 */
+export interface NodeExtra {
+  kubeletVersion?: string
+  ready?: boolean
+  readyText?: string
+  roles?: string[]
+  taints?: number
+  podCapacity?: string
+  instanceType?: string
+  cpu?: number
+  memory?: number
+  zone?: string
+  zoneName?: string
+  charge?: string
+  createdTime?: string
+}
+
+export function clusterTags(item: TkeClusterItem): string[] {
+  return (item.TagSpecification || [])
+    .flatMap((spec) => spec.Tags || [])
+    .map((tag) => `${tag.Key || ''}=${tag.Value || ''}`)
+    .filter((row) => row !== '=')
+}
+
+export function nodeSpecLabel(extra: NodeExtra | undefined): string {
+  if (!extra || !extra.cpu) return '-'
+  const mem = extra.memory ? `${extra.memory >= 1024 ? `${Math.round(extra.memory / 1024)}GB` : `${extra.memory}MB`}` : ''
+  return [`${extra.cpu}核`, mem].filter(Boolean).join(' ')
+}
+
+export function mapNodeCard(item: TkeInstanceItem, extra?: NodeExtra): DetailCard {
   const unschedulable = item.Unschedulable === true || item.Unschedulable === 1
   const labels = nodeLabelPairs(item)
   const nodeName = String(item.NodeName || item.LanIP || item.InstanceId || '')
+  const info = extra || {}
+  // 控制台的「状态」是 k8s 的 Ready/NotReady,不是 CVM 的 running;拿不到 k8s 时才退回实例状态
+  const readyText = info.readyText || (info.ready === true ? 'Ready' : info.ready === false ? 'NotReady' : '')
   return {
     id: String(item.InstanceId || ''),
     title: String(item.InstanceId || ''),
-    status: String(item.InstanceState || ''),
+    status: readyText || String(item.InstanceState || ''),
     badges: [item.InstanceRole, unschedulable ? '已封锁' : ''].filter(Boolean) as string[],
     columns: [
       { label: 'IP', value: item.LanIP || '-' },
       { label: '节点名', value: nodeName || '-' },
       { label: '封锁', value: unschedulable ? '是' : '否' },
-      { label: '状态', value: item.InstanceState || '-' },
+      { label: '状态', value: readyText || item.InstanceState || '-' },
+      { label: 'Kubernetes 版本', value: info.kubeletVersion || '-' },
+      { label: '配置', value: nodeSpecLabel(info) },
+      { label: '机型', value: info.instanceType || item.InstanceType || '-' },
+      { label: '可用区', value: info.zoneName || info.zone || '-' },
       { label: '节点池', value: item.NodePoolId || '-' },
+      { label: '计费模式', value: info.charge || '-' },
+      { label: '创建时间', value: info.createdTime || item.CreatedTime || '-' },
       { label: 'Label', value: labels.join(',') || '-' },
     ],
     flags: {
@@ -213,6 +263,12 @@ export function mapNodeCard(item: TkeInstanceItem): DetailCard {
       nodeName,
       nodePoolId: item.NodePoolId || '',
       labels: labels.join(','),
+      instanceState: item.InstanceState || '',
+      kubeletVersion: info.kubeletVersion || '',
+      ready: info.ready === true,
+      roles: (info.roles || []).join(','),
+      taints: info.taints || 0,
+      podCapacity: info.podCapacity || '',
     },
   }
 }
@@ -449,7 +505,7 @@ export function normalizePoolType(raw: string): string {
   return raw.trim()
 }
 
-export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule {
+export function createTkeModule(call: typeof tkeCall = tkeCall, cvm: typeof cvmCall = cvmCall): ResourceModule {
   const module: ResourceModule = {
     id: 'tencent.tke',
     provider: 'tencent',
@@ -519,7 +575,7 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
       if (!clusterId) throw new Error('缺少集群')
       const cluster = await loadCluster(call, ctx, region, clusterId)
       const card = mapClusterItem(cluster, module.id, region)
-      const [nodes, pools, addons, endpoint, namespaces, bindings, policies, ops] = await Promise.all([
+      const [nodes, pools, addons, endpoint, namespaces, bindings, policies, ops, endpoints, upgrade, quota, releases, inspection, k8sNodes] = await Promise.all([
         loadNodes(call, ctx, region, clusterId),
         loadNodePools(call, ctx, region, clusterId),
         loadAddons(call, ctx, region, clusterId),
@@ -528,7 +584,14 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
         loadBindings(call, ctx, region, clusterId),
         loadPolicies(call, ctx, region, clusterId),
         loadOps(call, ctx, region, clusterId),
+        loadEndpointDetail(call, ctx, region, clusterId),
+        loadUpgradeVersions(call, ctx, region, clusterId),
+        loadQuotaUsage(call, ctx, region, clusterId),
+        loadReleases(call, ctx, region, clusterId),
+        loadInspection(call, ctx, region, clusterId),
+        loadK8sNodes(call, ctx, region, clusterId),
       ])
+      const cvmNodes = await loadCvmNodeInfo(cvm, ctx, region, nodes.map((row) => String(row.InstanceId || '')))
       const network = cluster.ClusterNetworkSettings || {}
       const blocks: DetailBlock[] = [
         {
@@ -539,8 +602,11 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
             { label: '集群 ID', value: String(cluster.ClusterId || clusterId) },
             { label: '类型', value: clusterTypeLabel(cluster.ClusterType) },
             { label: '状态', value: cluster.ClusterStatus || '' },
+            { label: '所在地域', value: region },
             { label: 'Kubernetes 版本', value: cluster.ClusterVersion || '' },
             { label: '容器运行时', value: cluster.ContainerRuntime || '' },
+            { label: '集群描述', value: cluster.ClusterDescription || '-' },
+            { label: '标签', value: clusterTags(cluster).join(', ') || '-' },
             { label: '删除保护', value: cluster.DeletionProtection ? '已开启' : '已关闭' },
             { label: '创建时间', value: cluster.CreatedTime || '' },
           ].filter((row) => row.value),
@@ -562,12 +628,17 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
           title: '集群 APIServer 信息',
           fields: [
             { label: '内网访问', value: endpoint.intranet ? '已开启' : '未开启' },
+            { label: '内网地址', value: endpoints.intranetIp || '' },
+            { label: '内网域名', value: endpoints.intranetDomain || '' },
             { label: '外网访问', value: endpoint.internet ? '已开启' : '未开启' },
+            { label: '外网地址', value: endpoints.internetIp || '' },
+            { label: '外网域名', value: endpoints.internetDomain || '' },
+            { label: '外网安全组', value: endpoints.securityGroup || '' },
             { label: 'kubeconfig', value: (endpoint.intranet || endpoint.internet) ? '可在受信界面复制或下载' : '未开启访问' },
-          ],
+          ].filter((row) => row.value),
         },
       ]
-      const nodeCards = nodes.map(mapNodeCard)
+      const nodeCards = nodes.map((row) => mapNodeCard(row, mergeNodeExtra(k8sNodes, cvmNodes, row)))
       return {
         card,
         fields: blocks[0].fields,
@@ -580,14 +651,29 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
           addons,
           bindings,
           policies,
+          releases,
+          quota,
+          inspection,
         },
         flags: {
           region,
+          clusterId: String(cluster.ClusterId || clusterId),
+          clusterName: cluster.ClusterName || card.title,
+          clusterDescription: cluster.ClusterDescription || '',
+          clusterStatus: cluster.ClusterStatus || '',
+          createdTime: cluster.CreatedTime || '',
           clusterType: cluster.ClusterType || '',
           deletionProtection: !!cluster.DeletionProtection,
           kubernetesVersion: cluster.ClusterVersion || '',
+          upgradeVersions: upgrade.join(','),
           intranet: !!endpoint.intranet,
           internet: !!endpoint.internet,
+          intranetIp: endpoints.intranetIp,
+          internetIp: endpoints.internetIp,
+          intranetDomain: endpoints.intranetDomain,
+          internetDomain: endpoints.internetDomain,
+          securityGroup: endpoints.securityGroup,
+          intranetSubnet: endpoints.intranetSubnet,
           kubeconfigAvailable: !!(endpoint.intranet || endpoint.internet),
           audit: !!ops.audit,
           event: !!ops.event,
@@ -605,6 +691,17 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
         if (actionId === 'cluster.protection') {
           const enable = payload.enable === true || payload.enabled === true
           await call(enable ? 'EnableClusterDeletionProtection' : 'DisableClusterDeletionProtection', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
+          return { ok: true }
+        }
+        if (actionId === 'cluster.rename') {
+          const name = String(payload.clusterName || payload.name || '').trim()
+          const desc = payload.description ?? payload.clusterDesc
+          if (!name && desc === undefined) return { ok: false, error: '缺少集群名称' }
+          await call('ModifyClusterAttribute', {
+            ClusterId: clusterId,
+            ...(name ? { ClusterName: name } : {}),
+            ...(desc === undefined ? {} : { ClusterDesc: String(desc) }),
+          }, creds(ctx), opts(ctx, region))
           return { ok: true }
         }
         if (actionId === 'cluster.delete') return deleteCluster(call, ctx, region, clusterId, payload)
@@ -836,6 +933,10 @@ export function createTkeModule(call: typeof tkeCall = tkeCall): ResourceModule 
           await call(payload.enable === true ? 'EnableEventPersistence' : 'DisableEventPersistence', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
           return { ok: true }
         }
+        if (actionId === 'k8s.list') return listK8sResource(call, ctx, region, clusterId, payload)
+        if (actionId === 'k8s.scale') return scaleK8sResource(call, ctx, region, clusterId, payload)
+        if (actionId === 'k8s.restart') return restartK8sResource(call, ctx, region, clusterId, payload)
+        if (actionId === 'k8s.delete') return deleteK8sResource(call, ctx, region, clusterId, payload)
         return { ok: false, error: `未知动作 ${actionId}` }
       } catch (err) {
         return { ok: false, error: publicErrorMessage(err) }
@@ -1216,6 +1317,65 @@ async function loadNodesStrict(call: typeof tkeCall, ctx: ModuleContext, region:
   return out
 }
 
+interface CvmNodeItem {
+  InstanceId?: string
+  InstanceType?: string
+  CPU?: number
+  Memory?: number
+  InstanceChargeType?: string
+  CreatedTime?: string
+  Placement?: { Zone?: string }
+}
+
+/** 机型 / 配置 / 可用区 / 计费只在 CVM 侧有,控制台节点列表这几列就是这么来的。 */
+async function loadCvmNodeInfo(
+  cvm: typeof cvmCall,
+  ctx: ModuleContext,
+  region: string,
+  instanceIds: string[],
+): Promise<Map<string, NodeExtra>> {
+  const out = new Map<string, NodeExtra>()
+  const wanted = instanceIds.filter(Boolean)
+  if (!wanted.length) return out
+  const zones = await listZones(cvm, creds(ctx), opts(ctx, region), region)
+  for (let from = 0; from < wanted.length && from < 500; from += 100) {
+    try {
+      const data = await cvm<{ InstanceSet?: CvmNodeItem[] }>('DescribeInstances', {
+        InstanceIds: wanted.slice(from, from + 100),
+        Limit: 100,
+      }, creds(ctx), opts(ctx, region))
+      for (const row of data.InstanceSet || []) {
+        const id = String(row.InstanceId || '')
+        if (!id) continue
+        const zone = String(row.Placement?.Zone || '')
+        out.set(id, {
+          instanceType: row.InstanceType || '',
+          cpu: Number(row.CPU || 0) || 0,
+          // CVM 的 Memory 单位是 GB,统一换成 MB 交给 nodeSpecLabel
+          memory: Number(row.Memory || 0) ? Number(row.Memory) * 1024 : 0,
+          zone,
+          zoneName: zone ? zones.get(zone) || zone : '',
+          charge: chargeTypeLabel(row.InstanceChargeType),
+          createdTime: row.CreatedTime || '',
+        })
+      }
+    } catch {
+      break
+    }
+  }
+  return out
+}
+
+export function mergeNodeExtra(
+  k8s: Map<string, NodeExtra>,
+  cvm: Map<string, NodeExtra>,
+  item: TkeInstanceItem,
+): NodeExtra {
+  const fromK8s = k8s.get(String(item.NodeName || '')) || k8s.get(String(item.LanIP || '')) || {}
+  const fromCvm = cvm.get(String(item.InstanceId || '')) || {}
+  return { ...fromCvm, ...fromK8s }
+}
+
 async function loadNodePools(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<TkeNodePoolItem[]> {
   try {
     const data = await call<{ NodePoolSet?: TkeNodePoolItem[] }>('DescribeClusterNodePools', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
@@ -1340,6 +1500,472 @@ async function loadPolicies(call: typeof tkeCall, ctx: ModuleContext, region: st
   } catch {
     return []
   }
+}
+
+export interface EndpointDetail {
+  intranetIp: string
+  internetIp: string
+  intranetDomain: string
+  internetDomain: string
+  securityGroup: string
+  intranetSubnet: string
+}
+
+const K8S_KIND: Record<string, { path: string; namespaced: boolean; group?: string }> = {
+  deployments: { path: '/apis/apps/v1/deployments', namespaced: true },
+  statefulsets: { path: '/apis/apps/v1/statefulsets', namespaced: true },
+  daemonsets: { path: '/apis/apps/v1/daemonsets', namespaced: true },
+  jobs: { path: '/apis/batch/v1/jobs', namespaced: true },
+  cronjobs: { path: '/apis/batch/v1/cronjobs', namespaced: true },
+  pods: { path: '/api/v1/pods', namespaced: true },
+  services: { path: '/api/v1/services', namespaced: true },
+  ingresses: { path: '/apis/networking.k8s.io/v1/ingresses', namespaced: true },
+  configmaps: { path: '/api/v1/configmaps', namespaced: true },
+  secrets: { path: '/api/v1/secrets', namespaced: true },
+  pvc: { path: '/api/v1/persistentvolumeclaims', namespaced: true },
+  pv: { path: '/api/v1/persistentvolumes', namespaced: false },
+  sc: { path: '/apis/storage.k8s.io/v1/storageclasses', namespaced: false },
+  events: { path: '/api/v1/events', namespaced: true },
+}
+
+function k8sPath(kind: string, namespace?: string, name?: string): string {
+  const spec = K8S_KIND[kind]
+  if (!spec) throw new Error(`不支持的资源类型 ${kind}`)
+  const ns = String(namespace || '').trim()
+  const id = String(name || '').trim()
+  if (spec.namespaced && ns) {
+    const base = spec.path.replace(/\/(deployments|statefulsets|daemonsets|jobs|cronjobs|pods|services|ingresses|configmaps|secrets|persistentvolumeclaims|events)$/, `/namespaces/${encodeURIComponent(ns)}/$1`)
+    return id ? `${base}/${encodeURIComponent(id)}` : base
+  }
+  return id && !spec.namespaced ? `${spec.path}/${encodeURIComponent(id)}` : spec.path
+}
+
+async function loadK8sNodes(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+): Promise<Map<string, NodeExtra>> {
+  const out = new Map<string, NodeExtra>()
+  try {
+    const data = await call<{ ResponseBody?: string }>('ForwardApplicationRequestV3', {
+      ClusterName: clusterId,
+      Method: 'GET',
+      Path: '/api/v1/nodes',
+    }, creds(ctx), opts(ctx, region))
+    const parsed = parseJson(data.ResponseBody)
+    const items = Array.isArray(parsed?.items) ? parsed.items as Array<{
+      metadata?: { name?: string; labels?: Record<string, string> }
+      spec?: { taints?: unknown[] }
+      status?: {
+        addresses?: Array<{ type?: string; address?: string }>
+        conditions?: Array<{ type?: string; status?: string }>
+        nodeInfo?: { kubeletVersion?: string }
+        capacity?: { pods?: string }
+      }
+    }> : []
+    for (const item of items) {
+      const name = String(item.metadata?.name || '').trim()
+      const ip = String((item.status?.addresses || []).find((row) => row.type === 'InternalIP')?.address || '').trim()
+      const ready = (item.status?.conditions || []).find((row) => row.type === 'Ready')
+      const extra: NodeExtra = {
+        kubeletVersion: item.status?.nodeInfo?.kubeletVersion || '',
+        ready: String(ready?.status || '') === 'True',
+        readyText: String(ready?.status || '') === 'True' ? 'Ready' : (name ? 'NotReady' : ''),
+        roles: Object.keys(item.metadata?.labels || {}).filter((key) => key.startsWith('node-role.kubernetes.io/')).map((key) => key.slice('node-role.kubernetes.io/'.length)),
+        taints: Array.isArray(item.spec?.taints) ? item.spec.taints.length : 0,
+        podCapacity: item.status?.capacity?.pods || '',
+      }
+      if (name) out.set(name, extra)
+      if (ip) out.set(ip, extra)
+    }
+  } catch {
+    // 未开访问或无权限时控制台也只显示 CVM 侧字段
+  }
+  return out
+}
+
+async function loadEndpointDetail(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+): Promise<EndpointDetail> {
+  const empty: EndpointDetail = { intranetIp: '', internetIp: '', intranetDomain: '', internetDomain: '', securityGroup: '', intranetSubnet: '' }
+  try {
+    const data = await call<{
+      ClusterExternalEndpoint?: string
+      ClusterIntranetEndpoint?: string
+      ClusterDomain?: string
+      ClusterExternalDomain?: string
+      ClusterIntranetDomain?: string
+      SecurityGroup?: string
+      ClusterIntranetSubnetId?: string
+    }>('DescribeClusterEndpoints', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
+    return {
+      intranetIp: String(data.ClusterIntranetEndpoint || ''),
+      internetIp: String(data.ClusterExternalEndpoint || ''),
+      intranetDomain: String(data.ClusterIntranetDomain || ''),
+      internetDomain: String(data.ClusterExternalDomain || data.ClusterDomain || ''),
+      securityGroup: String(data.SecurityGroup || ''),
+      intranetSubnet: String(data.ClusterIntranetSubnetId || ''),
+    }
+  } catch {
+    return empty
+  }
+}
+
+async function loadUpgradeVersions(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+): Promise<string[]> {
+  try {
+    const data = await call<{
+      Versions?: string[]
+      Clusters?: Array<{ Versions?: string[] }>
+    }>('DescribeAvailableClusterVersion', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
+    const fromCluster = data.Clusters?.[0]?.Versions || []
+    const list = (data.Versions || []).length ? data.Versions || [] : fromCluster
+    return list.map((row) => String(row || '').trim()).filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+async function loadQuotaUsage(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+): Promise<DetailCard[]> {
+  try {
+    const data = await call<{
+      CRDUsage?: { Requested?: number; Limit?: number }
+      ConfigMapUsage?: { Requested?: number; Limit?: number }
+      SecretUsage?: { Requested?: number; Limit?: number }
+      PVCUsage?: { Requested?: number; Limit?: number }
+      ServiceUsage?: { Requested?: number; Limit?: number }
+    }>('DescribeResourceUsage', { ClusterId: clusterId }, creds(ctx), opts(ctx, region))
+    const rows: Array<[string, { Requested?: number; Limit?: number } | undefined]> = [
+      ['CRD', data.CRDUsage],
+      ['ConfigMap', data.ConfigMapUsage],
+      ['Secret', data.SecretUsage],
+      ['PVC', data.PVCUsage],
+      ['Service', data.ServiceUsage],
+    ]
+    return rows.filter(([, usage]) => usage).map(([name, usage]) => ({
+      id: name,
+      title: name,
+      columns: [
+        { label: '已用', value: String(usage?.Requested ?? 0) },
+        { label: '配额', value: String(usage?.Limit ?? '-') },
+      ],
+    }))
+  } catch {
+    return []
+  }
+}
+
+async function loadReleases(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+): Promise<DetailCard[]> {
+  try {
+    const data = await call<{
+      ReleaseSet?: Array<{
+        Name?: string
+        Namespace?: string
+        Chart?: string
+        ChartVersion?: string
+        Status?: string
+        UpdatedTime?: string
+      }>
+    }>('DescribeClusterReleases', { ClusterId: clusterId, Limit: 100 }, creds(ctx), opts(ctx, region))
+    return (data.ReleaseSet || []).map((item) => ({
+      id: `${item.Namespace || 'default'}/${item.Name || ''}`,
+      title: String(item.Name || ''),
+      status: item.Status || '',
+      columns: [
+        { label: '命名空间', value: item.Namespace || 'default' },
+        { label: 'Chart', value: item.Chart || '-' },
+        { label: '版本', value: item.ChartVersion || '-' },
+        { label: '更新时间', value: item.UpdatedTime || '-' },
+      ],
+    })).filter((item) => item.title)
+  } catch {
+    return []
+  }
+}
+
+async function loadInspection(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+): Promise<DetailCard[]> {
+  try {
+    const data = await call<{
+      Statistics?: Array<{ Name?: string; Result?: string; Count?: number; Level?: string }>
+      ClusterInspectionOverview?: Array<{ Name?: string; Result?: string; Count?: number; Level?: string }>
+    }>('DescribeClusterInspectionResultsOverview', { ClusterIds: [clusterId] }, creds(ctx), opts(ctx, region))
+    const rows = data.Statistics || data.ClusterInspectionOverview || []
+    return rows.map((item, index) => ({
+      id: String(item.Name || index),
+      title: String(item.Name || `检查项 ${index + 1}`),
+      status: item.Result || item.Level || '',
+      columns: [
+        { label: '结果', value: item.Result || '-' },
+        { label: '数量', value: item.Count != null ? String(item.Count) : '-' },
+        { label: '级别', value: item.Level || '-' },
+      ],
+    }))
+  } catch {
+    return []
+  }
+}
+
+function mapK8sItem(kind: string, item: Record<string, unknown>): DetailCard {
+  const meta = (item.metadata && typeof item.metadata === 'object' ? item.metadata : {}) as {
+    name?: string
+    namespace?: string
+    creationTimestamp?: string
+  }
+  const status = (item.status && typeof item.status === 'object' ? item.status : {}) as Record<string, unknown>
+  const spec = (item.spec && typeof item.spec === 'object' ? item.spec : {}) as Record<string, unknown>
+  const name = String(meta.name || '')
+  const ns = String(meta.namespace || '')
+  const created = String(meta.creationTimestamp || '-')
+  if (kind === 'deployments' || kind === 'statefulsets') {
+    const replicas = Number(spec.replicas ?? 0) || 0
+    const ready = Number((status.readyReplicas as number | undefined) ?? 0) || 0
+    return {
+      id: `${ns}/${name}`,
+      title: name,
+      status: `${ready}/${replicas}`,
+      columns: [
+        { label: '命名空间', value: ns || '-' },
+        { label: '就绪', value: `${ready}/${replicas}` },
+        { label: '镜像', value: k8sImages(spec) },
+        { label: '创建时间', value: created },
+      ],
+      flags: { namespace: ns, name, kind, replicas, ready },
+    }
+  }
+  if (kind === 'daemonsets') {
+    const desired = Number((status.desiredNumberScheduled as number | undefined) ?? 0) || 0
+    const ready = Number((status.numberReady as number | undefined) ?? 0) || 0
+    return {
+      id: `${ns}/${name}`,
+      title: name,
+      status: `${ready}/${desired}`,
+      columns: [
+        { label: '命名空间', value: ns || '-' },
+        { label: '就绪', value: `${ready}/${desired}` },
+        { label: '镜像', value: k8sImages(spec) },
+        { label: '创建时间', value: created },
+      ],
+      flags: { namespace: ns, name, kind },
+    }
+  }
+  if (kind === 'jobs' || kind === 'cronjobs') {
+    const completions = kind === 'jobs'
+      ? `${Number(status.succeeded || 0) || 0}/${Number(spec.completions ?? 1) || 1}`
+      : String((spec.schedule as string | undefined) || '-')
+    return {
+      id: `${ns}/${name}`,
+      title: name,
+      status: String((status.active as number | undefined) ? '运行中' : (item.status && (status.succeeded as number) ? '完成' : '-')),
+      columns: [
+        { label: '命名空间', value: ns || '-' },
+        { label: kind === 'cronjobs' ? 'Cron' : '完成', value: completions },
+        { label: '创建时间', value: created },
+      ],
+      flags: { namespace: ns, name, kind },
+    }
+  }
+  if (kind === 'services') {
+    const ports = Array.isArray(spec.ports)
+      ? (spec.ports as Array<{ port?: number; protocol?: string; targetPort?: number | string }>).map((row) => `${row.port}/${row.protocol || 'TCP'}`).join(',')
+      : '-'
+    return {
+      id: `${ns}/${name}`,
+      title: name,
+      status: String(spec.type || 'ClusterIP'),
+      columns: [
+        { label: '命名空间', value: ns || '-' },
+        { label: '类型', value: String(spec.type || 'ClusterIP') },
+        { label: 'ClusterIP', value: String(spec.clusterIP || '-') },
+        { label: '端口', value: ports || '-' },
+        { label: '创建时间', value: created },
+      ],
+      flags: { namespace: ns, name, kind },
+    }
+  }
+  if (kind === 'ingresses') {
+    const rules = Array.isArray((spec as { rules?: Array<{ host?: string }> }).rules)
+      ? ((spec as { rules?: Array<{ host?: string }> }).rules || []).map((row) => row.host || '*').join(',')
+      : '-'
+    return {
+      id: `${ns}/${name}`,
+      title: name,
+      columns: [
+        { label: '命名空间', value: ns || '-' },
+        { label: '域名', value: rules || '-' },
+        { label: '创建时间', value: created },
+      ],
+      flags: { namespace: ns, name, kind },
+    }
+  }
+  if (kind === 'secrets') {
+    const data = (item.data && typeof item.data === 'object' ? Object.keys(item.data as object) : []).length
+    return {
+      id: `${ns}/${name}`,
+      title: name,
+      status: String(spec.type || item.type || 'Opaque'),
+      columns: [
+        { label: '命名空间', value: ns || '-' },
+        { label: '类型', value: String(spec.type || item.type || 'Opaque') },
+        { label: '键数', value: String(data) },
+        { label: '创建时间', value: created },
+      ],
+      flags: { namespace: ns, name, kind },
+    }
+  }
+  if (kind === 'events') {
+    const involved = (item.involvedObject && typeof item.involvedObject === 'object' ? item.involvedObject : {}) as { kind?: string; name?: string }
+    return {
+      id: `${ns}/${name}` || created,
+      title: String(item.reason || name || '-'),
+      status: String(item.type || ''),
+      columns: [
+        { label: '命名空间', value: ns || '-' },
+        { label: '对象', value: [involved.kind, involved.name].filter(Boolean).join('/') || '-' },
+        { label: '消息', value: String(item.message || '-').slice(0, 160) },
+        { label: '时间', value: String(item.lastTimestamp || created) },
+      ],
+    }
+  }
+  return {
+    id: ns ? `${ns}/${name}` : name,
+    title: name,
+    status: String(status.phase || ''),
+    columns: [
+      { label: '命名空间', value: ns || '-' },
+      { label: '状态', value: String(status.phase || status.provisioner || '-') },
+      { label: '创建时间', value: created },
+    ],
+    flags: { namespace: ns, name, kind },
+  }
+}
+
+function k8sImages(spec: Record<string, unknown>): string {
+  const pod = (spec.template && typeof spec.template === 'object'
+    ? spec.template as { spec?: { containers?: Array<{ image?: string }> } }
+    : { spec })
+  const containers = pod.spec && Array.isArray(pod.spec.containers) ? pod.spec.containers : []
+  const images = containers.map((row) => String((row && row.image) || '').trim()).filter(Boolean)
+  return images.join(',') || '-'
+}
+
+async function listK8sResource(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+  payload: Record<string, unknown>,
+): Promise<ActionResult> {
+  const kind = String(payload.resource || payload.kind || '').trim()
+  if (kind === 'helm' || kind === 'releases') {
+    return { ok: true, data: { items: await loadReleases(call, ctx, region, clusterId) } }
+  }
+  if (!K8S_KIND[kind]) return { ok: false, error: `不支持的资源类型 ${kind}` }
+  const namespace = String(payload.namespace || payload.ns || '').trim()
+  const data = await call<{ ResponseBody?: string }>('ForwardApplicationRequestV3', {
+    ClusterName: clusterId,
+    Method: 'GET',
+    Path: k8sPath(kind, namespace),
+  }, creds(ctx), opts(ctx, region))
+  const parsed = parseJson(data.ResponseBody)
+  const items = Array.isArray(parsed?.items) ? parsed.items as Record<string, unknown>[] : []
+  return { ok: true, data: { items: items.map((item) => mapK8sItem(kind, item)) } }
+}
+
+async function scaleK8sResource(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+  payload: Record<string, unknown>,
+): Promise<ActionResult> {
+  const kind = String(payload.resource || payload.kind || 'deployments').trim()
+  const name = String(payload.name || '').trim()
+  const namespace = String(payload.namespace || 'default').trim()
+  const replicas = Number(payload.replicas)
+  if (!name) return { ok: false, error: '缺少工作负载名称' }
+  if (!Number.isFinite(replicas) || replicas < 0) return { ok: false, error: '缺少副本数' }
+  if (kind !== 'deployments' && kind !== 'statefulsets') return { ok: false, error: '该资源不支持调整副本' }
+  await call('ForwardApplicationRequestV3', {
+    ClusterName: clusterId,
+    Method: 'PATCH',
+    Path: k8sPath(kind, namespace, name),
+    ContentType: 'application/strategic-merge-patch+json',
+    RequestBody: JSON.stringify({ spec: { replicas } }),
+  }, creds(ctx), opts(ctx, region))
+  return { ok: true }
+}
+
+async function restartK8sResource(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+  payload: Record<string, unknown>,
+): Promise<ActionResult> {
+  const kind = String(payload.resource || payload.kind || 'deployments').trim()
+  const name = String(payload.name || '').trim()
+  const namespace = String(payload.namespace || 'default').trim()
+  if (!name) return { ok: false, error: '缺少工作负载名称' }
+  if (!['deployments', 'statefulsets', 'daemonsets'].includes(kind)) return { ok: false, error: '该资源不支持滚动重启' }
+  await call('ForwardApplicationRequestV3', {
+    ClusterName: clusterId,
+    Method: 'PATCH',
+    Path: k8sPath(kind, namespace, name),
+    ContentType: 'application/strategic-merge-patch+json',
+    RequestBody: JSON.stringify({
+      spec: {
+        template: {
+          metadata: {
+            annotations: { 'kubectl.kubernetes.io/restartedAt': new Date().toISOString() },
+          },
+        },
+      },
+    }),
+  }, creds(ctx), opts(ctx, region))
+  return { ok: true }
+}
+
+async function deleteK8sResource(
+  call: typeof tkeCall,
+  ctx: ModuleContext,
+  region: string,
+  clusterId: string,
+  payload: Record<string, unknown>,
+): Promise<ActionResult> {
+  const kind = String(payload.resource || payload.kind || '').trim()
+  const name = String(payload.name || '').trim()
+  const namespace = String(payload.namespace || '').trim()
+  if (!K8S_KIND[kind]) return { ok: false, error: `不支持的资源类型 ${kind}` }
+  if (!name) return { ok: false, error: '缺少资源名称' }
+  await call('ForwardApplicationRequestV3', {
+    ClusterName: clusterId,
+    Method: 'DELETE',
+    Path: k8sPath(kind, namespace, name),
+  }, creds(ctx), opts(ctx, region))
+  return { ok: true }
 }
 
 async function loadOps(call: typeof tkeCall, ctx: ModuleContext, region: string, clusterId: string): Promise<{ audit: boolean; event: boolean }> {

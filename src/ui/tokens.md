@@ -61,6 +61,7 @@
   --ci-shadow-2: 0 8px 24px rgba(0, 0, 0, .16);
   --ci-z-modal: 40;
   --ci-z-popover: 60;
+  --ci-z-toast: 80;
 }
 ```
 

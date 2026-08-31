@@ -124,6 +124,7 @@ export interface FieldGroup {
 export interface DetailPage {
   id: string
   title: string
+  group?: string
 }
 
 export interface DetailBlock {

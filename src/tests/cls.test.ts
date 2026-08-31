@@ -413,6 +413,9 @@ test('client CLS card stays inside ci-panel and does not save config (g2.3 g1.4)
   assert.match(cls, /\.finally\(\(\) => \{ moreLock\.current = false; \}\)/)
   assert.match(cls, /el\.scrollHeight - el\.scrollTop - el\.clientHeight <= 96/)
   assert.match(cls, /el\.scrollHeight - el\.clientHeight <= 8\) loadMoreLogs\(\)/)
+  // 续拉失败或 append 0 条时必须停 hasMore,否则首屏补拉 effect 会空转 SearchLog
+  assert.match(cls, /setLogMore\(false\)/)
+  assert.match(cls, /used\.append && nextLogs\.length === 0/)
   assert.match(cls, /"ci-logtable", ref: logPane, onScroll: onLogScroll/)
   // 空闲时底部不留提示行、取完也不留「没有更多」,只有真的在取时占一行
   assert.match(cls, /logMore && logBusy \? h\("div", \{ className: "ci-log-more" \}/)

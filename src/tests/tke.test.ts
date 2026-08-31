@@ -110,8 +110,23 @@ function mockCall() {
     }
     if (action === 'DescribeClusterSecurity') return { Kubeconfig: 'apiVersion: v1\nkind: Config\n' }
     if (action === 'DescribeExternalClusterSpec') return { Spec: 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: tke-register\n' }
+    if (action === 'DescribeClusterEndpoints') {
+      return { ClusterIntranetEndpoint: '10.0.0.8', ClusterExternalEndpoint: '', ClusterIntranetDomain: '' }
+    }
+    if (action === 'DescribeAvailableClusterVersion') return { Versions: ['1.30.0', '1.32.1'] }
     if (action === 'ForwardApplicationRequestV3') {
       const path = String((payload as { Path?: string }).Path || '')
+      if (path.includes('/apis/apps/v1/deployments')) {
+        return {
+          ResponseBody: JSON.stringify({
+            items: [{
+              metadata: { name: 'web', namespace: 'default', creationTimestamp: '2026-01-01T00:00:00Z' },
+              spec: { replicas: 2, template: { spec: { containers: [{ image: 'nginx:1.27' }] } } },
+              status: { readyReplicas: 2 },
+            }],
+          }),
+        }
+      }
       if (path.includes('clusterrolebindings')) {
         return {
           ResponseBody: JSON.stringify({
@@ -206,6 +221,10 @@ test('g1.2 detail uses sidebar pages instead of DNS records', async () => {
   assert.ok((detail?.cards?.nodePools || []).some((card) => (card.columns || []).some((col) => col.label === '计费' && col.value === '按量计费')))
   assert.equal(detail?.flags?.audit, false)
   assert.equal(detail?.flags?.event, true)
+  assert.ok(detail?.pages?.some((page) => page.id === 'workloads'))
+  assert.ok(detail?.pages?.some((page) => page.id === 'services'))
+  assert.ok(detail?.pages?.some((page) => page.id === 'helm'))
+  assert.ok(detail?.blocks?.find((block) => block.id === 'apiserver')?.fields?.some((row) => row.label === '内网地址'))
   const logCall = calls.find((row) => row.action === 'DescribeLogSwitches')
   assert.deepEqual((logCall?.payload as { ClusterIds?: string[] }).ClusterIds, ['cls-abc12345'])
   const endpoints = calls.filter((row) => row.action === 'DescribeClusterEndpointStatus')
@@ -490,6 +509,22 @@ test('g2.7 namespace quota, addon, rbac, policy confirm, audit switch', async ()
   assert.equal(calls.some((row) => row.action === 'EnableClusterAudit'), true)
 })
 
+test('g2.8 k8s.list/scale/restart/delete cover console workload actions', async () => {
+  const { module, calls } = mockCall()
+  const id = 'tencent.tke:ap-guangzhou:cls-abc12345'
+  const listed = await module.execute?.('k8s.list', { resource: 'deployments' }, ctx({ id }))
+  assert.equal(listed?.ok, true)
+  const items = listed && 'data' in listed ? (listed.data as { items?: Array<{ title?: string }> }).items : []
+  assert.equal(items?.[0]?.title, 'web')
+  assert.equal((await module.execute?.('k8s.scale', { resource: 'deployments', name: 'web', namespace: 'default', replicas: 3 }, ctx({ id })))?.ok, true)
+  const scale = calls.find((row) => row.action === 'ForwardApplicationRequestV3' && (row.payload as { Method?: string }).Method === 'PATCH' && String((row.payload as { Path?: string }).Path || '').includes('/deployments/web'))
+  assert.ok(scale)
+  assert.equal((await module.execute?.('k8s.restart', { resource: 'deployments', name: 'web', namespace: 'default' }, ctx({ id })))?.ok, true)
+  assert.equal((await module.execute?.('k8s.delete', { resource: 'services', name: 'web', namespace: 'default' }, ctx({ id })))?.ok, true)
+  const deleted = calls.find((row) => row.action === 'ForwardApplicationRequestV3' && (row.payload as { Method?: string }).Method === 'DELETE')
+  assert.match(String((deleted?.payload as { Path?: string }).Path || ''), /\/services\/web/)
+})
+
 test('g4.2 kind=cluster render has no 解析记录 and query does not write overlay', async () => {
   const text = renderQuery({
     query: '',
@@ -536,6 +571,8 @@ test('g4.2 client ClusterConsole is independent of DetailView records table', ()
   const client = src('src/client.js')
   assert.match(client, /function ClusterConsole/)
   assert.match(client, /function ClusterDetail/)
+  assert.match(client, /function k8sKindForPage/)
+  assert.match(client, /next && next !== k8sKind/)
   assert.match(client, /function CreateWizard/)
   assert.match(client, /function DeleteWizard/)
   assert.match(client, /function FormPanel/)
@@ -544,6 +581,8 @@ test('g4.2 client ClusterConsole is independent of DetailView records table', ()
   assert.match(client, /我已知晓风险/)
   assert.match(client, /ci-np-card/)
   assert.match(client, /ci-side-nav/)
+  assert.match(client, /ci-tke-nav/)
+  assert.match(client, /工作负载/)
   assert.match(client, /kind === "cluster"/)
   assert.match(client, /单节点 Pod 上限/)
   assert.match(client, /生成导入配置/)

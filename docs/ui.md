@@ -47,7 +47,7 @@
 ### 阴影与层级
 
 `--ci-shadow-0`(滑块 / 分段选中)/ `--ci-shadow-1`(菜单)/ `--ci-shadow-2`(浮层与弹窗),`--ci-mask`(弹窗遮罩),
-`--ci-z-modal`(40)/ `--ci-z-popover`(60)。
+`--ci-z-window`(30)/ `--ci-z-modal`(40)/ `--ci-z-popover`(60)/ `--ci-z-toast`(80)。Toast 必须高于弹窗,对齐腾讯云 CAM Message。
 
 宿主主题**没有** `--dsw-alias-shadow`,引用它的 `box-shadow` 整条无效,所以阴影一律走上面三档 token;
 遮罩取 `--dsw-alias-bg-mask-1` 而不是 `bg-mask-3`(后者是 48% 纯黑,插件嵌在对话卡片里会把整张卡压暗)。
@@ -101,7 +101,9 @@ h(Tabs, {
 ```
 
 视觉 = **2px 品牌色下划线 + 品牌色文字**,等同腾讯云控制台 Detail 页 Tab。已自动应用:
-- TKE 详情(基本 / 节点 / 节点池 / 命名空间 / 组件 / 授权 / 策略 / 运维)
+- TKE 详情对齐控制台：左侧分组导航 + 分区卡片两列键值（不再用 chip 堆字段）；
+  节点 / 节点池 / 工作负载 / 服务与路由 / 配置 / 存储 / 命名空间 / 组件 / Helm 应用 / 授权 / 策略 / 运维均为全宽表；
+  工作负载支持调整副本、滚动重启、删除。
 - CDB 11 页签(实例详情 / 监控 / 数据库 / 参数 / 任务 / 备份 / 日志 / 账号 / 安全组 / 只读 / 连接)
 - DBbrain 诊断优化分组
 - CLS 检索分析(主题列表 / 检索分析)
@@ -127,6 +129,8 @@ h(Modal, {
 
 特性:`role=dialog` + `aria-modal=true` + Esc 关闭 + 打开时焦点入、关闭焦点归。`width: "wizard"` 时切换为宽体向导容器。
 
+`ConfirmDialog` 的按钮走 `.ci-mini`:**取消**保持灰描边,hover 不改成蓝框;**确认**在 `danger` 时是红底白字(`.ci-mini.primary.danger`),不能叠成蓝底红字。`.ci-mini` 带 `appearance:none`,避免吃到宿主默认按钮皮。
+
 ### 2.5 Empty — 空态
 
 ```js
@@ -139,6 +143,18 @@ h(Empty, { text: "该地域下没有存储桶", hint: "试试切换地域", acti
 
 ```js
 h(Notice, { type: "error" }, "拉取地域失败,请稍后重试")
+```
+
+Notice 只用于页面里需要常驻的说明。云厂商 / CAM 报错不要再用 Notice 或 `.ci-err` 堆在面板顶上。
+
+### 2.6.1 Toast / Message — 右上角报错
+
+对齐腾讯云控制台 CAM Message:`api()` 在 query / detail / search / action 失败时调用 `pushToast("error", publicErrorMessage(err))`。`ToastHost` 挂到 `document.body`,固定在视口右上角,盖过窗口和弹窗(`--ci-z-toast:80`),约 4.5s 自动消失,可手动关闭。同屏最多 4 条。
+
+设置页 `config` / `meta` 仍走卡片内 `.ci-err`。表单本地校验(文件过大、未勾协议等)也可以留在弹窗里。列表失败时空态写「无法加载…」,不要把「当前密钥没有该操作的权限」再印成一行红字。
+
+```js
+pushToast("error", "当前密钥没有该操作的权限")
 ```
 
 ### 2.7 Pagination — 分页
