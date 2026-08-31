@@ -27,6 +27,9 @@
 3. **表格滚动条**:`cvm / lighthouse` × 有数据 / 空结果 四种组合,断言容器确实横向可滚(`scrollWidth > clientWidth`)、
    滚动条占了高度(`offsetHeight - clientHeight > 0`);空结果时还要求 `.ci-empty` 在 `.ci-scroll` 内、
    容器底边落在空态之下、且空态为 `sticky`。
+   另外对 `cdb / cos / cls / cvm` 量滚动容器底边是否贴着 `.ci-list-body` 下沿(行数少时 `ListPane` 撑出来的
+   空白必须留在容器**内部**,否则滚动条浮在表格中间);再把卡片压到 560px 让 CDB 宽表真的横向溢出,
+   直接量滚动条本身的位置,并截一张 `cdb-scrollbar.png`。
 4. **切 Tab 链路**:CVM 选「清远信安」→ 切轻量(收敛到同城的「清远」+ 给说明 + 拿到数据)→
    看浮层列的是轻量自己的清单且文案口径统一 → 切回 CVM(换成 CVM 的写法去查、城市没变则不打扰用户)。
    另有两条回落:轻量没有的地域优先回到该 Tab 上次选过的地域;全新挂载时清单还没到,等结果回来自愈到广州。
@@ -49,5 +52,5 @@ node scripts/verify-list-layout/verify.mjs [/path/to/chrome-headless-shell]
 ```
 
 截图落在 `$TMPDIR/list-layout-verify/shots/`(cvm 全称链、cls 短名链、cvm 空态滚动条、切 Tab 收敛说明、
-域名注册结算栏、面板全屏、证书行内菜单各一张)。
+域名注册结算栏、面板全屏、证书行内菜单、CDB 窄卡片滚动条各一张)。
 运行前需要 `libgbm` / `libasound`(TencentOS:`dnf install -y mesa-libgbm alsa-lib`)。

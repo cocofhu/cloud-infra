@@ -241,8 +241,14 @@ h(RegionPicker, {
 放到外面时容器就只包住 `<thead>`,滚动条会紧贴表头下沿,看着像"表头上长了根滚动条"。
 
 - `.ci-scroll > .ci-empty` 带 `position:sticky;left:0`,横滚表头时提示文案不会被推出可视区。
+- 同一个坑的另一半:**滚动容器必须自己吃掉 `ListPane` 撑出来的空白**。`ListPane` 为了翻页不抖会给
+  `.ci-list-body` 兜一个高度(`min-height:160px` 或上一屏的高度),行数少时这段空白落在滚动容器**下面**,
+  滚动条就停在表格与空白之间,浮在列表中央。所以 `.ci-list-body` 是 column flex,
+  `.ci-scroll` / `.ci-table-wrap` / `.ci-table-scroll` 作为直接子元素取 `flex:1;min-height:0` ——
+  表格照旧贴顶,多出来的高度在容器内部,滚动条回到列表下沿。CDB / COS / CLS / 实例表共用这一条。
 - 契约由 `client-contract.test.ts` 做括号配平检查(空态节点必须落在 `.ci-scroll` 的调用范围内)。
-- 视觉回归:`node scripts/verify-list-layout/verify.mjs [chrome]`,空/非空各量一次滚动条位置。
+- 视觉回归:`node scripts/verify-list-layout/verify.mjs [chrome]`,空/非空各量一次滚动条位置;
+  再对 cdb / cos / cls / cvm 量滚动容器底边是否贴着列表下沿,并把卡片压到 560px 让 CDB 宽表真的溢出。
 
 ### 2.16 实例卡双 Tab — 地域按 Tab 独立
 

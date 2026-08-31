@@ -611,6 +611,10 @@ test('cvm and lighthouse consoles share one dual-tab instance card', () => {
     assert.ok(emptyAt < balancedEnd(body, scrollAt), `${fn}: 空态落在 .ci-scroll 之外,滚动条会贴在表头下沿`)
   }
   assert.match(client, /\.ci-scroll>\.ci-empty\{position:sticky;left:0/)
+  // 同一个坑的另一半:行数少时 ListPane 兜的高度必须留在滚动容器内部,
+  // 否则滚动条停在表格与空白之间,浮在列表中央(CDB/COS/CLS/实例表共用这条)
+  assert.match(client, /\.ci-list-body\{min-height:160px;display:flex;flex-direction:column\}/)
+  assert.match(client, /\.ci-list-body>\.ci-scroll,\.ci-list-body>\.ci-table-wrap,\.ci-list-body>\.ci-table-scroll\{flex:1;min-height:0\}/)
   // 地域命名统一:客户端按控制台全称归一,短名(如「广州」)映射为「华南地区（广州）」
   assert.match(client, /function canonicalRegionName/)
   assert.match(client, /\["广州", "华南地区（广州）"\]/)

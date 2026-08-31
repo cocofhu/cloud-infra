@@ -125,7 +125,11 @@ window.__ModuleLoader__.load({
 .ci-region-notice-static{color:var(--dsw-alias-label-caption);background:var(--dsw-alias-fill-l2,rgba(127,127,127,.08))}
 .ci-region-notice .ci-mini{margin:0}
 .ci-load{display:flex;align-items:center;justify-content:center;padding:36px 16px;color:var(--dsw-alias-label-caption);border-top:1px solid var(--dsw-alias-border-l1)}
-.ci-list-body{min-height:160px}
+/* 横向滚动条要长在整块列表的下沿。滚动容器只包着表格时,ListPane 为了翻页不抖而撑出来的
+   那段空白落在它下面,滚动条就卡在表格与空白之间(看着像浮在列表中间)。让滚动容器自己
+   吃掉这段高度:表格照旧贴顶,多出来的空白在容器内部,滚动条自然回到容器底边。 */
+.ci-list-body{min-height:160px;display:flex;flex-direction:column}
+.ci-list-body>.ci-scroll,.ci-list-body>.ci-table-wrap,.ci-list-body>.ci-table-scroll{flex:1;min-height:0}
 .ci-list-body.compact{min-height:0}
 /* 卡片「窗口化 / 全屏」:对话卡片只有几百像素宽,宽表在里面永远要横向滚。
    这一层把同一棵面板搬到 body 上的浮层里,z-index 必须低于 --ci-z-modal,
