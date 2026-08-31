@@ -16,6 +16,7 @@ import {
   DNSPOD_AUTO_DNS_HINT,
   isDomainVerificationPassed,
   isFreeDomainValid,
+  isUnauthorized,
   mapCertItem,
   needsCancelBeforeDelete,
   normalizeHostInstances,
@@ -25,7 +26,9 @@ import {
   toDeployedResourceType,
   type CertificatesItem,
 } from '../providers/tencent/products/cert.js'
+import { TencentApiError } from '../providers/tencent/client.js'
 import { renderQuery } from '../core/query.js'
+import { publicErrorMessage } from '../core/safe-error.js'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const fixture = (name: string) => JSON.parse(readFileSync(join(dir, 'fixtures', name), 'utf8')) as Record<string, unknown>
@@ -247,6 +250,7 @@ test('createCertModule list/detail/actions talk SSL APIs without writing setting
     assert.equal(downloaded.data?.filename, 'QL8k2m.zip')
     assert.equal(downloaded.data?.content, 'UEsA')
   }
+  assert.equal(calls.some((row) => row.action === 'DescribeDownloadCertificateUrl'), false)
 
   for (const action of ['cert.revoke', 'cert.delete', 'cert.cancel', 'cert.deploy.retry']) {
     const payload = action === 'cert.deploy.retry' ? { deployRecordId: 9 } : { certificateId: 'QL8k2m' }
@@ -478,4 +482,44 @@ test('renderQuery for cert does not guide 解析 or settings', () => {
     total: 1,
   })
   assert.match(domainText, /解析/)
+})
+
+test('cert.download falls back to a temp link when the key lacks ssl:DownloadCertificate', async () => {
+  const calls: string[] = []
+  const call = async (action: string) => {
+    calls.push(action)
+    if (action === 'DownloadCertificate') {
+      throw new TencentApiError('操作未授权，请检查CAM策略。you are not authorized to perform operation (ssl:DownloadCertificate)', 'AuthFailure.UnauthorizedOperation', 'req-1')
+    }
+    if (action === 'DescribeDownloadCertificateUrl') {
+      return { DownloadCertificateUrl: 'https://certificate-1.cos.ap-guangzhou.myqcloud.com/x.zip?sign=1', DownloadFilename: 'example.com_nginx.zip' }
+    }
+    return {}
+  }
+  const module = createCertModule(call as never)
+  const result = await module.execute?.('cert.download', { certificateId: 'QL8k2m' }, { ...ctx, id: 'tencent.cert:QL8k2m' })
+  assert.equal(result?.ok, true)
+  if (result?.ok) {
+    assert.equal(result.data?.filename, 'example.com_nginx.zip')
+    assert.match(String(result.data?.url), /^https:\/\//)
+    assert.equal(result.data?.content, undefined)
+  }
+  assert.deepEqual(calls, ['DownloadCertificate', 'DescribeDownloadCertificateUrl'])
+
+  // 只兜「没授权」,别的错误照旧抛出去
+  assert.equal(isUnauthorized(new TencentApiError('x', 'AuthFailure.UnauthorizedOperation')), true)
+  assert.equal(isUnauthorized(new TencentApiError('x', 'UnauthorizedOperation')), true)
+  assert.equal(isUnauthorized(new TencentApiError('x', 'AuthFailure.SignatureExpire')), false)
+  assert.equal(isUnauthorized(new Error('AuthFailure.UnauthorizedOperation')), false)
+
+  const other = createCertModule((async (action: string) => {
+    if (action === 'DownloadCertificate') throw new TencentApiError('签名过期', 'AuthFailure.SignatureExpire')
+    return {}
+  }) as never)
+  const failed = await other.execute?.('cert.download', { certificateId: 'QL8k2m' }, { ...ctx, id: 'tencent.cert:QL8k2m' })
+  assert.equal(failed?.ok, false)
+
+  // 缺权限的文案不能再让人去翻密钥:密钥是对的,少的是 CAM 授权
+  assert.equal(publicErrorMessage(new TencentApiError('x', 'AuthFailure.UnauthorizedOperation')), '当前密钥没有该操作的权限')
+  assert.equal(publicErrorMessage(new TencentApiError('x', 'AuthFailure')), '云厂商鉴权失败，请检查设置中的密钥')
 })

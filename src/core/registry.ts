@@ -132,7 +132,7 @@ export function credentialMap(provider: CloudProvider, bucket: Record<string, st
   return out
 }
 
-export const SETTINGS_HINT = '请在 设置 → 插件 → 云资源 填写对应云厂商的 AccessKey'
+export const SETTINGS_HINT = '请在 设置 → 插件 → Cloud Infra 填写对应云厂商的 AccessKey'
 export const CERT_CREDENTIAL_HINT = '请使用已有腾讯云 SecretId/SecretKey'
 
 export function credentialHint(kind?: string): string {

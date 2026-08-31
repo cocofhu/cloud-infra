@@ -14,11 +14,31 @@ export interface MetricSeries {
   values: Array<number | null>
 }
 
-/** 时间档 → 默认采样周期（秒）：1h/60s、6h/300s、24h/900s */
+/**
+ * 云监控允许的统计粒度（秒）。GetMonitorData 只接受这些取值，
+ * 传集合外的数字（曾用过 900）会被上游直接判 `InvalidParameterValue: period is invalid`，
+ * 且是整档时间范围内的每个指标都失败，而不是单个指标降级。
+ */
+export const MONITOR_PERIODS = [10, 60, 300, 3600, 86400]
+
+/**
+ * 时间档 → 默认采样周期（秒）：1h/60s、6h/300s、24h/300s。
+ * 24h 用 300s（288 点，远低于单请求 1440 点上限）而不是 3600s：
+ * 轻量应用服务器的 CpuUsage 等指标官方只给到 300s 粒度，3600s 不在其统计规则内。
+ */
 export const MONITOR_RANGE_PERIOD: Record<MonitorRange, number> = {
   '1h': 60,
   '6h': 300,
-  '24h': 900,
+  '24h': 300,
+}
+
+/** 把任意周期收敛到合法粒度：优先取不超过目标值的最细一档，保证点数不少于预期。 */
+export function normalizeMonitorPeriod(period?: number): number {
+  const want = Number(period)
+  if (!Number.isFinite(want) || want <= 0) return 60
+  if (MONITOR_PERIODS.includes(want)) return want
+  const finer = MONITOR_PERIODS.filter((row) => row < want)
+  return finer.length ? finer[finer.length - 1] : MONITOR_PERIODS[0]
 }
 
 export function normalizeMonitorRange(range?: string): MonitorRange {
@@ -31,7 +51,7 @@ export function normalizeMonitorRange(range?: string): MonitorRange {
  */
 export function monitorWindow(range?: string, nowMs = Date.now()): { startTime: string; endTime: string; period: number } {
   const r = normalizeMonitorRange(range)
-  const period = MONITOR_RANGE_PERIOD[r]
+  const period = normalizeMonitorPeriod(MONITOR_RANGE_PERIOD[r])
   const hours = r === '24h' ? 24 : r === '6h' ? 6 : 1
   const align = 300
   const endSec = Math.floor(nowMs / 1000 / align) * align
@@ -75,7 +95,7 @@ export async function fetchMetricSeries(
   const data = await monitor<GetMonitorDataResponse>('GetMonitorData', {
     Namespace: input.namespace,
     MetricName: input.metric,
-    Period: input.period || win.period,
+    Period: normalizeMonitorPeriod(input.period || win.period),
     StartTime: win.startTime,
     EndTime: win.endTime,
     Instances: [{ Dimensions: [{ Name: input.dimensionName || 'InstanceId', Value: input.instanceId }] }],
@@ -104,7 +124,7 @@ export interface HostMetricDef {
 }
 
 /** 指标级失败根因分类 */
-export type MetricErrorType = 'AGENT_MISSING' | 'METRIC_NOT_FOUND' | 'API_ERROR'
+export type MetricErrorType = 'AGENT_MISSING' | 'METRIC_NOT_FOUND' | 'API_ERROR' | 'INSTANCE_NOT_RUNNING'
 
 export interface MetricError {
   key: string
@@ -122,19 +142,26 @@ export const METRIC_SUGGESTIONS: Record<MetricErrorType, string> = {
   METRIC_NOT_FOUND: '云监控未提供该指标',
   AGENT_MISSING: '请到轻量/CVM 控制台检查并安装或启动监控组件(barad_agent)后重试',
   API_ERROR: '请检查 CAM 云监控权限或稍后重试',
+  INSTANCE_NOT_RUNNING: '实例开机后约 5 分钟开始上报监控数据',
 }
+
+/** 实例未运行时的整体说明,替代逐条「监控组件未安装」(关机实例本来就不上报) */
+export const MONITOR_NOT_RUNNING_NOTE = '实例未运行，云监控暂无数据（开机后约 5 分钟开始上报）'
 
 /**
  * 指标级根因分类。优先级与需求边界用例一致:
- *  1) 空点 + 依赖 agent → AGENT_MISSING
- *  2) 空点(或错误信息表明指标/维度不存在)→ METRIC_NOT_FOUND
- *  3) 带上游 code → 命中上述 not-found 关键字时归 METRIC_NOT_FOUND,否则 API_ERROR
+ *  1) 空点 + 实例未运行 → INSTANCE_NOT_RUNNING(关机实例不上报,归因为 agent 缺失会误导用户去装组件)
+ *  2) 空点 + 依赖 agent → AGENT_MISSING
+ *  3) 空点(或错误信息表明指标/维度不存在)→ METRIC_NOT_FOUND
+ *  4) 带上游 code → 命中上述 not-found 关键字时归 METRIC_NOT_FOUND,否则 API_ERROR
  */
 export function classifyMetricError(input: {
   error?: unknown
   emptyPoints?: boolean
   requiresAgent?: boolean
   unavailable?: string
+  /** 明确为 false 时表示实例非运行中(已关机/待回收等) */
+  instanceRunning?: boolean
 }): { errorType: MetricErrorType; message?: string; code?: string } {
   // 结构性不可用(官方未暴露)与「按官方要求未发请求」
   if (input.unavailable) return { errorType: 'METRIC_NOT_FOUND', message: input.unavailable }
@@ -144,6 +171,10 @@ export function classifyMetricError(input: {
   // 判定依据用上游原始信息(脱敏后可能塌缩为「云厂商请求失败」),展示信息用脱敏后的
   const raw = err instanceof Error ? err.message : String(err ?? '')
   const notFound = /InvalidParameterValue|ResourceNotFound|MetricNotExist|not exist|不存在/i.test(`${code} ${raw}`)
+  // 非运行中实例不会上报监控；即使上游以错误而非空序列表达，也不要误导成 agent 缺失。
+  if (input.emptyPoints && input.instanceRunning === false) {
+    return { errorType: 'INSTANCE_NOT_RUNNING', code: code || undefined }
+  }
   if (err) {
     // 依赖 agent 的指标同时返回空/报错:优先按 agent 缺失归因(空点最常见就是组件未装)
     if (input.emptyPoints && input.requiresAgent) return { errorType: 'AGENT_MISSING', message, code: code || undefined }
@@ -152,6 +183,7 @@ export function classifyMetricError(input: {
     if (input.emptyPoints && input.requiresAgent) return { errorType: 'AGENT_MISSING', message }
     return { errorType: 'API_ERROR', message }
   }
+  if (input.emptyPoints && input.instanceRunning === false) return { errorType: 'INSTANCE_NOT_RUNNING' }
   if (input.emptyPoints && input.requiresAgent) return { errorType: 'AGENT_MISSING' }
   if (input.emptyPoints) return { errorType: 'METRIC_NOT_FOUND' }
   return { errorType: 'API_ERROR' }
@@ -177,14 +209,16 @@ export const HOST_METRICS: HostMetricDef[] = [
 /**
  * 轻量应用服务器(QCE/LIGHTHOUSE)指标集。
  * 命名空间与 CVM 不同,多项指标英文名也不同:
- *  - CPU 使用率:CPUUsage(CVM 为 CpuUsage)
- *  - 内存使用率:MemoryUsage(CVM 为 MemUsage;需实例安装监控组件,未装时返回空序列)
- *  - 磁盘使用率:DiskUsage(CVM 为 CvmDiskUsage;Lighthouse 侧带 disk 维度,单 InstanceId 查询时云监控返回首块磁盘序列)
+ * 指标英文名以官方「轻量应用服务器监控指标」文档(https://cloud.tencent.com/document/product/248/60127)为准:
+ *  - CPU 使用率:CpuUsage
+ *  - 内存使用率:MemUsage(与 CVM 同名;依赖实例内监控组件,未装时返回空序列)
+ *  - 磁盘使用率:DiskUsage(CVM 为 CvmDiskUsage)
+ * 该命名空间不存在 CPUUsage / MemoryUsage 指标,传这两个名字云监控会返回 InvalidParameterValue。
  * 与 CVM 一致:官方在 InstanceId 维度同样未提供主机级磁盘 IOPS,指标集不含 IOPS 条目。
  */
 export const LIGHTHOUSE_METRICS: HostMetricDef[] = [
-  { key: 'cpu', metricName: 'CPUUsage', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
-  { key: 'memory', metricName: 'MemoryUsage', label: '内存使用率', unit: '%', color: '#8a5cf6', requiresAgent: true },
+  { key: 'cpu', metricName: 'CpuUsage', label: 'CPU 使用率', unit: '%', color: '#3a7bff' },
+  { key: 'memory', metricName: 'MemUsage', label: '内存使用率', unit: '%', color: '#8a5cf6', requiresAgent: true },
   { key: 'disk', metricName: 'DiskUsage', label: '磁盘使用率', unit: '%', color: '#f6a35c', requiresAgent: true },
   { key: 'lanIn', metricName: 'LanIntraffic', label: '内网入带宽', unit: 'Mbps', color: '#2fbf71' },
   { key: 'lanOut', metricName: 'LanOuttraffic', label: '内网出带宽', unit: 'Mbps', color: '#1f9d8f' },
@@ -207,8 +241,17 @@ export async function fetchMonitorSeries(
     creds: TencentCreds
     opts: TencentCallContext
     nowMs?: number
+    /** 实例是否运行中;传 false 时空序列归因为「实例未运行」而不是「监控组件未安装」 */
+    instanceRunning?: boolean
   },
-): Promise<{ range: MonitorRange; series: MetricSeries[]; errors: string[]; metricErrors: MetricError[] }> {
+): Promise<{
+  range: MonitorRange
+  series: MetricSeries[]
+  errors: string[]
+  metricErrors: MetricError[]
+  /** 实例未运行且全部指标为空:调用方应只给一条整体说明,不逐条列失败 */
+  notRunning?: boolean
+}> {
   const range = normalizeMonitorRange(input.range)
   const results = await Promise.all(input.metrics.map(async (metric) => {
     if (metric.unavailable) {
@@ -223,9 +266,13 @@ export async function fetchMonitorSeries(
     }
     try {
       const row = await fetchMetricSeries(monitor, { ...input, metric: metric.metricName, range })
-      // 依赖 agent 的指标返回空序列且无错误码:归因为 AGENT_MISSING,让用户获得可操作的引导
-      if (metric.requiresAgent && !row.timestamps.length) {
-        const cls = classifyMetricError({ emptyPoints: true, requiresAgent: true })
+      // 空序列且无错误码:关机实例归因为「实例未运行」,运行中且依赖 agent 才归因为组件缺失
+      if (!row.timestamps.length && (metric.requiresAgent || input.instanceRunning === false)) {
+        const cls = classifyMetricError({
+          emptyPoints: true,
+          requiresAgent: metric.requiresAgent,
+          instanceRunning: input.instanceRunning,
+        })
         return {
           ...row,
           key: metric.key,
@@ -240,7 +287,12 @@ export async function fetchMonitorSeries(
       // 同步回填 MetricDef.key,前端 seriesMap 统一以 key 为键(避免 metricName 与 key 错位)
       return { ...row, key: metric.key }
     } catch (err) {
-      const cls = classifyMetricError({ error: err, requiresAgent: metric.requiresAgent })
+      const cls = classifyMetricError({
+        error: err,
+        emptyPoints: true,
+        requiresAgent: metric.requiresAgent,
+        instanceRunning: input.instanceRunning,
+      })
       return {
         key: metric.key,
         metric: metric.metricName,
@@ -258,9 +310,15 @@ export async function fetchMonitorSeries(
   const metricErrors = results
     .map((row) => ('error' in row ? row.error : undefined))
     .filter((row): row is MetricError => !!row)
+  const series = results.map((row) => ({ key: row.key, metric: row.metric, timestamps: row.timestamps, values: row.values }))
+  // 关机实例全部指标为空是预期行为,逐条列「拉取失败」只会让用户以为要去修组件
+  const notRunning = input.instanceRunning === false
+    && series.every((row) => !row.timestamps.length)
+    && metricErrors.every((row) => row.errorType === 'INSTANCE_NOT_RUNNING')
+  if (notRunning) return { range, series, errors: [], metricErrors: [], notRunning: true }
   return {
     range,
-    series: results.map((row) => ({ key: row.key, metric: row.metric, timestamps: row.timestamps, values: row.values })),
+    series,
     errors: metricErrors.map((row) => row.message || row.errorType),
     metricErrors,
   }
@@ -341,6 +399,31 @@ export function parseInstanceRef(id: string): { moduleId: string; region: string
 
 export function instanceCardId(moduleId: string, region: string, instanceId: string): string {
   return `${moduleId}:${region}:${instanceId}`
+}
+
+/**
+ * 状态筛选可选项，与控制台「状态」列下拉一致，取值即 mapInstanceState 产出的中文状态。
+ * 过渡态（开机中/关机中/重启中/创建中）不单列，避免下拉里出现一堆瞬时项。
+ */
+export const INSTANCE_STATUS_OPTIONS = ['运行中', '待回收', '已关机']
+
+/**
+ * 按状态筛选。ctx.filters.status 为逗号分隔的中文状态（前端多选拼接），空值表示不筛选。
+ * 这里在已映射的卡片上做，而不是下推成 DescribeInstances 的 instance-state 过滤器：
+ * 「待回收」在我们的口径里覆盖 SHUTDOWN/EXPIRED/TERMINATED 多个上游状态，
+ * 下推后既要维护一份易漂移的状态映射，又会因传入官方状态表外的值被判 InvalidFilterValue 而整表拉取失败。
+ */
+export function matchInstanceStatus(card: { stateLabel?: string }, status?: string): boolean {
+  const wanted = parseStatusFilter(status)
+  if (!wanted.length) return true
+  return wanted.includes(String(card.stateLabel || ''))
+}
+
+export function parseStatusFilter(status?: string): string[] {
+  return String(status || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 export function matchInstanceQuery(haystacks: Array<string | undefined>, query: string): boolean {
@@ -462,9 +545,11 @@ export async function listZones(
   region: string,
 ): Promise<Map<string, string>> {
   try {
-    const data = await call<{ ZoneSet?: ZoneItem[] }>('DescribeZones', {}, creds, { ...opts, region })
+    // CVM 返回 ZoneSet,轻量应用服务器返回 ZoneInfoSet(同为 Zone + ZoneName);
+    // 只读 ZoneSet 会让轻量的可用区列退化成 ap-guangzhou-7 这样的 id。
+    const data = await call<{ ZoneSet?: ZoneItem[]; ZoneInfoSet?: ZoneItem[] }>('DescribeZones', {}, creds, { ...opts, region })
     const map = new Map<string, string>()
-    for (const item of data.ZoneSet || []) {
+    for (const item of data.ZoneSet || data.ZoneInfoSet || []) {
       if (item.Zone) map.set(item.Zone, item.ZoneName || item.Zone)
     }
     return map

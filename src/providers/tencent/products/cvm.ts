@@ -22,7 +22,9 @@ import {
   normalizeMonitorRange,
   instanceSearchText,
   matchInstanceQuery,
+  matchInstanceStatus,
   matchRegion,
+  MONITOR_NOT_RUNNING_NOTE,
   optsOf,
   paginateItems,
   pickRegions,
@@ -167,11 +169,13 @@ export function createCvmModule(call: TencentProductCall = cvmCall, monitor: Ten
     async list(ctx) {
       const regions = await listRegions(call, credsOf(ctx), optsOf(ctx))
       const scoped = pickRegions(regions, ctx.region)
+      const status = ctx.filters?.status
       const { items, errors } = await listAcrossRegions(scoped, async (region) => {
         const mapped = await loadCvmRegion(call, ctx, module.id, region)
-        return ctx.clientLocalFilter === false
+        const scopedCards = ctx.clientLocalFilter === false
           ? mapped.filter((card) => matchCvmQuery(card, ctx.query) && matchRegion(card, ctx.region))
           : mapped.filter((card) => matchRegion(card, ctx.region))
+        return scopedCards.filter((card) => matchInstanceStatus(card, status))
       }, module.id)
       // 单地域超过拉取上限被截断时,明确提示而不是让用户以为「只有这些」
       if (listAllPagesTruncated.current) {
@@ -203,6 +207,7 @@ export function createCvmModule(call: TencentProductCall = cvmCall, monitor: Ten
           range,
           creds: credsOf(ctx),
           opts: optsOf(ctx),
+          instanceRunning: card.stateLabel === '运行中',
         })
         return {
           ...detail,
@@ -214,7 +219,9 @@ export function createCvmModule(call: TencentProductCall = cvmCall, monitor: Ten
               metrics: HOST_METRICS,
               series: monitorData.series,
               errors: monitorData.metricErrors,
-              note: monitorData.metricErrors.length === HOST_METRICS.length
+              note: monitorData.notRunning
+                ? MONITOR_NOT_RUNNING_NOTE
+                : monitorData.metricErrors.length === HOST_METRICS.length
                 ? '无法拉取监控数据，请检查 CAM 云监控权限'
                 : monitorData.metricErrors.length ? `部分指标拉取失败（${monitorData.metricErrors.length} 项）` : '',
             },

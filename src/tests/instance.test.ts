@@ -8,9 +8,12 @@ import type { TencentProductCall } from '../providers/tencent/client.js'
 import { createCvmModule, mapCvmItem, cvmDetailGroups, matchCvmQuery } from '../providers/tencent/products/cvm.js'
 import {
   HOST_METRICS,
+  INSTANCE_STATUS_OPTIONS,
   LIGHTHOUSE_METRICS,
+  MONITOR_NOT_RUNNING_NOTE,
   mapInstanceState,
   matchInstanceQuery,
+  matchInstanceStatus,
   parseInstanceRef,
   pickRegions,
   powerAllowed,
@@ -200,6 +203,57 @@ test('cvm and lighthouse detail groups cover official sections and omit DNS reco
   assert.equal(detail.groups?.length, 5)
 })
 
+test('状态筛选按控制台中文口径匹配，空值不筛选', () => {
+  assert.deepEqual(INSTANCE_STATUS_OPTIONS, ['运行中', '待回收', '已关机'])
+  assert.equal(matchInstanceStatus({ stateLabel: '运行中' }, ''), true)
+  assert.equal(matchInstanceStatus({ stateLabel: '运行中' }, undefined), true)
+  assert.equal(matchInstanceStatus({ stateLabel: '运行中' }, '运行中,已关机'), true)
+  assert.equal(matchInstanceStatus({ stateLabel: '已关机' }, '运行中'), false)
+  // 过渡态不在下拉里，但被显式筛选时仍按字面匹配
+  assert.equal(matchInstanceStatus({ stateLabel: '开机中' }, '开机中'), true)
+})
+
+test('cvm 列表按 filters.status 筛选，总数只算筛后条数', async () => {
+  const call = mockCall((action) => {
+    if (action === 'DescribeRegions') return { RegionSet: [{ Region: 'ap-shanghai', RegionName: '华东地区(上海)', RegionState: 'AVAILABLE' }] }
+    if (action === 'DescribeZones') return { ZoneSet: [{ Zone: 'ap-shanghai-3', ZoneName: '上海三区' }] }
+    if (action === 'DescribeInstances') return { InstanceSet: [cvmRunning, cvmStopped], TotalCount: 2 }
+    throw new Error(action)
+  })
+  const module = createCvmModule(call)
+  const all = await module.list({ ...ctx, region: 'ap-shanghai' })
+  assert.equal(all.total, 2)
+  const stopped = await module.list({ ...ctx, region: 'ap-shanghai', filters: { status: '已关机' } })
+  assert.equal(stopped.total, 1)
+  assert.deepEqual(stopped.items.map((row) => row.stateLabel), ['已关机'])
+  const both = await module.list({ ...ctx, region: 'ap-shanghai', filters: { status: '运行中,已关机' } })
+  assert.equal(both.total, 2)
+})
+
+test('关机实例的监控归因为「实例未运行」而不是缺监控组件', async () => {
+  const call = mockCall((action) => {
+    if (action === 'DescribeRegions') return { RegionSet: [{ Region: 'ap-shanghai', RegionName: '华东地区(上海)', RegionState: 'AVAILABLE' }] }
+    if (action === 'DescribeZones') return { ZoneSet: [{ Zone: 'ap-shanghai-3', ZoneName: '上海三区' }] }
+    if (action === 'DescribeInstances') return { InstanceSet: [cvmStopped], TotalCount: 1 }
+    throw new Error(action)
+  })
+  // 关机实例云监控对所有指标都返回空序列
+  const monitor = (async () => ({ DataPoints: [] })) as unknown as TencentProductCall
+  const detail = await createCvmModule(call, monitor).detail?.({
+    ...ctx,
+    id: 'tencent.cvm:ap-shanghai:ins-0p9q2c',
+    tab: '实例监控',
+  })
+  const tabData = (detail?.extra as {
+    tabData?: { note?: string; errors?: Array<{ errorType?: string }>; series?: Array<{ timestamps: number[] }> }
+  }).tabData
+  assert.equal(tabData?.note, MONITOR_NOT_RUNNING_NOTE)
+  // 不再逐条列「部分指标拉取失败」,也不再出现 AGENT_MISSING 的误导性引导
+  assert.deepEqual(tabData?.errors, [])
+  assert.doesNotMatch(JSON.stringify(tabData), /AGENT_MISSING|barad_agent/)
+  assert.equal(tabData?.series?.length, HOST_METRICS.length)
+})
+
 test('cvm detail monitor tab returns monitorSeries with QCE/CVM namespace', async () => {
   const monitorCalls: Array<{ payload: Record<string, unknown> }> = []
   const call = mockCall((action) => {
@@ -254,8 +308,8 @@ test('lighthouse detail monitor tab returns series and isolates errors', async (
   const lanIn = tabData?.series?.find((row) => row.metric === 'LanIntraffic')
   assert.deepEqual(lanIn?.timestamps, [])
   assert.equal(lanIn?.key, 'lanIn')
-  // QCE/LIGHTHOUSE 命名空间的 CPU 指标名为 CPUUsage(与 CVM 的 CpuUsage 不同)
-  const cpu = tabData?.series?.find((row) => row.metric === 'CPUUsage')
+  // QCE/LIGHTHOUSE 的 CPU 指标名为 CpuUsage(官方 248/60127)
+  const cpu = tabData?.series?.find((row) => row.metric === 'CpuUsage')
   assert.deepEqual(cpu?.timestamps, [1000])
   assert.equal(cpu?.key, 'cpu')
   // 磁盘使用率应为 DiskUsage 而非 CvmDiskUsage
@@ -459,6 +513,21 @@ test('cvm and lighthouse list paginates with offset/limit and hasMore', async ()
   assert.equal(lhPage.items.length, 2)
   assert.equal(lhPage.total, 3)
   assert.equal(lhPage.hasMore, true)
+})
+
+test('轻量的可用区列取中文名:DescribeZones 返回 ZoneInfoSet 而不是 ZoneSet', async () => {
+  const call = mockCall((action) => {
+    if (action === 'DescribeRegions') {
+      return { RegionSet: [{ Region: 'ap-guangzhou', RegionName: '华南地区(广州)', RegionState: 'AVAILABLE' }] }
+    }
+    // 轻量应用服务器的字段名是 ZoneInfoSet;只读 ZoneSet 时这一列会退化成 ap-guangzhou-3
+    if (action === 'DescribeZones') return { ZoneInfoSet: [{ Zone: 'ap-guangzhou-3', ZoneName: '广州三区' }] }
+    if (action === 'DescribeInstances') return { InstanceSet: [{ ...lhRunning, Zone: 'ap-guangzhou-3' }], TotalCount: 1 }
+    throw new Error(action)
+  })
+  const page = await createLighthouseModule(call).list({ ...ctx, region: 'ap-guangzhou' })
+  const zone = page.items[0]?.columns?.find((row) => row.label === '可用区')
+  assert.equal(zone?.value, '广州三区')
 })
 
 test('queryResources merges per-region list errors and keeps other items', async () => {

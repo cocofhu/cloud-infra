@@ -46,6 +46,10 @@ export function tc3Headers(input: Tc3Input & { version: string; region?: string 
     'x-tc-action': input.action,
     'x-tc-timestamp': String(input.timestamp),
     'x-tc-version': input.version,
+    // 云 API 按该头返回本地化字段(可用区名、状态描述、错误 Message):
+    // 不传时本账号默认 en-US,可用区列会显示 "Guangzhou Zone 3" 而不是「广州三区」。
+    // 该头不在签名范围内(SignedHeaders 固定为 content-type;host;x-tc-action)。
+    'x-tc-language': 'zh-CN',
   }
   if (input.region) headers['x-tc-region'] = input.region
   return headers

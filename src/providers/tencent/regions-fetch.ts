@@ -125,7 +125,10 @@ export async function fetchSharedRegions(
       return merged
     } catch (err) {
       lastErr = err
-      if (err instanceof Error && /InvalidAction|invalid or not found|不支持/i.test(err.message)) continue
+      // 云 API 按 zh-CN 返回 Message,「该产品没有 DescribeRegions」的判定以错误码为主、文案兜底
+      const code = err && typeof err === 'object' && 'code' in err ? String((err as { code?: unknown }).code || '') : ''
+      if (/InvalidAction|UnsupportedOperation/i.test(code)) continue
+      if (err instanceof Error && /InvalidAction|invalid or not found|不支持|无此接口|不存在/i.test(err.message)) continue
       break
     }
   }

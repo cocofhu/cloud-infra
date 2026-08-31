@@ -217,6 +217,38 @@ test('queryResources 非直达 kind 未命中时不回落重拉', async () => {
   assert.equal(calls, 1)
 })
 
+test('queryResources kind=auto 只扇出 cvm/lighthouse，不牵连其它模块', async () => {
+  const called: string[] = []
+  const source = createRegistry()
+  source.registerProvider({
+    id: 'tencent',
+    title: '腾讯云',
+    fields: [
+      { key: 'secretId', label: 'SecretId' },
+      { key: 'secretKey', label: 'SecretKey' },
+    ],
+  })
+  for (const kind of ['cvm', 'lighthouse', 'cluster', 'domain', 'cos']) {
+    source.registerModule({
+      id: `tencent.${kind}`,
+      provider: 'tencent',
+      kind,
+      title: `测试 ${kind}`,
+      implemented: true,
+      list: async (ctx: ModuleContext) => {
+        called.push(kind)
+        // tke 的真实行为：无显式地域时抛「缺少地域」，历史上这个错会串到服务器卡上
+        if (kind === 'cluster' && !ctx.region) throw new Error('缺少地域')
+        return { items: [card(`tencent.${kind}:ap-guangzhou:x-1`, `x-1-${kind}`, kind)] }
+      },
+    })
+  }
+  const result = await queryResources({ kind: 'auto' }, cfg(), undefined, source)
+  assert.deepEqual(called.sort(), ['cvm', 'lighthouse'])
+  assert.deepEqual(result.items.map((item) => item.kind).sort(), ['cvm', 'lighthouse'])
+  assert.deepEqual(result.errors, [])
+})
+
 test('queryResources 空 query 不产生直达字段', async () => {
   const items = [card('tencent.cos:ap-guangzhou:assets-1', 'assets-1')]
   const result = await queryResources(

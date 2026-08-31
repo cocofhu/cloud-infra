@@ -13,6 +13,25 @@ function read(rel: string): string {
   return readFileSync(join(root, rel), 'utf8')
 }
 
+/** 从 src[from] 处那次 h(...) 调用起做括号配平,返回该调用结束的下标(跳过字符串与行注释里的括号)。 */
+function balancedEnd(src: string, from: number): number {
+  let depth = 0
+  let quote = ''
+  for (let i = src.indexOf('(', from); i < src.length; i += 1) {
+    const c = src[i]
+    if (quote) {
+      if (c === '\\') i += 1
+      else if (c === quote) quote = ''
+      continue
+    }
+    if (c === '"' || c === "'" || c === '`') quote = c
+    else if (c === '/' && src[i + 1] === '/') i = src.indexOf('\n', i)
+    else if (c === '(') depth += 1
+    else if (c === ')' && --depth === 0) return i
+  }
+  return src.length
+}
+
 test('host and query core do not switch on vendor names', () => {
   const host = read('src/host.ts')
   const query = read('src/core/query.ts')
@@ -51,10 +70,25 @@ test('g3 registrar search / checkout stay on the chat tool card, not SettingsCar
   assert.ok(toolStart > 0 && settingsStart > toolStart)
   const tool = client.slice(toolStart, settingsStart)
   const settings = client.slice(settingsStart)
-  assert.match(tool, /请输入域名或后缀/)
+  assert.match(tool, /域名或名称，如 example\.com/)
   assert.match(tool, /请输入域名关键字/)
   assert.match(tool, /立即加购/)
   assert.match(tool, /购物车/)
+  // 加购之后必须还有出路:行内能直接移除,列表下沿常驻结算入口(不再靠顶栏那个小链接)
+  assert.match(tool, /function CartBar/)
+  assert.match(tool, /inCart \? "移除" : "立即加购"/)
+  assert.match(tool, /onRemove: removeCart/)
+  assert.match(tool, /className: "ci-mini primary", disabled: busy, onClick: onOpen \}, "去结算"/)
+  // 加购不再自动弹购物车:连着加几个域名时会被弹窗反复打断
+  const addCart = tool.match(/const addCart = \(item\) => \{[\s\S]*?\n      \};/)![0]
+  assert.doesNotMatch(addCart, /setFlow/)
+  // 补出来的其它后缀单独分一段,别混在精确匹配里
+  assert.match(tool, /extraOf\(item, "suggested", false\) === true/)
+  assert.match(tool, /className: "ci-subhead" \}, "其他后缀"/)
+  // 只有几行且不翻页,不留 160px 高度地板和「共 N 条」页脚
+  assert.match(tool, /compact: kind === "registrar"/)
+  assert.match(client, /\.ci-list-body\.compact\{min-height:0\}/)
+  assert.match(tool, /kind === "registrar"\s*\n\s*\? h\(CartBar/)
   assert.match(tool, /提交订单/)
   assert.match(tool, /核对信息/)
   assert.match(tool, /账户余额支付/)
@@ -248,7 +282,7 @@ test('g6 dbbrain stays in the chat card with type+region filters and tabs (全�
   assert.match(client, /session\.kill/)
   assert.match(client, /confirm === "always"/)
   assert.match(client, /实例 ID \/ 名称/)
-  assert.match(client, /地域只在对话卡片里选，不进设置/)
+  assert.match(client, /填写云厂商 AccessKey。地域在对话卡片里选，不写入设置。/)
   assert.match(client, /ap-shanghai-fsi/)
   assert.match(client, /ap-jakarta/)
   assert.match(client, /item\.hasReport/)
@@ -358,12 +392,19 @@ test('empty cert query still paints 我的证书 card and pickPayload keeps reso
   const ops = client.slice(client.indexOf('function CertOps'), client.indexOf('function CertTable'))
   assert.match(ops, /部署/)
   assert.match(ops, /下载/)
-  assert.match(ops, /MoreMenu/)
+  assert.match(ops, /CertMoreMenu/)
   assert.doesNotMatch(ops, /"详情"/)
-  const more = client.slice(client.indexOf('function MoreMenu'), client.indexOf('function CertOps'))
+  const more = client.slice(client.indexOf('function CertMoreMenu'), client.indexOf('function CertOps'))
   assert.match(more, /cert\.verify/)
   assert.match(more, /cancelable/)
   assert.match(more, /else \{\s*items\.push\(\{ id: "cert\.delete"/)
+  // 证书菜单曾被后声明的同名实例菜单整体顶掉:证书行里冒出「开机/关机/重启」,吊销和删除全没了。
+  // 同一作用域内函数声明后者胜,所以这里直接禁掉重名。
+  const declared = [...client.matchAll(/^ {4}function ([A-Za-z0-9_]+)/gm)].map((m) => m[1])
+  assert.deepEqual(declared.filter((name, i) => declared.indexOf(name) !== i), [])
+  const instanceMenu = client.slice(client.indexOf('function InstanceMoreMenu'))
+  assert.match(instanceMenu.slice(0, 900), /instance\.(start|stop|reboot)/)
+  assert.doesNotMatch(more, /开机|关机|重启/)
   const onMore = client.slice(client.indexOf('const onMore ='), client.indexOf('const onDownload'))
   assert.match(onMore, /cert\.replace/)
   assert.match(onMore, /type: "replace"/)
@@ -372,6 +413,12 @@ test('empty cert query still paints 我的证书 card and pickPayload keeps reso
   assert.match(dl, /if \(\/-----BEGIN \/i\.test\(raw\)\) throw/)
   assert.match(dl, /不支持明文下发/)
   assert.doesNotMatch(dl, /if \(!content \|\| \/-----BEGIN/)
+  // 兜底链接分支:只认 https,且不能用 a[download](跨域会被忽略),要新标签页交给浏览器
+  assert.match(dl, /if \(!content && href\)/)
+  assert.match(dl, /\/\^https:\\\/\\\/\/i\.test\(link\)/)
+  assert.match(dl, /a\.target = "_blank"/)
+  assert.match(dl, /rel = "noopener noreferrer"/)
+  assert.match(client, /triggerDownload\(data\.filename, data\.content, data\.contentType, data\.url\)/)
 })
 
 test('g3 ClusterConsole is a separate console tree and never saves settings', () => {
@@ -393,7 +440,7 @@ test('g3 ClusterConsole is a separate console tree and never saves settings', ()
   assert.match(client, /登录密钥/)
   assert.doesNotMatch(client.slice(client.indexOf('function CreateWizard'), client.indexOf('function SearchToolView')), /window\.prompt/)
   assert.match(client, /kind === "cluster"/)
-  assert.match(client, /地域在资源列表中选择，不写入设置/)
+  assert.match(client, /填写云厂商 AccessKey。地域在对话卡片里选，不写入设置。/)
   const start = client.indexOf('function ClusterConsole')
   const end = client.indexOf('function SearchToolView')
   const consoleSrc = client.slice(start, end)
@@ -445,7 +492,7 @@ test('cvm and lighthouse consoles share one dual-tab instance card', () => {
   assert.match(client, /function CvmConsole/)
   assert.match(client, /function LhConsole/)
   assert.match(client, /function InstanceDetailView/)
-  assert.match(client, /function MoreMenu/)
+  assert.match(client, /function InstanceMoreMenu/)
   assert.match(client, /ID\/名称/)
   assert.match(client, /主IPv4地址/)
   assert.match(client, /可用区/)
@@ -457,9 +504,34 @@ test('cvm and lighthouse consoles share one dual-tab instance card', () => {
   assert.match(client, /function KindTabs/)
   // 「全部地域」已下线:RegionSelect 不再提供 all 哨兵,CVM/轻量/CDB 下拉里不出现
   assert.doesNotMatch(client, /id: "all", label: "全部地域"/)
+  // 状态列筛选:控制台式多选浮层,云服务器与轻量共用同一个表头组件
+  assert.match(client, /function ColumnFilter/)
+  assert.match(client, /function InstanceHead/)
+  assert.match(client, /\(全选\)/)
+  assert.match(client, /"确定"/)
+  assert.match(client, /"重置"/)
+  assert.match(client, /INSTANCE_STATUS_OPTIONS = \["运行中", "待回收", "已关机"\]/)
+  // 浮层必须 portal 到 body:th 与 .ci-scroll 都会裁剪绝对定位的下拉
+  assert.match(client, /className: "ci-colfilter"[\s\S]{0,400}?createPortal|createPortal\(h\("div", \{\s*className: "ci-colfilter"/)
+  assert.match(client, /\.ci-colfilter\{position:fixed/)
   assert.doesNotMatch(client, /label: "全部地域"/)
-  // CVM/轻量选中未开通地域时前端拦截并给友好提示
-  assert.match(client, /未开通\/不可用，请重新选择地域/)
+  // 切 Tab 不能再撞「未开通」的死路:两条链地域集合不同(CVM 44 / 轻量 18),清单按 Tab 分开缓存,
+  // 目标产品不支持当前地域时就地收敛并说明,而不是报错让用户自己重选
+  assert.doesNotMatch(client, /未开通\/不可用，请重新选择地域/)
+  assert.match(client, /const regionCache = useRef\(\{ cvm: \[\], lighthouse: \[\] \}\)/)
+  assert.match(client, /const regionMemo = useRef\(\{ cvm: "", lighthouse: "" \}\)/)
+  assert.match(client, /function resolveRegionForOptions/)
+  assert.match(client, /const options = \(regionCache\.current\[useKind\] \|\| \[\]\)\.filter\(Boolean\)/)
+  // 按字符串比而不是按 reason:后端按地域名字符串过滤,同一地域的两种写法也必须换成目标产品的原文
+  assert.match(client, /if \(fixed\.region && fixed\.region !== wanted\)/)
+  assert.match(client, /function regionFixWorthTelling/)
+  assert.match(client, /if \(regionFixWorthTelling\(fixed\.reason\)\) setRegionFix/)
+  // 首次进某个 Tab 时清单还没回来,只能等结果到手再收敛并重拉一次
+  assert.match(client, /regionCache\.current\[useKind\] = names/)
+  assert.match(client, /fetchList\(0, trimmed, fixed\.region, useTab\)/)
+  // 说明文案是派生的,不额外维护清理逻辑
+  assert.match(client, /function regionSwitchNote/)
+  assert.match(client, /\.ci-region-note\{margin:8px 14px/)
   assert.match(client, /云服务器/)
   assert.match(client, /轻量应用服务器/)
   assert.match(client, /搜索 ID \/ 名称 \/ IP/)
@@ -485,6 +557,10 @@ test('cvm and lighthouse consoles share one dual-tab instance card', () => {
   const toolStart = client.indexOf('function SearchToolView')
   const toolEnd = client.indexOf('function matchModule', toolStart)
   const tool = client.slice(toolStart, toolEnd)
+  // 切 Tab 时先换清单、记住离开那个 Tab 的地域,回来能复用
+  assert.match(tool, /regionMemo\.current\[tabToKind\(kindTab\)\] = safeText\(listRegion\)/)
+  assert.match(tool, /const cached = \(regionCache\.current\[tabToKind\(next\)\] \|\| \[\]\)\.filter\(Boolean\)/)
+  assert.match(tool, /const regionNote = regionFix/)
   assert.match(tool, /h\(KindTabs/)
   assert.match(tool, /h\(Pager/)
   assert.match(tool, /region: useRegion/)
@@ -502,17 +578,39 @@ test('cvm and lighthouse consoles share one dual-tab instance card', () => {
   assert.match(client, /function SearchField/)
   assert.match(client, /function ListPane/)
   assert.match(client, /加载列表/)
+  // 翻页不得让卡片抖动:列表区高度锚定 + 分页条常驻(加载中只置灰,不卸载)
+  assert.match(client, /function ListPane\(\{ busy, hold, compact, children \}\)/)
+  assert.match(client, /minHeight: floor/)
+  assert.match(tool, /hold: pageCount > 1/)
+  assert.doesNotMatch(tool, /!listBusy \? h\(Pager/)
+  // 服务器卡只展示自己模块的错误(kind=auto 曾把 tke 的「缺少地域」显示在已选广州的卡上)
+  assert.match(tool, /instanceErrors/)
+  assert.doesNotMatch(tool, /errors\.length \? h\("div", \{ key: "perr"/)
+  // 状态筛选:随 query 请求下发 filters.status,且改筛选回到第 1 页
+  assert.match(tool, /status: useStatus\.join\(","\)/)
+  assert.match(tool, /onStatus: onInstStatus/)
+  assert.match(tool, /const onInstStatus = \(next\) => \{[\s\S]{0,220}?fetchList\(0, String\(activeQ \|\| ""\)\.trim\(\), undefined, undefined, \{ status: list \}\)/)
   assert.doesNotMatch(client, /ci-list-mask/)
   assert.doesNotMatch(tool, /showDomain = kind === "domain" \|\| \(!showCvm && !showLh\)/)
   // Tab 行为主行,下行统一「地域下拉 + 搜索框」:一套 RegionSelect + SearchField 由 KindTabs 下层的 ci-bar 渲染
   assert.match(tool, /h\("div", \{ key: "bar", className: "ci-bar" \}/)
   assert.match(tool, /h\(RegionSelect, \{[\s\S]*h\(SearchField, \{/)
   // 切 Tab 按需拉取另一类型,保留搜索词与地域(onChange 内 fetchList 带 next tab)
-  assert.match(tool, /onChange: \(next\) => \{[\s\S]{0,160}?setKindTab\(next\)[\s\S]{0,160}?fetchList\(0, String\(activeQ \|\| ""\)\.trim\(\), undefined, next\)/)
+  assert.match(tool, /onChange: \(next\) => \{[\s\S]{0,320}?setKindTab\(next\)[\s\S]{0,320}?fetchList\(0, String\(activeQ \|\| ""\)\.trim\(\), undefined, next\)/)
   // 切 Tab 时不再因 showCvm/showLh 之一缺失而退回单 Tab
   assert.match(tool, /kindTab === "cvm" \? h\(CvmConsole/)
   // 轻量空态与云服务器一致(没有匹配…的实例)
   assert.match(tool, /emptyHint[\s\S]{0,80}?没有匹配「\$\{activeQ \|\| draftQ\}」的实例[\s\S]{0,80}?没有匹配的实例/)
+  // 空态必须留在 .ci-scroll 里:横向滚动条画在容器下沿,空态挂到容器外面时容器只包住表头,
+  // 滚动条就会紧贴表头下沿(看着像表头上长了根滚动条);sticky 让提示横滚时不被推出可视区
+  for (const fn of ['CvmConsole', 'LhConsole']) {
+    const body = client.slice(client.indexOf(`function ${fn}(`))
+    const scrollAt = body.indexOf('h("div", { className: "ci-scroll" }')
+    const emptyAt = body.indexOf('className: "ci-empty" }, instanceEmptyHint')
+    assert.ok(scrollAt > 0 && emptyAt > scrollAt, `${fn}: 找不到 .ci-scroll 或空态`)
+    assert.ok(emptyAt < balancedEnd(body, scrollAt), `${fn}: 空态落在 .ci-scroll 之外,滚动条会贴在表头下沿`)
+  }
+  assert.match(client, /\.ci-scroll>\.ci-empty\{position:sticky;left:0/)
   // 地域命名统一:客户端按控制台全称归一,短名(如「广州」)映射为「华南地区（广州）」
   assert.match(client, /function canonicalRegionName/)
   assert.match(client, /\["广州", "华南地区（广州）"\]/)
@@ -543,9 +641,7 @@ test('canonicalRegionName maps short names to console full names and RegionSelec
 test('instance detail uses official groups and never renders DNS records', () => {
   const client = read('src/client.js')
   const start = client.indexOf('function InstanceDetailView')
-  const tke = client.indexOf('const TKE_REGIONS', start)
-  const search = client.indexOf('function SearchToolView', start)
-  const end = tke > start ? tke : search
+  const end = client.indexOf('function OwnedDetailView', start)
   assert.ok(start > 0 && end > start)
   const body = client.slice(start, end)
   assert.match(body, /h\(BackButton, \{ onClick: onBack \}\)/)
@@ -625,6 +721,8 @@ test('host tool kind lists domain lighthouse cvm auto and default stays domain',
 test('host prompt guides one kind=auto call for server queries and references dual tabs', () => {
   const host = read('src/host.ts')
   // 工具 description 内的关键句
+  assert.match(host, /kind=auto queries the server modules only \(CVM and Lighthouse\)/)
+  assert.doesNotMatch(host, /kind=auto to query every enabled module/)
   assert.match(host, /ONE call with kind=auto/)
   assert.match(host, /do NOT split into two calls/)
   assert.match(host, /云服务器 \| 轻量应用服务器 tabs/)
@@ -690,7 +788,7 @@ test('g3 COS console two pages use region combo and file list, not an expand tre
   assert.match(readme, /默认选中广州/)
   assert.match(readme, /禁止用 Ask question/)
   assert.match(readme, /上一页 \/ 下一页/)
-  assert.match(readme, /设置 → 插件 → 云资源/)
+  assert.match(readme, /设置 → 插件 → Cloud Infra/)
   assert.match(readme, /x-cos-copy-source/)
   assert.match(client, /下一页/)
   assert.match(client, /id: "ci-cos-file-next"/)
@@ -774,7 +872,7 @@ test('g1.3 settings card fields and layout stay schema-driven without COS extras
   const start = client.indexOf('function ConfigCard')
   const end = client.indexOf('const inject = ["slots"]')
   const card = client.slice(start, end)
-  assert.match(card, /配置各云厂商 AccessKey，查询域名与解析记录/)
+  assert.match(card, /填写云厂商 AccessKey。地域在对话卡片里选，不写入设置。/)
   assert.match(card, /provider\.fields/)
   assert.match(card, /SecretId|field\.label/)
   assert.doesNotMatch(card, /默认地域|defaultRegion|COS 地域/)
@@ -782,6 +880,23 @@ test('g1.3 settings card fields and layout stay schema-driven without COS extras
   assert.match(card, /"产品模块"/)
   assert.match(card, /className: "ci-cfg-mod-list"/)
   assert.match(card, /写操作免确认（删除仍会确认）/)
+  // 设置卡标题与模块列表:不要 kind=xxx 这种实现细节,简介也别堆产品名
+  assert.match(card, /"Cloud Infra"/)
+  assert.doesNotMatch(card, /kindHint|\(kind=/)
+  assert.doesNotMatch(card, /ci-cfg-mod-hint2/)
+  assert.match(card, /勾选后参与对话查询。/)
+  assert.doesNotMatch(card, /条目增多时在框内滚动/)
+})
+
+test('设置卡在宿主槽里仍有圆角 token(不依赖 .ci-root 包裹)', () => {
+  const client = read('src/client.js')
+  // ConfigCard 挂在 settings.plugin.item,外面没有 .ci-root;漏了 --ci-radius-* 会整张直角
+  assert.match(client, /\.ci-root,\.ci-regionpop,\.ci-modal-mask,\.ci-more-menu,\.ci-colfilter,\.ci-menu-portal,\.ci-winframe,\.ci-cfg\{--ci-fg:/)
+  assert.match(client, /,\.ci-cfg\{--dsw-alias-brand-primary:var\(--dsw-alias-button-info-fill\)/)
+  assert.match(client, /\.ci-cfg\{[^}]*border-radius:var\(--ci-radius-xl\)/)
+  assert.match(client, /\.ci-cfg-f input\[type=text\][^}]*border-radius:var\(--ci-radius-lg\)/)
+  assert.match(client, /\.ci-cfg-mod-list\{[^}]*border-radius:var\(--ci-radius-lg\)/)
+  assert.match(client, /\.ci-cfg-save\{[^}]*border-radius:var\(--ci-radius-lg\)/)
 })
 
 test('g4 lightweight form/confirm overlay and g5 skipConfirm live update', () => {
@@ -885,7 +1000,7 @@ test('review v1-v2 pickPayload binds empty image errors and search box stays emp
     meta: {
       kind: 'image',
       items: [],
-      errors: [{ moduleId: 'tencent.image', message: '腾讯云 未配置 SecretId、SecretKey。请在 设置 → 插件 → 云资源 填写对应云厂商的 AccessKey' }],
+      errors: [{ moduleId: 'tencent.image', message: '腾讯云 未配置 SecretId、SecretKey。请在 设置 → 插件 → Cloud Infra 填写对应云厂商的 AccessKey' }],
       query: '查一下我的镜像',
       region: 'ap-guangzhou',
     },
@@ -932,7 +1047,7 @@ test('g3.3 instance h3 uses dual-theme title color and ConfigCard stays unchange
   assert.match(client, /--ci-title:var\(--ci-fg\)/)
   const card = client.slice(client.indexOf('function ConfigCard()'))
   assert.match(card, /function ConfigCard\(/)
-  assert.match(card, /查询域名与解析记录/)
+  assert.match(card, /填写云厂商 AccessKey。地域在对话卡片里选，不写入设置。/)
   assert.match(card, /key:\s*"cloud-infra"/)
   assert.match(card, /写操作免确认（删除仍会确认）/)
   assert.doesNotMatch(card, /ap-guangzhou/)
@@ -1008,11 +1123,15 @@ test('G2.6 RegionPicker 共享组件存在并被 6+ 个产品卡片接入', () =
   assert.match(client, /createPortal/)
   assert.match(client, /ci-regionpop/)
   assert.match(client, /ci-regionpick-btn/)
-  // 胶囊模式 + 选中指示 ▾;🌍 图标已移除(g1.2)
+  // 胶囊模式 + 展开箭头;🌍 图标已移除(g1.2)
   assert.doesNotMatch(client, /ci-regionpick-globe/)
-  assert.match(client, /▾/)
+  // 箭头用 SVG 而不是「▾」字符:字形随字体漂移,基线对不齐
+  assert.match(client, /className: "ci-regionpick-caret"[\s\S]{0,200}?viewBox: "0 0 10 10"/)
+  assert.doesNotMatch(client, /"ci-regionpick-caret" \}, "▾"/)
+  assert.match(client, /\.ci-regionpick-btn\.open \.ci-regionpick-caret\{transform:rotate\(180deg\)\}/)
   // 弹层必须不透明(g1.1):Portal 后 token 自解析 + 背景双写兜底
-  assert.match(client, /\.ci-root,\.ci-regionpop\{--ci-fg:/)
+  // token 作用域必须覆盖所有 portal 到 body 的浮层,否则 var(--ci-radius-*) 失效、圆角掉成直角
+  assert.match(client, /\.ci-root,\.ci-regionpop,\.ci-modal-mask,\.ci-more-menu,\.ci-colfilter,\.ci-menu-portal,\.ci-winframe,\.ci-cfg\{--ci-fg:/)
   assert.match(client, /background-color:var\(--dsw-alias-bg-layer-1\)/)
   assert.match(client, /background-color:var\(--ci-bg\)/)
   // 模糊搜索:input / placeholder 中专有字符串
@@ -1031,6 +1150,17 @@ test('G2.6 RegionPicker 共享组件存在并被 6+ 个产品卡片接入', () =
   // 至少 6 处实例化(COS/TKE/CLS/CDB/TCR/DBbrain/CVM 等);所有实例化点共享同一 RegionPicker
   const pickers = client.split('h(RegionPicker').length - 1
   assert.ok(pickers >= 6, `expected >= 6 RegionPicker instantiation sites, got ${pickers}`)
+  // 各产品不再通过 inline width 各自改尺寸；统一 140px、8px 圆角，focus 不画双层 outline
+  assert.doesNotMatch(client, /additionalStyle/)
+  assert.match(client, /\.ci-regionpick\{[^}]*width:140px[^}]*min-width:140px[^}]*max-width:140px/)
+  // 收起态只显示城市名:「华南地区（广州）」在固定宽度里必然截断,全称留给 title 与浮层
+  assert.match(client, /function shortRegionLabel/)
+  assert.match(client, /const displayLabel = valueObj \? shortRegionLabel\(valueObj\.label\)/)
+  assert.match(client, /id: inputId, title: fullLabel,/)
+  assert.match(client, /h\("span", \{ className: "ci-regionpop-label" \}, r\.label \|\| r\.id\)/)
+  assert.match(client, /\.ci-regionpick-btn\{[^}]*width:100%[^}]*border-radius:var\(--ci-radius-lg\)/)
+  assert.match(client, /\.ci-regionpick-btn:focus-visible\{outline:none[^}]*box-shadow:/)
+  assert.match(client, /\.ci-regionpick-text\{[^}]*text-overflow:ellipsis/)
   // 默认地域值仍兼容:空 value → fallback 到调用方传入的 "ap-guangzhou"
   assert.match(client, /ap-guangzhou/)
 })
@@ -1045,6 +1175,33 @@ test('G4.1 深色模式:0 处硬编码 hex 与 prefers-color-scheme 已下沉', 
   // 不允许出现 prefers-color-scheme 媒体查询兜底(明/暗由宿主 dsw 全量驱动)
   // 注意 src 中允许 [data-theme=...] 属性选择器
   assert.doesNotMatch(client, /@media \(prefers-color-scheme/)
+})
+
+test('阴影与遮罩收敛到 --ci-shadow-*/--ci-mask,不再引用宿主未定义的 --dsw-alias-shadow', () => {
+  const client = read('src/client.js')
+  // 宿主主题包里没有 --dsw-alias-shadow:引用它的整条 box-shadow 声明无效,弹窗/菜单/开关会一点投影都没有
+  assert.doesNotMatch(client, /var\(--dsw-alias-shadow\)/)
+  // 三级阴影 + 遮罩都在 token 层定义;遮罩取 bg-mask-1,bg-mask-3 是 48% 纯黑,会把整张对话卡片压暗
+  assert.match(client, /--ci-shadow-0:0 1px 2px rgba\(0,0,0,\.12\)/)
+  assert.match(client, /--ci-shadow-1:0 2px 8px rgba\(0,0,0,\.08\)/)
+  assert.match(client, /--ci-shadow-2:0 4px 16px rgba\(0,0,0,\.1\)/)
+  assert.match(client, /--ci-mask:var\(--dsw-alias-bg-mask-1\)/)
+  assert.doesNotMatch(client, /var\(--dsw-alias-bg-mask-3\)/)
+  assert.match(client, /\.ci-modal-mask\{[^}]*background:var\(--ci-mask\)/)
+  // 使用点一律走 token:黑色只允许出现在 token 定义那一行
+  for (const rule of ['\\.ci-modal\\{', '\\.ci-more-menu\\{', '\\.ci-colfilter\\{']) {
+    assert.match(client, new RegExp(rule + '[^}]*box-shadow:var\\(--ci-shadow-2\\)'))
+  }
+  for (const rule of ['\\.ci-menu\\{', '\\.ci-drop-menu\\{', '\\.ci-more-list\\{']) {
+    assert.match(client, new RegExp(rule + '[^}]*box-shadow:var\\(--ci-shadow-1\\)'))
+  }
+  assert.match(client, /\.ci-toggle i\{[^}]*box-shadow:var\(--ci-shadow-0\)/)
+  assert.match(client, /\.ci-monitor-range\.active\{[^}]*box-shadow:var\(--ci-shadow-0\)/)
+  const blackLines = client.split('\n').filter((line) => /rgba\(0,0,0/.test(line) && !/--ci-shadow-0:/.test(line))
+  assert.equal(blackLines.length, 0, `硬编码黑色应只留在 token 行:${blackLines.slice(0, 2).join(' | ')}`)
+  // portal 到 body 的 .ci-menu 也要落在 token 作用域内,否则 shadow/圆角双双失效
+  assert.match(client, /"ci-menu" \+ \(pos \? " ci-menu-portal" : ""\)/)
+  assert.match(client, /,\.ci-menu-portal,\.ci-winframe,\.ci-cfg\{--ci-fg:/)
 })
 
 test('G4.2 / G4.3 a11y:dialog 角色 + focus-visible + Esc 链 + aria-modal', () => {
@@ -1079,6 +1236,33 @@ test('G2.3 Tabs/SubTabs 统一蓝色下划线样式并应用到所有 ci-tab 用
   assert.match(client, /className:\s*"ci-tab"/)
 })
 
+test('Tab 条不出现滚动条,禁用态不跟随 hover 变色', () => {
+  const client = read('src/client.js')
+  // .ci-tab 用 margin-bottom:-1px 压容器边框,放在滚动容器里会溢出 1px 并挂上滚动条
+  const tabs = client.match(/\n\.ci-tabs\{[^}]*\}/)![0]
+  const tabsV2 = client.match(/\n\.ci-tabs-v2\{[^}]*\}/)![0]
+  for (const rule of [tabs, tabsV2]) {
+    assert.doesNotMatch(rule, /overflow/)
+    assert.match(rule, /flex-wrap:wrap/)
+  }
+  assert.match(client, /\.ci-tab:hover:not\(:disabled\)\{color:var\(--ci-brand\)\}/)
+  assert.match(client, /\.ci-tab-v2:hover:not\(:disabled\)\{color:var\(--ci-brand\)\}/)
+  // 服务器 Tab:中文标签 + 产品代号只放在 title 里
+  assert.match(client, /title: "云服务器 CVM"/)
+  assert.match(client, /title: "轻量应用服务器 Lighthouse"/)
+})
+
+test('文字链与正文可区分:brand token 重映射到宿主蓝色并有 hover 反馈', () => {
+  const client = read('src/client.js')
+  // 宿主 --dsw-alias-brand-primary == label-primary(近黑),直接用会让「部署/下载/更多」与正文同色
+  assert.match(client, /--dsw-alias-brand-primary:var\(--dsw-alias-button-info-fill\)/)
+  assert.match(client, /--dsw-alias-button-primary-fill:var\(--dsw-alias-button-info-fill\)/)
+  assert.match(client, /--ci-brand-hover:color-mix\(in srgb,var\(--dsw-alias-button-info-fill\)/)
+  assert.match(client, /\.ci-link:hover:not\(:disabled\)\{color:var\(--ci-brand-hover\);text-decoration:underline\}/)
+  // 证书列表操作列不再是固定 128px,避免「下载中」把有效期列挤掉
+  assert.match(client, /minmax\(130px,1fr\) minmax\(128px,max-content\)/)
+})
+
 test('RegionSelect defaults to Guangzhou via RegionPicker and blocks unavailable regions', () => {
   const client = read('src/client.js')
   // RegionSelect 已统一切到共享 RegionPicker,默认走 defaultRegionName(广州优先,不可用回退第一个)
@@ -1092,14 +1276,48 @@ test('RegionSelect defaults to Guangzhou via RegionPicker and blocks unavailable
   assert.match(defRegion, /广州/)
   assert.match(defRegion, /ap-guangzhou/)
   assert.match(defRegion, /list\[0\]/)
-  // 未开通地域前端拦截:不发请求,提示「未开通/不可用,请重新选择地域」
-  assert.match(client, /未开通\/不可用，请重新选择地域/)
+  // 地域收敛优先级:同一地域 → 同城(专区回落主城)→ 该 Tab 上次选的 → 该 Tab 默认
+  const resolve = client.match(/function resolveRegionForOptions[\s\S]*?\n    \}/)![0]
+  assert.match(resolve, /reason: "same"/)
+  assert.match(resolve, /reason: "alias"/)
+  assert.match(resolve, /reason: "city"/)
+  assert.match(resolve, /reason: "remembered"/)
+  assert.match(resolve, /reason: "default"/)
+  assert.match(resolve, /city\.length >= 2 && wantCity\.length > city\.length && wantCity\.startsWith\(city\)/)
+  assert.match(resolve, /defaultRegionName\(list\)/)
+  // 返回的是清单自己的写法:CVM 说「华南地区（广州）」,轻量说「广州」,回传后端必须用目标产品的原文
+  const optionMatch = client.match(/function regionOptionMatch[\s\S]*?\n    \}/)![0]
+  assert.match(optionMatch, /return name/)
   // CDB 下拉不再注入「全部地域」特殊项
-  const cdbPick = client.match(/inputId: "ci-cdb-region"[\s\S]{0,350}?additionalStyle/)![0]
+  const cdbPick = client.match(/inputId: "ci-cdb-region"[\s\S]{0,350}?onChange/)![0]
   assert.doesNotMatch(cdbPick, /全部地域/)
   // CLS 圆角已纳入统一 --ci-radius-lg(G1.2/g1.4),不再是独立硬编码
-  assert.doesNotMatch(client, /\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:[0-9]+px/)
-  assert.match(client, /\.ci-cls \.ci-region,\.ci-cls-filter \.ci-combo,\.ci-cls \.ci-search\{border-radius:var\(--ci-radius-lg\)/)
+  assert.doesNotMatch(client, /\.ci-cls-control\{[^}]*border-radius:[0-9]+px/)
+  assert.match(client, /\.ci-cls-control\{[^}]*width:100%[^}]*height:36px[^}]*border-radius:var\(--ci-radius-lg\)/)
+  // TCR 曾把 RegionPicker 套进自带边框的 ci-chip-sel，产生双边框；地域组件现在直接挂在筛选行
+  const imageRegionAt = client.indexOf('inputId: "ci-image-region"')
+  assert.ok(imageRegionAt > 0)
+  const imageRegion = client.slice(imageRegionAt - 280, imageRegionAt)
+  assert.doesNotMatch(imageRegion, /ci-chip-sel/)
+})
+
+test('DNSPod 托管域名可从我的域名详情直达解析记录', () => {
+  const client = read('src/client.js')
+  assert.match(client, /extras\.dnspodHosted \? h\("button"/)
+  assert.match(client, /title: "打开 DNSPod 解析记录"/)
+  assert.match(client, /function OwnedDetailView\(\{[^}]*onOpenDns/)
+  assert.match(client, /const openDnsRecords = \(owned\) => openItem\(\{/)
+  assert.match(client, /moduleId: "tencent\.domain"/)
+  assert.match(client, /onOpenDns: openDnsRecords/)
+})
+
+test('MySQL 行内操作与编辑弹窗使用统一紧凑样式', () => {
+  const client = read('src/client.js')
+  assert.match(client, /\.ci-inline-action\{margin-left:10px;font-size:12px/)
+  assert.match(client, /className: "ci-link ci-inline-action"/)
+  assert.match(client, /className: "ci-modal ci-form-modal"/)
+  assert.match(client, /\.ci-form-modal \.ci-field input\{[^}]*height:36px[^}]*box-sizing:border-box/)
+  assert.match(client, /\.ci-form-modal \.ci-modal-actions\{[^}]*border-top:1px solid var\(--ci-border\)/)
 })
 
 test('g1/g2 列表横向滚动 hover 连续与 .ci-mini 品牌色 hover 契约', () => {
@@ -1120,4 +1338,57 @@ test('g1/g2 列表横向滚动 hover 连续与 .ci-mini 品牌色 hover 契约',
   assert.match(client, /\.ci-mini\.danger:hover:not\(:disabled\)\{[^}]*color-mix\(in srgb,var\(--dsw-alias-state-error-primary\) 10%,transparent\)/)
   const miniHover = client.match(/\.ci-mini[^,{]*:hover[^}]*\}/g)!.join('\n')
   assert.doesNotMatch(miniHover, /filter:/)
+  // 操作列不许 background:inherit —— 那是把半透明行底色(hover 6% / 已选 12%)在子盒里再画一遍,
+  // 结果操作列位置多出一块更深的色块,看着像按钮自己带了 hover
+  assert.doesNotMatch(client, /[;{]background:inherit/)
+  assert.match(client, /\.ci-cell\.ci-ops-cell\{overflow:visible;min-width:0\}/)
+  assert.match(client, /\.ci-ops\{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap\}/)
+  // 已选行的 hover 在自己的品牌色上加深,不被中性 hover 顶掉
+  assert.match(client, /\.ci-row\.picked:hover\{background:var\(--ci-brand-soft-14\)\}/)
+})
+
+test('面板可窗口化 / 全屏:所有产品卡共用 PanelFrame,且不盖住自己的弹窗', () => {
+  const client = read('src/client.js')
+  assert.match(client, /function PanelFrame\(\{ title, className, children \}\)/)
+  // 三态:inline / window / full,窗口态 portal 到 body
+  assert.match(client, /const \[mode, setMode\] = useState\("inline"\)/)
+  assert.match(client, /createPortal\(node, document\.body\)/)
+  assert.match(client, /className: "ci-win" \+ \(full \? " full" : ""\)/)
+  // 每个根视图都要接入,否则某些产品卡打不开窗口(数量与 kind 一起长)
+  const frames = client.match(/h\(PanelFrame, \{ title: /g) || []
+  assert.ok(frames.length >= 6, `PanelFrame 接入点只有 ${frames.length} 处`)
+  assert.doesNotMatch(client, /className: "ci-root ci-tool/)
+  // z-index 必须压在弹窗之下:否则面板内部的确认框/表单会被自己的窗口盖住
+  assert.match(client, /--ci-z-window:30;--ci-z-modal:40/)
+  assert.match(client, /\.ci-winframe\{position:fixed;inset:0;z-index:var\(--ci-z-window\)/)
+  // 拖动按尺寸夹位置、缩放按位置夹尺寸;反过来会变成「往右下拉,窗口往左上跑」
+  assert.match(client, /function clampWinRect\(rect, mode\)/)
+  assert.match(client, /if \(mode === "size"\)/)
+  assert.match(client, /clampWinRect\(\{ x: from\.x \+ dx, y: from\.y \+ dy, w: from\.w, h: from\.h \}, "move"\)/)
+  assert.match(client, /\}, "size"\)/)
+  // 手势挂 document:指针移出窗口边界后仍要跟手
+  assert.match(client, /document\.addEventListener\("mousemove", onMove\)/)
+  assert.match(client, /document\.addEventListener\("mouseup", onUp\)/)
+  // Esc 非捕获,让内层弹窗先消费；只 preventDefault 的 Modal 也不能连带关闭窗口
+  const frame = client.match(/function PanelFrame[\s\S]*?\n    function useOverlayKeys/)![0]
+  assert.match(frame, /document\.addEventListener\("keydown", onKey\)\;/)
+  assert.doesNotMatch(frame, /addEventListener\("keydown", onKey, true\)/)
+  assert.match(frame, /e\.defaultPrevented/)
+  assert.match(frame, /document\.querySelector\("\.ci-modal-mask,.ci-regionpop,.ci-more-menu,.ci-colfilter"\)/)
+  // 浮层期间按引用计数锁宿主滚动，关闭任意一张卡不会提前解锁
+  assert.match(client, /let bodyScrollLocks = 0/)
+  assert.match(client, /function lockBodyScroll\(\)/)
+  assert.match(frame, /const unlockBodyScroll = lockBodyScroll\(\)/)
+  assert.match(frame, /unlockBodyScroll\(\)/)
+  // 面板搬走后卡片要留占位,否则卡片塌成 0 高会把对话滚动条拽到底
+  assert.match(frame, /className: "ci-win-away"/)
+  assert.match(client, /\.ci-win-away\{[^}]*border:1px dashed/)
+  // a11y:窗口是 dialog,标题栏按钮都有中文 title/aria-label
+  assert.match(frame, /role: "dialog"/)
+  assert.match(frame, /"aria-label": "在窗口中打开"/)
+  assert.match(frame, /"aria-label": "全屏打开"/)
+  assert.match(frame, /"aria-label": "还原为窗口"/)
+  assert.match(frame, /"aria-label": "收回对话卡片"/)
+  // 行为回归:node scripts/verify-list-layout/verify.mjs 走拖拽/缩放/全屏/弹窗层级
+  assert.match(read('scripts/verify-list-layout/verify.mjs'), /window\.__winDrag\(/)
 })

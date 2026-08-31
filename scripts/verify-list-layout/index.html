@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>地域选择器文案完整性 harness</title>
+<style>
+  :root,[data-theme="light"]{
+    --dsw-alias-label-primary:#1f2329;
+    --dsw-alias-label-secondary:#3c4250;
+    --dsw-alias-label-tertiary:#646a78;
+    --dsw-alias-label-caption:#8a8f9b;
+    --dsw-alias-bg-layer-1:#ffffff;
+    --dsw-alias-bg-layer-2:#f5f6f7;
+    --dsw-alias-bg-layer-3:#eceff2;
+    --dsw-alias-border-l1:#e4e6ea;
+    --dsw-alias-border-l2:#d2d6dc;
+    --dsw-alias-brand-primary:#1f2329;
+    --dsw-alias-button-primary-fill:#1f2329;
+    --dsw-alias-button-info-fill:#0052d9;
+    --dsw-alias-label-primary-foreground:#ffffff;
+    --dsw-alias-state-success-primary:#18a058;
+    --dsw-alias-state-success-tertiary:#e7f6ee;
+    --dsw-alias-state-warn-label:#d48806;
+    --dsw-alias-state-warn-tertiary:#fdf3e1;
+    --dsw-alias-state-error-primary:#d54941;
+    --dsw-alias-bg-mask-1:#0000003d;
+    --dsw-alias-interactive-bg-hover:rgba(31,35,41,.06);
+    background:#f0f1f3;
+  }
+  body{margin:0;padding:16px;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;}
+  .host-card{max-width:980px;margin:0 auto;}
+  #probe{max-width:980px;margin:12px auto 0;display:flex;flex-wrap:wrap;gap:8px;}
+</style>
+</head>
+<body data-theme="light">
+<div class="host-card" id="root"></div>
+<!-- 探针区:用真实插件 CSS 渲染胶囊骨架,逐个量文案会不会被截断 -->
+<div class="ci-root" id="probe"></div>
+<script>
+  window.__capturedFactory = null;
+  window.__ModuleLoader__ = {
+    load(def) { if (def && typeof def.factory === "function") window.__capturedFactory = def.factory; },
+  };
+</script>
+<script src="./react.production.min.js"></script>
+<script src="./react-dom.production.min.js"></script>
+<script src="./client.js"></script>
+<script>
+  const requireShim = (name) => {
+    if (name === "react") return window.React;
+    if (name === "react-dom") return window.ReactDOM;
+    throw new Error("unknown module " + name);
+  };
+  const mod = window.__capturedFactory(requireShim);
+
+  // 覆盖所有会渲染 RegionPicker 的 kind;地域给短名,CVM/轻量那条链会自己归一成控制台全称
+  const CITY_REGIONS = [
+    "广州", "上海", "北京", "成都", "重庆", "南京", "深圳", "深圳金融",
+    "中国香港", "新加坡", "东京", "首尔", "曼谷", "雅加达", "孟买",
+    "硅谷", "弗吉尼亚", "法兰克福",
+  ];
+  const OBJ_REGIONS = [
+    { id: "ap-guangzhou", name: "广州", label: "广州", group: "大陆" },
+    { id: "ap-shanghai", name: "上海", label: "上海", group: "大陆" },
+    { id: "ap-hongkong", name: "中国香港", label: "中国香港", group: "港澳台" },
+    { id: "ap-shanghai-adc", name: "上海自动驾驶云", label: "上海自动驾驶云", group: "特殊" },
+  ];
+  const card = (kind, extras) => Object.assign({
+    id: `tencent.${kind}:demo`,
+    moduleId: `tencent.${kind}`,
+    provider: "tencent",
+    kind,
+    title: "demo-resource",
+    status: "enable",
+    columns: [],
+  }, extras || {});
+
+  // 可注册查询的行:字段口径跟 mapCheckDomain 一致(状态/价格两列 + extras)
+  const regRow = (name, o) => ({
+    id: `tencent.registrar:${name}`,
+    moduleId: "tencent.registrar",
+    provider: "tencent",
+    kind: "registrar",
+    title: name,
+    description: o.available ? "未注册" : "已被注册",
+    status: o.available ? "enable" : "error",
+    columns: [
+      { label: "状态", value: o.available ? "未注册" : "已被注册" },
+      { label: "价格", value: o.price ? `¥${o.price}/年` : "-" },
+    ],
+    openLabel: o.available ? "立即加购" : "",
+    extras: {
+      available: !!o.available,
+      price: o.price || 0,
+      actionHint: o.available ? "立即加购" : "已被注册",
+      suggested: !!o.suggested,
+    },
+  });
+
+  // 证书行:口径跟 mapCertItem 一致(列 + meta,CertTable 全靠 meta 决定操作列)
+  const certRow = (id, o) => ({
+    id: `tencent.cert:${id}`,
+    moduleId: "tencent.cert",
+    provider: "tencent",
+    kind: "cert",
+    title: id,
+    description: `${o.domain} · ${o.statusName}`,
+    status: o.status === 1 ? "enable" : "pause",
+    columns: [
+      { label: "证书 ID", value: id },
+      { label: "绑定域名", value: o.domain },
+      { label: "备注", value: "—" },
+      { label: "类型/品牌", value: "服务端 SVR · TrustAsia" },
+      { label: "状态", value: o.statusName },
+      { label: "有效期", value: o.status === 1 ? "2026-11-23 12:59:59" : "—" },
+    ],
+    openLabel: "详情",
+    meta: {
+      certificateId: id,
+      domain: o.domain,
+      status: o.status,
+      statusName: o.statusName,
+      deployable: !!o.deployable,
+      downloadable: !!o.downloadable,
+      renewable: false,
+      cancelable: !!o.cancelable,
+      deleteDirect: !o.cancelable,
+      verifyType: "DNS",
+    },
+  });
+
+  const PAYLOADS = {
+    cvm: { resourceKind: "cvm", regions: CITY_REGIONS, items: [card("cvm", { title: "demo-cvm" })], total: 1 },
+    lighthouse: { resourceKind: "lighthouse", regions: CITY_REGIONS, items: [card("lighthouse", { title: "demo-lh" })], total: 1 },
+    cls: {
+      resourceKind: "cls",
+      region: "ap-guangzhou",
+      regions: OBJ_REGIONS,
+      items: [card("cls", { title: "cls_service_log", columns: [{ label: "主题ID", value: "t-1" }, { label: "日志集", value: "ls" }] })],
+      total: 1,
+    },
+    cdb: { resourceKind: "cdb", region: "ap-guangzhou", regions: OBJ_REGIONS, items: [card("cdb", { title: "mysql-demo" })], total: 1 },
+    cluster: { resourceKind: "cluster", region: "ap-guangzhou", regions: OBJ_REGIONS, items: [card("cluster", { title: "tke-demo" })], total: 1 },
+    image: { resourceKind: "image", region: "ap-guangzhou", regions: OBJ_REGIONS, items: [], total: 0 },
+    dbbrain: { resourceKind: "dbbrain", region: "ap-guangzhou", regions: OBJ_REGIONS, items: [card("dbbrain", { title: "cdb-inst" })], total: 1 },
+    cos: { resourceKind: "cos", region: { id: "ap-guangzhou", label: "华南地区（广州）" }, regions: OBJ_REGIONS, items: [], total: 0 },
+    // 可注册查询:一行精确匹配 + 两行后端补出来的其它后缀(其中一个已被注册,不可加购)
+    registrar: {
+      resourceKind: "registrar",
+      query: "fagagbv.com",
+      items: [
+        regRow("fagagbv.com", { available: true, price: 83 }),
+        regRow("fagagbv.cn", { available: true, price: 29, suggested: true }),
+        regRow("fagagbv.net", { available: false, price: 0, suggested: true }),
+      ],
+      total: 3,
+    },
+    // 我的证书:已颁发一行(可部署可下载)+ 审核中一行(只有「更多」),验证行内菜单是证书动作而不是实例开关机
+    cert: {
+      resourceKind: "cert",
+      query: "example",
+      items: [
+        certRow("Kd7Xq2Ab", { domain: "example.com", status: 1, statusName: "证书已颁发", deployable: true, downloadable: true }),
+        certRow("Vm3Pz9Cd", { domain: "pending.com", status: 0, statusName: "证书审核中", cancelable: true }),
+      ],
+      total: 2,
+    },
+  };
+
+  // 假后端:云服务器与轻量的可用地域集合刻意不同(线上实测 CVM 44 / 轻量 18),
+  // 用来复现「在 CVM 选了清远信安 → 切到轻量」这条链路。
+  const CVM_ONLY_REGIONS = ["华南地区（广州）", "华南地区（清远）", "华南地区（清远信安）", "华东地区（上海）", "华东地区（上海自动驾驶云）", "港澳台地区（中国香港）", "西北地区（西北）"];
+  const LH_ONLY_REGIONS = ["广州", "清远", "上海", "中国香港", "东京"];
+  window.__apiLog = [];
+  const realFetch = window.fetch.bind(window);
+  window.fetch = async (url, init) => {
+    const href = String(url || "");
+    if (!/\/cloud-infra$/.test(href)) return realFetch(url, init);
+    const req = JSON.parse((init && init.body) || "{}");
+    if (req.method === "meta") return new Response(JSON.stringify({ ok: true, skipConfirm: false }), { status: 200 });
+    if (req.method !== "query") return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    window.__apiLog.push({ kind: req.kind, region: req.region });
+    const lh = req.kind === "lighthouse";
+    const regions = lh ? LH_ONLY_REGIONS : CVM_ONLY_REGIONS;
+    // 严格按字符串比:后端 pickRegions 就是 row.region === want || row.regionName === want,
+    // 写法不对(拿轻量的「清远」去查 CVM)一样查不到,harness 不能比后端宽松
+    const supported = regions.some((name) => name === req.region);
+    const items = supported ? [card(lh ? "lighthouse" : "cvm", { title: lh ? "demo-lh" : "demo-cvm" })] : [];
+    return new Response(JSON.stringify({
+      ok: true, items, total: items.length, offset: 0, hasMore: false, regions, errors: [],
+    }), { status: 200 });
+  };
+
+  window.__readBar = function () {
+    const text = document.querySelector("#root .ci-regionpick-text");
+    const note = document.querySelector("#root .ci-region-note");
+    const err = document.querySelector("#root .ci-err");
+    const options = [...document.querySelectorAll(".ci-regionpop-item .ci-regionpop-label")].map((el) => el.textContent);
+    return {
+      region: text ? text.textContent : "",
+      title: (document.querySelector("#root .ci-regionpick-btn") || {}).title || "",
+      note: note ? note.textContent : "",
+      err: err ? err.textContent : "",
+      rows: document.querySelectorAll("#root .ci-dense tbody tr").length,
+      tab: (document.querySelector("#root .ci-tab.on") || {}).textContent || "",
+      options,
+      lastCall: window.__apiLog[window.__apiLog.length - 1] || null,
+    };
+  };
+
+  window.__clickTab = function (label) {
+    const btn = [...document.querySelectorAll("#root .ci-tab")].find((el) => el.textContent === label);
+    if (!btn) return false;
+    btn.click();
+    return true;
+  };
+
+  // 浮层是 React 状态驱动的,开与选必须分两次调用(中间让出一帧),否则查不到 option
+  window.__openRegionPop = function () {
+    const btn = document.querySelector("#root .ci-regionpick-btn");
+    if (!btn) return false;
+    if (!document.querySelector(".ci-regionpop")) btn.click();
+    return true;
+  };
+
+  window.__pickRegion = function (label) {
+    const item = [...document.querySelectorAll(".ci-regionpop-item")]
+      .find((el) => (el.querySelector(".ci-regionpop-label") || {}).textContent === label);
+    if (!item) return false;
+    item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    return true;
+  };
+
+  window.__mountKind = function (kind, opts) {
+    const o = opts || {};
+    const payload = Object.assign({ kind, errors: [] }, PAYLOADS[kind] || { resourceKind: kind, items: [], total: 0 });
+    if (o.empty) {
+      // 空结果但卡片仍在:带上 query,SearchToolView 才会保留表头(否则整卡直接不渲染)
+      payload.items = [];
+      payload.total = 0;
+      payload.query = "zzz-no-match";
+    }
+    const props = {
+      block: {
+        kind: "tool.call.result",
+        call: { argsRaw: JSON.stringify({ kind, query: o.empty ? "zzz-no-match" : "", region: "ap-guangzhou" }) },
+        result: payload,
+      },
+    };
+    const rootEl = document.getElementById("root");
+    // 每个 kind 用独立 root:避免上一个 kind 的组件 state 串味
+    if (window.__reactRoot) window.__reactRoot.unmount();
+    window.__reactRoot = window.ReactDOM.createRoot(rootEl);
+    window.__reactRoot.render(window.React.createElement(mod.SearchToolView, props));
+    return true;
+  };
+
+  // 量所有已渲染的地域胶囊:文案是否被省略号截断 + 宽度是否统一
+  window.__measurePickers = function () {
+    return [...document.querySelectorAll("#root .ci-regionpick")].map((wrap) => {
+      const text = wrap.querySelector(".ci-regionpick-text");
+      const btn = wrap.querySelector(".ci-regionpick-btn");
+      return {
+        label: text ? text.textContent : "",
+        title: btn ? btn.getAttribute("title") : "",
+        width: Math.round(wrap.getBoundingClientRect().width),
+        truncated: text ? text.scrollWidth > text.clientWidth + 1 : null,
+      };
+    });
+  };
+
+  // 量横向滚动容器:滚动条属于 .ci-scroll 的下沿,所以要确认空态也在容器内、
+  // 容器底边在空态之下(否则滚动条就压在表头下面)
+  window.__measureScroll = function () {
+    const scroll = document.querySelector("#root .ci-scroll");
+    if (!scroll) return null;
+    const table = scroll.querySelector("table");
+    const head = scroll.querySelector("thead tr");
+    const empty = scroll.parentElement ? scroll.parentElement.querySelector(".ci-empty") : null;
+    const inside = !!(empty && scroll.contains(empty));
+    const r = (el) => (el ? el.getBoundingClientRect() : null);
+    const sr = r(scroll), hr = r(head), er = r(empty);
+    return {
+      scrollable: scroll.scrollWidth > scroll.clientWidth + 1,
+      emptyInside: empty ? inside : null,
+      // 滚动条占掉的高度:容器 offsetHeight 与 clientHeight 之差
+      barHeight: scroll.offsetHeight - scroll.clientHeight,
+      headBottom: hr ? Math.round(hr.bottom) : null,
+      emptyBottom: er ? Math.round(er.bottom) : null,
+      scrollBottom: sr ? Math.round(sr.bottom) : null,
+      tableWidth: table ? Math.round(table.getBoundingClientRect().width) : null,
+      emptySticky: empty ? getComputedStyle(empty).position : null,
+    };
+  };
+
+  // 可注册查询卡:读每行的操作按钮 / 分段小标题 / 底部结算栏 / 列表实际高度
+  window.__readRegistrar = function () {
+    const body = document.querySelector("#root .ci-list-body");
+    const list = document.querySelector("#root .ci-list");
+    const bar = document.querySelector("#root .ci-cartbar");
+    const rows = [...document.querySelectorAll("#root .ci-row:not(.head)")].map((el) => ({
+      name: (el.querySelector(".ci-name") || {}).textContent || "",
+      picked: el.classList.contains("picked"),
+      tag: (el.querySelector(".ci-badge") || {}).textContent || "",
+      op: (el.querySelector(".ci-ops button") || el.querySelector(".ci-op-hint") || {}).textContent || "",
+    }));
+    return {
+      rows,
+      subhead: [...document.querySelectorAll("#root .ci-subhead")].map((el) => el.textContent),
+      cartbar: bar ? bar.querySelector(".ci-cartbar-t").textContent : "",
+      // 单行结果不该在列表下面留一大块空白:容器高度应当贴着内容
+      bodyHeight: body ? Math.round(body.getBoundingClientRect().height) : null,
+      listHeight: list ? Math.round(list.getBoundingClientRect().height) : null,
+      pager: !!document.querySelector("#root .ci-footbar"),
+      modal: !!document.querySelector(".ci-modal-mask"),
+    };
+  };
+
+  window.__clickRegistrarOp = function (name, label) {
+    const row = [...document.querySelectorAll("#root .ci-row:not(.head)")]
+      .find((el) => ((el.querySelector(".ci-name") || {}).textContent || "") === name);
+    const btn = row && row.querySelector(".ci-ops button");
+    if (!btn || (label && btn.textContent !== label)) return false;
+    btn.click();
+    return true;
+  };
+
+  // 操作列不许自带底色:background:inherit 会把半透明行底色画第二遍,
+  // 在按钮那一块留下更深的色块(看着像按钮自己带 hover)
+  window.__readOpsBg = function () {
+    const row = document.querySelector("#root .ci-row.picked") || document.querySelector("#root .ci-row:not(.head)");
+    if (!row) return null;
+    const ops = row.querySelector(".ci-ops");
+    const bg = (el) => (el ? getComputedStyle(el).backgroundColor : null);
+    const clear = (v) => v === "rgba(0, 0, 0, 0)" || v === "transparent";
+    return {
+      rowBg: bg(row),
+      opsBg: bg(ops),
+      opsClear: clear(bg(ops)),
+      rowPainted: !clear(bg(row)),
+    };
+  };
+
+  window.__clickCartBtn = function (label) {
+    const btn = [...document.querySelectorAll("#root .ci-cartbar button")].find((el) => el.textContent === label);
+    if (!btn) return false;
+    btn.click();
+    return true;
+  };
+
+  // 我的证书:读每行操作 + 打开行内「更多」看菜单项。同名函数覆盖过一次,
+  // 证书行里出现过实例的开机/关机/重启,吊销和删除全丢,所以这里要按文案核对
+  window.__readCertRow = function (id) {
+    const row = [...document.querySelectorAll("#root .ci-cert-list .ci-row:not(.head)")]
+      .find((el) => ((el.querySelector(".ci-name") || {}).textContent || "") === id);
+    if (!row) return null;
+    return {
+      ops: [...row.querySelectorAll(".ci-ops button")].map((el) => el.textContent),
+      menu: [...document.querySelectorAll(".ci-more-menu .ci-more-item")].map((el) => el.textContent),
+    };
+  };
+
+  window.__openCertMore = function (id) {
+    const row = [...document.querySelectorAll("#root .ci-cert-list .ci-row:not(.head)")]
+      .find((el) => ((el.querySelector(".ci-name") || {}).textContent || "") === id);
+    const btn = row && [...row.querySelectorAll(".ci-ops button")].find((el) => el.textContent === "更多");
+    if (!btn) return false;
+    btn.click();
+    return true;
+  };
+
+  // 窗口化 / 全屏:量浮层几何、拖拽与缩放是否跟手、内层弹窗有没有被窗口盖住
+  window.__winClick = function (label) {
+    const btn = [...document.querySelectorAll(".ci-winctl-btn, .ci-win-op")]
+      .find((el) => (el.getAttribute("title") || "").indexOf(label) === 0);
+    if (!btn) return false;
+    btn.click();
+    return true;
+  };
+
+  window.__readWin = function () {
+    const frame = document.querySelector(".ci-winframe");
+    const win = document.querySelector(".ci-win");
+    const body = document.querySelector(".ci-win-body");
+    const panel = body ? body.querySelector(".ci-panel") : null;
+    const mask = document.querySelector(".ci-modal-mask");
+    const zOf = (el) => (el ? getComputedStyle(el).zIndex : null);
+    const r = (el) => {
+      if (!el) return null;
+      const b = el.getBoundingClientRect();
+      return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+    };
+    return {
+      open: !!frame,
+      full: !!(win && win.classList.contains("full")),
+      win: r(win),
+      panelWidth: panel ? Math.round(panel.getBoundingClientRect().width) : null,
+      title: (document.querySelector(".ci-win-t") || {}).textContent || "",
+      // 面板搬走后卡片里要留占位,否则卡片塌成 0 高
+      away: !!document.querySelector("#root .ci-win-away"),
+      cardHeight: Math.round(document.getElementById("root").getBoundingClientRect().height),
+      grips: document.querySelectorAll(".ci-win-grip").length,
+      bodyLocked: document.body.style.overflow === "hidden",
+      zWin: zOf(frame),
+      zMask: zOf(mask),
+      viewport: { w: window.innerWidth, h: window.innerHeight },
+    };
+  };
+
+  // 用真实鼠标事件走一遍手势:mousedown 在把手上,mousemove/mouseup 打在 document 上
+  window.__winDrag = function (selector, dx, dy) {
+    const el = document.querySelector(selector);
+    if (!el) return false;
+    const b = el.getBoundingClientRect();
+    const x = Math.round(b.x + b.width / 2);
+    const y = Math.round(b.y + b.height / 2);
+    const opts = (cx, cy) => ({ bubbles: true, cancelable: true, clientX: cx, clientY: cy, button: 0 });
+    el.dispatchEvent(new MouseEvent("mousedown", opts(x, y)));
+    document.dispatchEvent(new MouseEvent("mousemove", opts(x + dx, y + dy)));
+    document.dispatchEvent(new MouseEvent("mouseup", opts(x + dx, y + dy)));
+    return true;
+  };
+
+  window.__winDblTitle = function () {
+    const bar = document.querySelector(".ci-win-bar");
+    if (!bar) return false;
+    bar.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
+    return true;
+  };
+
+  // 探针:把候选文案塞进真实胶囊骨架里量截断(覆盖那些当前 kind 没渲染出来的地域名)
+  window.__probeLabels = function (labels) {
+    const host = document.getElementById("probe");
+    host.innerHTML = "";
+    const short = (raw) => {
+      const hit = String(raw || "").trim().match(/^[^（(]*[（(]([^）)]+)[）)]\s*$/);
+      return hit && hit[1].trim() ? hit[1].trim() : String(raw || "").trim();
+    };
+    const out = [];
+    for (const raw of labels) {
+      const wrap = document.createElement("span");
+      wrap.className = "ci-regionpick";
+      wrap.innerHTML = '<button type="button" class="ci-regionpick-btn"><span class="ci-regionpick-text"></span>'
+        + '<svg class="ci-regionpick-caret" width="10" height="10" viewBox="0 0 10 10"></svg></button>';
+      const text = wrap.querySelector(".ci-regionpick-text");
+      text.textContent = short(raw);
+      host.appendChild(wrap);
+      out.push({ raw, shown: text.textContent, truncated: text.scrollWidth > text.clientWidth + 1 });
+    }
+    return out;
+  };
+</script>
+</body>
+</html>

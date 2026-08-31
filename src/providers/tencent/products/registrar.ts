@@ -143,7 +143,11 @@ export function availabilityAction(kind: ReturnType<typeof availabilityKeyword>)
   return '已被注册'
 }
 
-export function mapCheckDomain(item: CheckDomainResult, moduleId = REGISTRAR_MODULE_ID): ResourceCard {
+export function mapCheckDomain(
+  item: CheckDomainResult,
+  moduleId = REGISTRAR_MODULE_ID,
+  suggested = false,
+): ResourceCard {
   const name = String(item.DomainName || '').trim().toLowerCase()
   const kind = availabilityKeyword(item)
   const price = Number(item.RealPrice ?? item.Price ?? 0)
@@ -168,6 +172,7 @@ export function mapCheckDomain(item: CheckDomainResult, moduleId = REGISTRAR_MOD
       blocked: kind === 'blocked',
       price,
       actionHint: availabilityAction(kind),
+      suggested,
     },
   }
 }
@@ -227,6 +232,15 @@ export function nameServerText(servers: unknown): string {
   return servers.map((item) => String(item || '').trim()).filter(Boolean).join(' ')
 }
 
+/** 注册域名当前是否由 DNSPod 托管；用于在“我的域名”详情中开放解析记录入口。 */
+export function isDnspodNameServers(servers: unknown): boolean {
+  if (!Array.isArray(servers)) return false
+  return servers.some((item) => {
+    const host = String(item || '').trim().toLowerCase().replace(/\.$/, '')
+    return /(^|\.)dnspod\.(com|net)$/.test(host) || /(^|\.)dnsv[1-5]\.com$/.test(host)
+  })
+}
+
 export function mapOwnedDomain(item: DomainListRow, moduleId = MY_DOMAIN_MODULE_ID): ResourceCard {
   const domainId = String(item.DomainId || item.DomainName || '')
   const title = item.DomainName || domainId
@@ -262,12 +276,29 @@ export function parseOwnedRef(id: string): { moduleId: string; domainId: string 
   return { moduleId, domainId }
 }
 
+/**
+ * 要查的域名清单。第一项是用户真正输入的那个,后面是同名的其它热门后缀。
+ *
+ * 只查精确匹配的话,一次查询就回一行:卡片大半是空的,想看 .cn 还得自己改后缀再查一遍。
+ * 控制台是连着给出其它后缀的可注册情况,这里对齐。
+ * 只在「二级域 + 单段后缀」时补:example.com.cn / a.b.com 拆出来的名字没有意义。
+ */
 export function checkTargets(query: string): string[] {
   const keyword = normalizeKeyword(query)
   if (!keyword) return []
-  if (isFullDomain(keyword)) return [keyword]
   if (isBareName(keyword)) return POPULAR_TLDS.map((tld) => `${keyword}${tld}`)
-  return []
+  if (!isFullDomain(keyword)) return []
+  const tld = tldOf(keyword)
+  const sld = keyword.slice(0, keyword.length - tld.length)
+  if (!isBareName(sld)) return [keyword]
+  return [keyword, ...POPULAR_TLDS.filter((item) => item !== tld).map((item) => `${sld}${item}`)]
+}
+
+/** 补出来的后缀行要标出来,前端才能把「精确匹配」和「其它后缀」分段展示。 */
+export function isSuggestedTarget(query: string, name: string): boolean {
+  const keyword = normalizeKeyword(query)
+  if (!keyword || !isFullDomain(keyword)) return false
+  return String(name || '').trim().toLowerCase() !== keyword
 }
 
 export function filterOwned(items: DomainListRow[], query: string): DomainListRow[] {
@@ -330,7 +361,11 @@ export function createRegistrarModule(call: typeof domainCall = domainCall): Res
           DomainName: name,
           Period: '1',
         }, creds(ctx), opts(ctx))
-        return mapCheckDomain({ ...data, DomainName: data.DomainName || name }, module.id)
+        return mapCheckDomain(
+          { ...data, DomainName: data.DomainName || name },
+          module.id,
+          isSuggestedTarget(ctx.query, name),
+        )
       }))
       return {
         items: rows,
@@ -435,6 +470,7 @@ export function createMyDomainModule(call: typeof domainCall = domainCall): Reso
         updateLock,
         transferLock,
         autoRenew,
+        dnspodHosted: isDnspodNameServers(base.NameServer),
       }
       return { card, fields }
     },
