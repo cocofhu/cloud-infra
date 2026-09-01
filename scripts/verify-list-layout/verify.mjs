@@ -131,6 +131,36 @@ for (const kind of ["cvm", "lighthouse"]) {
   }
 }
 
+// 行数少、列表又被 ListPane 撑高时,滚动条不能停在表格与空白之间:滚动容器要贴着列表下沿
+for (const kind of ["cdb", "cos", "cls", "cvm"]) {
+  await env.evaluate(`window.__mountKind(${JSON.stringify(kind)})`);
+  await wait(450);
+  const m = await env.evaluate("window.__measurePaneScroll()");
+  const ok = !!m && m.box === true && m.gapBelow <= 1 && m.boxHeight >= m.paneHeight - 1
+    && (m.tableHeight === null || m.boxHeight >= m.tableHeight);
+  check(`${kind}: 横向滚动容器贴着列表下沿(滚动条不浮在表格中间)`, ok, JSON.stringify(m));
+}
+
+// 把卡片压到 560px:CDB 这张宽表真的横向溢出,直接量滚动条本身在不在列表下沿
+await env.evaluate(`window.__setCardWidth(560)`);
+await env.evaluate(`window.__mountKind("cdb")`);
+await wait(500);
+const narrow = await env.evaluate("window.__measurePaneScroll()");
+check(
+  "窄卡片里 CDB 宽表:滚动条确实出现,且长在列表下沿",
+  !!narrow && narrow.scrollsX === true && narrow.barHeight > 0 && narrow.gapBelow <= 1
+    && narrow.boxHeight >= narrow.paneHeight - 1,
+  JSON.stringify(narrow),
+);
+const cdbShot = await env.evaluate(`(() => {
+  const el = document.querySelector("#root .ci-panel");
+  if (!el) return null;
+  const b = el.getBoundingClientRect();
+  return { x: b.x, y: b.y, width: b.width, height: b.height };
+})()`);
+if (cdbShot) await writeFile(join(DIR, "shots", "cdb-scrollbar.png"), await env.shot(cdbShot));
+await env.evaluate(`window.__setCardWidth(0)`);
+
 // ---------- 4. 切 Tab:地域清单/选中值不许串台 ----------
 // 假后端给两条链不同的地域集合(轻量没有「清远信安」),复现用户那条链路:
 // CVM 选清远信安 → 切轻量 → 切回 CVM。

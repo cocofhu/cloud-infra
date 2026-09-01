@@ -47,7 +47,7 @@
 ### 阴影与层级
 
 `--ci-shadow-0`(滑块 / 分段选中)/ `--ci-shadow-1`(菜单)/ `--ci-shadow-2`(浮层与弹窗),`--ci-mask`(弹窗遮罩),
-`--ci-z-modal`(40)/ `--ci-z-popover`(60)。
+`--ci-z-window`(30)/ `--ci-z-modal`(40)/ `--ci-z-popover`(60)/ `--ci-z-toast`(80)。Toast 必须高于弹窗,对齐腾讯云 CAM Message。
 
 宿主主题**没有** `--dsw-alias-shadow`,引用它的 `box-shadow` 整条无效,所以阴影一律走上面三档 token;
 遮罩取 `--dsw-alias-bg-mask-1` 而不是 `bg-mask-3`(后者是 48% 纯黑,插件嵌在对话卡片里会把整张卡压暗)。
@@ -101,7 +101,9 @@ h(Tabs, {
 ```
 
 视觉 = **2px 品牌色下划线 + 品牌色文字**,等同腾讯云控制台 Detail 页 Tab。已自动应用:
-- TKE 详情(基本 / 节点 / 节点池 / 命名空间 / 组件 / 授权 / 策略 / 运维)
+- TKE 详情对齐控制台：左侧分组导航 + 分区卡片两列键值（不再用 chip 堆字段）；
+  节点 / 节点池 / 工作负载 / 服务与路由 / 配置 / 存储 / 命名空间 / 组件 / Helm 应用 / 授权 / 策略 / 运维均为全宽表；
+  工作负载支持调整副本、滚动重启、删除。
 - CDB 11 页签(实例详情 / 监控 / 数据库 / 参数 / 任务 / 备份 / 日志 / 账号 / 安全组 / 只读 / 连接)
 - DBbrain 诊断优化分组
 - CLS 检索分析(主题列表 / 检索分析)
@@ -127,6 +129,8 @@ h(Modal, {
 
 特性:`role=dialog` + `aria-modal=true` + Esc 关闭 + 打开时焦点入、关闭焦点归。`width: "wizard"` 时切换为宽体向导容器。
 
+`ConfirmDialog` 的按钮走 `.ci-mini`:**取消**保持灰描边,hover 不改成蓝框;**确认**在 `danger` 时是红底白字(`.ci-mini.primary.danger`),不能叠成蓝底红字。`.ci-mini` 带 `appearance:none`,避免吃到宿主默认按钮皮。
+
 ### 2.5 Empty — 空态
 
 ```js
@@ -139,6 +143,18 @@ h(Empty, { text: "该地域下没有存储桶", hint: "试试切换地域", acti
 
 ```js
 h(Notice, { type: "error" }, "拉取地域失败,请稍后重试")
+```
+
+Notice 只用于页面里需要常驻的说明。云厂商 / CAM 报错不要再用 Notice 或 `.ci-err` 堆在面板顶上。
+
+### 2.6.1 Toast / Message — 右上角报错
+
+对齐腾讯云控制台 CAM Message:`api()` 在 query / detail / search / action 失败时调用 `pushToast("error", publicErrorMessage(err))`。`ToastHost` 挂到 `document.body`,固定在视口右上角,盖过窗口和弹窗(`--ci-z-toast:80`),约 4.5s 自动消失,可手动关闭。同屏最多 4 条。
+
+设置页 `config` / `meta` 仍走卡片内 `.ci-err`。表单本地校验(文件过大、未勾协议等)也可以留在弹窗里。列表失败时空态写「无法加载…」,不要把「当前密钥没有该操作的权限」再印成一行红字。
+
+```js
+pushToast("error", "当前密钥没有该操作的权限")
 ```
 
 ### 2.7 Pagination — 分页
@@ -227,6 +243,11 @@ h(RegionPicker, {
 - 柱子颜色不写死,`LogHistogram` 读 `.ci-cls-chart` 上已解析的 `color`(canvas 不认 `var()`)交给 echarts,明暗自动跟随。
 - 结构化日志展开后只列字段表;`content` 是 fields 的 JSON 原文时不再重复贴一遍原文。
 - `换行` / `全部展开` 两个开关在表头右侧(`.ci-cls-tools`),分别控制 `.ci-logrow.wrap` 与逐条展开态。
+- **续拉靠触底,不放「继续拉取」按钮**:`.ci-logtable` 自己就是滚动容器,离底 96px 内即取下一页。
+  三个坑:①`logBusy` 是 state,同一帧的连续 `scroll` 事件读到的都是旧值,必须再用 `moreLock` ref 上锁,
+  否则一次触底会用同一个 CLS `Context` 打出好几个请求;②首屏不足一屏时滚不动、永远等不到 `scroll` 事件,
+  要用 effect 补到能滚为止;③底部提示行只在**真的在取**时出现(`.ci-log-more`,sticky left 跟着横向滚动),
+  空闲不留提示、取完也不留「没有更多」,列表底部就是最后一条日志。
 - 视觉回归:`node scripts/verify-cls-console/verify.mjs [chrome]`(真实 Chromium + 真实构建产物,断言 + 亮/暗截图)。
 
 ### 2.15 宽表横向滚动 — 滚动条只能长在表格底部
@@ -236,8 +257,14 @@ h(RegionPicker, {
 放到外面时容器就只包住 `<thead>`,滚动条会紧贴表头下沿,看着像"表头上长了根滚动条"。
 
 - `.ci-scroll > .ci-empty` 带 `position:sticky;left:0`,横滚表头时提示文案不会被推出可视区。
+- 同一个坑的另一半:**滚动容器必须自己吃掉 `ListPane` 撑出来的空白**。`ListPane` 为了翻页不抖会给
+  `.ci-list-body` 兜一个高度(`min-height:160px` 或上一屏的高度),行数少时这段空白落在滚动容器**下面**,
+  滚动条就停在表格与空白之间,浮在列表中央。所以 `.ci-list-body` 是 column flex,
+  `.ci-scroll` / `.ci-table-wrap` / `.ci-table-scroll` 作为直接子元素取 `flex:1;min-height:0` ——
+  表格照旧贴顶,多出来的高度在容器内部,滚动条回到列表下沿。CDB / COS / CLS / 实例表共用这一条。
 - 契约由 `client-contract.test.ts` 做括号配平检查(空态节点必须落在 `.ci-scroll` 的调用范围内)。
-- 视觉回归:`node scripts/verify-list-layout/verify.mjs [chrome]`,空/非空各量一次滚动条位置。
+- 视觉回归:`node scripts/verify-list-layout/verify.mjs [chrome]`,空/非空各量一次滚动条位置;
+  再对 cdb / cos / cls / cvm 量滚动容器底边是否贴着列表下沿,并把卡片压到 560px 让 CDB 宽表真的溢出。
 
 ### 2.16 实例卡双 Tab — 地域按 Tab 独立
 

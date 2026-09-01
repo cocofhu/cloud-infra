@@ -400,7 +400,26 @@ test('client CLS card stays inside ci-panel and does not save config (g2.3 g1.4)
   assert.match(client, /api\("search"/)
   assert.match(client, /api\("query"/)
   assert.match(client, /view: "list"/)
-  assert.match(client, /继续拉取/)
+  // 原始日志靠触底续拉,没有「继续拉取」按钮:滚动条离底 96px 内就自动接着取,
+  // 同一帧内的连续 scroll 事件靠 moreLock ref 上锁(logBusy 是 state,读到的是旧值),
+  // 首屏不足一屏时用 effect 补到能滚为止,否则永远等不到 scroll 事件。
+  assert.doesNotMatch(client, /继续拉取/)
+  assert.doesNotMatch(client, /"拉取中"/)
+  const cls = client.slice(client.indexOf('function ClsCard'))
+  assert.match(cls, /const moreLock = useRef\(false\)/)
+  assert.match(cls, /const logPane = useRef\(null\)/)
+  assert.match(cls, /if \(!logMore \|\| logBusy \|\| moreLock\.current \|\| !topic\) return/)
+  assert.match(cls, /moreLock\.current = true/)
+  assert.match(cls, /\.finally\(\(\) => \{ moreLock\.current = false; \}\)/)
+  assert.match(cls, /el\.scrollHeight - el\.scrollTop - el\.clientHeight <= 96/)
+  assert.match(cls, /el\.scrollHeight - el\.clientHeight <= 8\) loadMoreLogs\(\)/)
+  // 续拉失败或 append 0 条时必须停 hasMore,否则首屏补拉 effect 会空转 SearchLog
+  assert.match(cls, /setLogMore\(false\)/)
+  assert.match(cls, /used\.append && nextLogs\.length === 0/)
+  assert.match(cls, /"ci-logtable", ref: logPane, onScroll: onLogScroll/)
+  // 空闲时底部不留提示行、取完也不留「没有更多」,只有真的在取时占一行
+  assert.match(cls, /logMore && logBusy \? h\("div", \{ className: "ci-log-more" \}/)
+  assert.match(client, /\.ci-log-more\{grid-column:1\/-1;position:sticky;left:0/)
   assert.match(client, /近 15 分钟/)
   assert.match(client, /自定义/)
   assert.match(client, /status:500 OR level:ERROR/)

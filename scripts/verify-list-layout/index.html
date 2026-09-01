@@ -139,11 +139,44 @@
       items: [card("cls", { title: "cls_service_log", columns: [{ label: "主题ID", value: "t-1" }, { label: "日志集", value: "ls" }] })],
       total: 1,
     },
-    cdb: { resourceKind: "cdb", region: "ap-guangzhou", regions: OBJ_REGIONS, items: [card("cdb", { title: "mysql-demo" })], total: 1 },
+    // 列值按控制台的真实长度给:harness 里 .ci-table 是 fixed 布局,列窄了表就不溢出,
+    // 「滚动条位置」这条断言会失去意义
+    cdb: {
+      resourceKind: "cdb",
+      region: "ap-guangzhou",
+      regions: OBJ_REGIONS,
+      items: [card("cdb", {
+        title: "cdb-8r6m7qfb",
+        description: "lightlottery-prod-mysql",
+        columns: [
+          { label: "运行状态", value: "运行中" },
+          { label: "可用区", value: "广州七区" },
+          { label: "数据库版本", value: "8.0" },
+          { label: "配置", value: "4核 8000MB / 100GB" },
+          { label: "内网地址", value: "10.240.33.14:3306" },
+          { label: "计费模式", value: "包年包月 2026-09-30 到期" },
+        ],
+      })],
+      total: 1,
+    },
     cluster: { resourceKind: "cluster", region: "ap-guangzhou", regions: OBJ_REGIONS, items: [card("cluster", { title: "tke-demo" })], total: 1 },
     image: { resourceKind: "image", region: "ap-guangzhou", regions: OBJ_REGIONS, items: [], total: 0 },
     dbbrain: { resourceKind: "dbbrain", region: "ap-guangzhou", regions: OBJ_REGIONS, items: [card("dbbrain", { title: "cdb-inst" })], total: 1 },
-    cos: { resourceKind: "cos", region: { id: "ap-guangzhou", label: "华南地区（广州）" }, regions: OBJ_REGIONS, items: [], total: 0 },
+    // 带一个存储桶:空态渲染的是 .ci-empty,量不到滚动容器,盖不住「滚动条位置」这条
+    cos: {
+      resourceKind: "cos",
+      region: { id: "ap-guangzhou", label: "华南地区（广州）" },
+      regions: OBJ_REGIONS,
+      items: [card("cos", {
+        title: "demo-bucket-1250000000",
+        columns: [
+          { label: "地域", value: "广州" },
+          { label: "创建时间", value: "2026-08-01 10:00:00" },
+          { label: "访问权限", value: "私有读写" },
+        ],
+      })],
+      total: 1,
+    },
     // 可注册查询:一行精确匹配 + 两行后端补出来的其它后缀(其中一个已被注册,不可加购)
     registrar: {
       resourceKind: "registrar",
@@ -290,6 +323,37 @@
       scrollBottom: sr ? Math.round(sr.bottom) : null,
       tableWidth: table ? Math.round(table.getBoundingClientRect().width) : null,
       emptySticky: empty ? getComputedStyle(empty).position : null,
+    };
+  };
+
+  // 把卡片压窄:复现对话卡片里宽表真的横向溢出的情形(默认 1080px 的 harness 里 CDB 表还不溢出)
+  window.__setCardWidth = function (px) {
+    const host = document.querySelector(".host-card");
+    if (!host) return false;
+    host.style.maxWidth = px ? px + "px" : "";
+    return true;
+  };
+
+  // 各产品列表的横向滚动容器:滚动条必须长在整块列表的下沿,而不是表格与空白之间。
+  // 判据是滚动容器的底边贴着 .ci-list-body 的底边(容器自己吃掉 ListPane 撑出来的空白)。
+  window.__measurePaneScroll = function () {
+    const pane = document.querySelector("#root .ci-list-body");
+    if (!pane) return null;
+    const box = pane.querySelector(":scope > .ci-scroll, :scope > .ci-table-wrap, :scope > .ci-table-scroll");
+    if (!box) return { pane: true, box: false };
+    const pr = pane.getBoundingClientRect();
+    const br = box.getBoundingClientRect();
+    const table = box.querySelector("table");
+    return {
+      pane: true,
+      box: true,
+      cls: box.className,
+      scrollsX: box.scrollWidth > box.clientWidth + 1,
+      barHeight: box.offsetHeight - box.clientHeight,
+      gapBelow: Math.round(pr.bottom - br.bottom),
+      paneHeight: Math.round(pr.height),
+      boxHeight: Math.round(br.height),
+      tableHeight: table ? Math.round(table.getBoundingClientRect().height) : null,
     };
   };
 
