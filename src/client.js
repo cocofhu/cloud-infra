@@ -2272,6 +2272,87 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       return h("svg", common, h("path", { d: "M3.2 3.2l7.6 7.6M10.8 3.2l-7.6 7.6", ...stroke }));
     }
 
+    function placeHoist(group, anchor) {
+      const parent = group.parentElement;
+      if (!parent) return;
+      const ids = [...group.querySelectorAll("[data-chat-call-id]")].map((el) => el.getAttribute("data-chat-call-id"));
+      const mine = ids.indexOf(anchor.dataset.ciCall || "");
+      const hoists = [...parent.children].filter((el) => el !== anchor && el.classList && el.classList.contains("ci-hoist"));
+      let before = null;
+      for (const el of hoists) {
+        const idx = ids.indexOf(el.dataset.ciCall || "");
+        if (mine >= 0 && idx > mine) { before = el; break; }
+      }
+      if (before) {
+        if (anchor.parentElement === parent && anchor.nextSibling === before) return;
+        parent.insertBefore(anchor, before);
+        return;
+      }
+      const earlier = hoists.filter((el) => {
+        const idx = ids.indexOf(el.dataset.ciCall || "");
+        return mine >= 0 && idx >= 0 && idx < mine;
+      });
+      const after = earlier.length ? earlier[earlier.length - 1] : group;
+      if (anchor.parentElement === parent && anchor.previousSibling === after) return;
+      parent.insertBefore(anchor, after.nextSibling);
+    }
+
+    // 回合结束后宿主把工具调用收进「Completed in …」，body 带 hidden，卡片跟着消失。
+    // 父级是 display:contents，把卡片插到这个折叠组后面，它就重新出现在回复上方。
+    function FlowHoist({ children }) {
+      const slotRef = useRef(null);
+      const anchorRef = useRef(null);
+      const [host, setHost] = useState(null);
+      useEffect(() => {
+        const slot = slotRef.current;
+        if (!slot || typeof document === "undefined") return;
+        let stop = false;
+        const sync = () => {
+          if (stop) return;
+          const group = slot.closest("[data-step-process]");
+          const body = group ? group.querySelector("[data-step-process-body]") : null;
+          const buried = !!(group && (group.hasAttribute("hidden") || (body && body.hasAttribute("hidden"))));
+          if (!buried || !group || !group.parentElement) {
+            if (anchorRef.current) {
+              anchorRef.current.remove();
+              anchorRef.current = null;
+            }
+            setHost((cur) => (cur === null ? cur : null));
+            return;
+          }
+          if (!anchorRef.current) {
+            const anchor = document.createElement("div");
+            anchor.className = "ci-hoist";
+            anchor.dataset.ciCall = slot.closest("[data-chat-call-id]")?.getAttribute("data-chat-call-id") || "";
+            anchor.style.cssText = "width:100%;min-width:0;margin:8px 0 12px;";
+            anchorRef.current = anchor;
+          }
+          placeHoist(group, anchorRef.current);
+          const next = anchorRef.current;
+          setHost((cur) => (cur === next ? cur : next));
+        };
+        sync();
+        const group = slot.closest("[data-step-process]");
+        const obs = new MutationObserver(sync);
+        if (group) {
+          obs.observe(group, { attributes: true, attributeFilter: ["hidden"] });
+          const body = group.querySelector("[data-step-process-body]");
+          if (body) obs.observe(body, { attributes: true, attributeFilter: ["hidden"] });
+        }
+        return () => {
+          stop = true;
+          obs.disconnect();
+          if (anchorRef.current) {
+            anchorRef.current.remove();
+            anchorRef.current = null;
+          }
+        };
+      }, []);
+      return h("div", { ref: slotRef, className: "ci-hoist-slot" },
+        host ? createPortal(children, host) : children,
+      );
+    }
+
     /**
      * 把一棵面板包成可窗口化 / 全屏的外壳。
      *
@@ -2341,7 +2422,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       const panel = h("div", { className: ("ci-root " + (className || "")).trim() }, children);
 
       if (mode === "inline") {
-        return h("div", { className: ("ci-root " + (className || "")).trim() },
+        return h(FlowHoist, null, h("div", { className: ("ci-root " + (className || "")).trim() },
           h(ToastHost),
           h("div", { className: "ci-winctl" },
             h("button", {
@@ -2360,7 +2441,7 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
             }, h(WinIcon, { name: "full" })),
           ),
           children,
-        );
+        ));
       }
 
       const full = mode === "full";
@@ -9696,9 +9777,10 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       };
     }
 
-    function ConfigCard() {
+    function ConfigCard(props) {
       useEffect(() => ensureCss(), []);
-      const [open, setOpen] = useState(false);
+      const page = !!(props && props.view === "page");
+      const [open, setOpen] = useState(page);
       const [meta, setMeta] = useState({ providers: [], modules: [] });
       const [saved, setSaved] = useState(null);
       const [draft, setDraft] = useState(null);
@@ -9904,6 +9986,14 @@ label.ci-check,div.ci-check{display:flex;align-items:flex-start;gap:8px;padding:
       ));
       slots.inject("settings.plugin.item", () => register(
         { name: "settings.plugin.item", key: "cloud-infra", order: 40 },
+        ConfigCard,
+      ));
+      slots.inject("plugins.bundle.config", () => register(
+        { name: "plugins.bundle.config", key: "@cocofhu/cloud-infra" },
+        ConfigCard,
+      ));
+      slots.inject("plugins.row.config", () => register(
+        { name: "plugins.row.config", key: "@cocofhu/cloud-infra#cloud-infra" },
         ConfigCard,
       ));
     }
